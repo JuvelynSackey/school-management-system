@@ -17,6 +17,7 @@ const feeStructuresRoutes = require('./feeStructures.routes');
 const terminalReportsRoutes = require('./terminalReports.routes');
 const announcementsRoutes = require('./announcements.routes');
 const schoolSettingsRoutes = require('./schoolSettings.routes');
+const verifyRoutes = require('./verify.routes');
 
 const router = express.Router();
 
@@ -42,5 +43,6 @@ router.use('/fee-structures', feeStructuresRoutes);
 router.use('/terminal-reports', terminalReportsRoutes);
 router.use('/announcements', announcementsRoutes);
 router.use('/school-settings', schoolSettingsRoutes);
+router.use('/verify', verifyRoutes);
 
 module.exports = router;

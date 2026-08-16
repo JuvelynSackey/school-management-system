@@ -1,11 +1,13 @@
 const models = require('../models');
-const { Fee, Payment, Student } = models;
+const { Fee, Payment, Student, SchoolSettings } = models;
 const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/AppError');
 const { getFeeBalance, refreshFeeStatus } = require('../services/fees.service');
 const { renderHtmlToPdfBuffer } = require('../services/pdf.service');
 const { buildReceiptHtml, receiptNumber } = require('../services/receiptTemplate.service');
+const { buildVerificationQrDataUrl } = require('../services/verification.service');
 const { deleteWithCascade } = require('../services/cascadeDelete.service');
+const { findOrCreate } = require('../utils/findOrCreate');
 
 const withBalance = async (fee) => {
   const { amountPaid, balance, status } = await getFeeBalance(fee);
@@ -128,7 +130,13 @@ const recordPayment = asyncHandler(async (req, res, next) => {
 const downloadReceipt = asyncHandler(async (req, res, next) => {
   const { feeId, paymentId } = req.params;
 
-  const fee = await Fee.findById(feeId).populate('student', 'firstName lastName admissionNo');
+  const fee = await Fee.findById(feeId)
+    .populate({
+      path: 'student',
+      select: 'firstName lastName admissionNo classId',
+      populate: { path: 'class', select: 'name section' },
+    })
+    .populate('academicTerm', 'name');
   if (!fee) return next(new AppError('Fee not found', 404));
   await assertFeeAccess(req, fee);
 
@@ -136,13 +144,18 @@ const downloadReceipt = asyncHandler(async (req, res, next) => {
   if (!payment) return next(new AppError('Payment not found', 404));
 
   const { balance } = await getFeeBalance(fee);
+  const [school] = await findOrCreate(SchoolSettings, { where: {} });
+  const qrCodeDataUrl = await buildVerificationQrDataUrl('receipt', payment.id);
 
   const html = buildReceiptHtml({
+    school,
     payment,
     fee,
     student: fee.student,
+    totalFee: fee.amountDue,
     balance,
     receivedByName: payment.receiver?.fullName,
+    qrCodeDataUrl,
   });
 
   const pdfBuffer = await renderHtmlToPdfBuffer(html);

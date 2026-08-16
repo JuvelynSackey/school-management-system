@@ -214,34 +214,47 @@ button, input, select, textarea { font: inherit; }
 .cosmic-submit:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 .cosmic-card .alert-error { text-align: left; margin-bottom: 16px; }
 
-/* Landing -> login "warp" transition (see context/PageTransitionContext.jsx) */
-.page-warp {
-  position: fixed; inset: 0; z-index: 9999; pointer-events: none;
-  opacity: 0;
+/* Login modal (opened from the landing page — see components/auth/LoginModal.jsx) */
+.login-modal-overlay {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(10, 8, 18, 0.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  animation: modal-overlay-in 0.2s ease-out;
 }
-.page-warp-expanding, .page-warp-revealing { opacity: 1; }
-.page-warp-core {
-  position: absolute;
-  left: var(--warp-x, 50%);
-  top: var(--warp-y, 50%);
-  width: 40px; height: 40px;
-  margin-left: -20px; margin-top: -20px;
-  border-radius: 50%;
-  background: radial-gradient(circle, #f97316 0%, #a855f7 45%, #0a0812 75%);
-  transform: scale(0);
+@keyframes modal-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
-.page-warp-expanding .page-warp-core {
-  animation: warp-expand 0.55s cubic-bezier(0.6, 0, 0.9, 0.2) forwards;
+.cosmic-card--modal {
+  animation:
+    modal-float-in 0.4s cubic-bezier(0.2, 0.8, 0.3, 1) forwards,
+    modal-bob 4s ease-in-out 0.4s infinite;
 }
-.page-warp-revealing .page-warp-core {
-  animation: warp-shrink 0.6s cubic-bezier(0.2, 0.8, 0.4, 1) forwards;
+/* Pause only the idle float (not the one-time entrance, which must always
+   finish — the email field auto-focuses immediately on open, so :focus-within
+   is true from frame 0) while the card is actually being used, since a
+   continuously-moving target makes it harder to click precisely. */
+.cosmic-card--modal:hover,
+.cosmic-card--modal:focus-within {
+  animation-play-state: running, paused;
 }
-@keyframes warp-expand {
-  to { transform: scale(70); }
+.login-modal-close {
+  position: absolute; top: 14px; right: 16px;
+  background: none; border: none; cursor: pointer;
+  font-size: 22px; line-height: 1; color: rgba(255, 255, 255, 0.6);
+  padding: 4px;
 }
-@keyframes warp-shrink {
-  from { transform: scale(70); }
-  to { transform: scale(0); }
+.login-modal-close:hover { color: #fff; }
+@keyframes modal-float-in {
+  from { opacity: 0; transform: translateY(28px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes modal-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
 }
 
 /* App shell */
@@ -607,3 +620,50 @@ th { color: #8a8794; font-weight: 500; font-size: 12px; text-transform: uppercas
 @media (max-width: 900px) {
   .dashboard-grid { grid-template-columns: 1fr; }
 }
+
+/* Public document verification page (reached by scanning a QR code) */
+.verify-page {
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  background: linear-gradient(180deg, #f4f3f8 0%, #ece9f7 100%);
+}
+.verify-card {
+  width: 100%; max-width: 420px;
+  background: #fff; border-radius: 16px;
+  padding: 36px 32px;
+  text-align: center;
+  box-shadow: 0 20px 45px rgba(50, 44, 124, 0.12);
+  border-top: 6px solid #ccc;
+}
+.verify-card--valid { border-top-color: #1a9c5c; }
+.verify-card--invalid { border-top-color: #d0342c; }
+
+.verify-icon {
+  width: 64px; height: 64px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 16px; font-size: 28px; font-weight: 700;
+}
+.verify-icon--valid { background: rgba(26, 156, 92, 0.12); color: #1a9c5c; }
+.verify-icon--invalid { background: rgba(208, 52, 44, 0.12); color: #d0342c; }
+
+.verify-card h1 { margin: 0 0 4px; font-size: 21px; color: var(--accent); }
+.verify-school { margin: 0 0 20px; font-size: 13px; color: #666; font-weight: 600; }
+
+.verify-details { text-align: left; margin: 0 0 18px; border-top: 1px solid #eee; }
+.verify-details > div {
+  display: flex; justify-content: space-between; gap: 12px;
+  padding: 8px 0; border-bottom: 1px solid #eee; font-size: 13px;
+}
+.verify-details dt { color: #777; margin: 0; }
+.verify-details dd { margin: 0; font-weight: 600; color: #222; text-align: right; }
+
+.verify-footnote { font-size: 12px; color: #888; margin: 0; line-height: 1.5; }
+
+.verify-spinner {
+  width: 34px; height: 34px; margin: 0 auto 14px;
+  border: 3px solid rgba(50, 44, 124, 0.15); border-top-color: var(--accent);
+  border-radius: 50%; animation: verify-spin 0.8s linear infinite;
+}
+@keyframes verify-spin { to { transform: rotate(360deg); } }
+.verify-status-text { font-size: 13px; color: #666; margin: 0; }

@@ -21,11 +21,13 @@ import SchoolSettings from '../pages/settings/SchoolSettings';
 import Announcements from '../pages/announcements/Announcements';
 import Unauthorized from '../pages/errors/Unauthorized';
 import NotFound from '../pages/errors/NotFound';
+import VerifyDocument from '../pages/verify/VerifyDocument';
 
 export default function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/verify/:type/:id" element={<VerifyDocument />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<AppShell />}>

@@ -6,6 +6,7 @@ const { findOrCreate } = require('../utils/findOrCreate');
 const { computeAggregatesForStudent, recalculateClassPositions } = require('../services/terminalReports.service');
 const { renderHtmlToPdfBuffer } = require('../services/pdf.service');
 const { buildReportCardsPdfHtml } = require('../services/reportCardTemplate.service');
+const { buildVerificationQrDataUrl } = require('../services/verification.service');
 
 const assertClassAccess = async (req, classId) => {
   if (req.user.role === 'admin') return;
@@ -140,6 +141,11 @@ const downloadPdf = asyncHandler(async (req, res, next) => {
   const rollCount = reports.length;
   const [school] = await findOrCreate(SchoolSettings, { where: {} });
 
+  const qrByReportId = new Map();
+  await Promise.all(reports.map(async (r) => {
+    qrByReportId.set(r.id, await buildVerificationQrDataUrl('report', r.id));
+  }));
+
   const html = buildReportCardsPdfHtml({
     school,
     classRow,
@@ -149,6 +155,7 @@ const downloadPdf = asyncHandler(async (req, res, next) => {
     resultsByStudent,
     totalPossible,
     rollCount,
+    qrByReportId,
   });
 
   const pdfBuffer = await renderHtmlToPdfBuffer(html, { format: 'A4' });

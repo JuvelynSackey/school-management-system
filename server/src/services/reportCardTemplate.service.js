@@ -30,7 +30,7 @@ const overallGrade = (averageScore) => {
   return match ? match.grade : 'F9';
 };
 
-const buildStudentPageHtml = ({ school, classRow, term, nextTerm, report, results, totalPossible, rollCount }) => {
+const buildStudentPageHtml = ({ school, classRow, term, nextTerm, report, results, totalPossible, rollCount, qrCodeDataUrl }) => {
   const isLocked = report.status === 'Locked';
   const watermark = !isLocked ? '<div class="watermark">DRAFT — NOT YET APPROVED</div>' : '';
 
@@ -139,15 +139,21 @@ const buildStudentPageHtml = ({ school, classRow, term, nextTerm, report, result
       </div>
 
       <div class="footer">
-        <span>Report ID: ${reportId}</span>
-        <span>Generated: ${generatedDate}</span>
-        <span>Page 1 of 1</span>
+        <div class="footer-verify">
+          ${qrCodeDataUrl ? `<img class="qr" src="${qrCodeDataUrl}" alt="Scan to verify" />` : ''}
+          <span class="qr-label">Scan to verify</span>
+        </div>
+        <div class="footer-meta">
+          <span>Report ID: ${reportId}</span>
+          <span>Generated: ${generatedDate}</span>
+          <span>Page 1 of 1</span>
+        </div>
       </div>
     </section>
   `;
 };
 
-const buildReportCardsPdfHtml = ({ school, classRow, term, nextTerm, reports, resultsByStudent, totalPossible, rollCount }) => {
+const buildReportCardsPdfHtml = ({ school, classRow, term, nextTerm, reports, resultsByStudent, totalPossible, rollCount, qrByReportId }) => {
   const pages = reports.map((report) => buildStudentPageHtml({
     school,
     classRow,
@@ -157,6 +163,7 @@ const buildReportCardsPdfHtml = ({ school, classRow, term, nextTerm, reports, re
     results: resultsByStudent.get(report.studentId.toString()) || [],
     totalPossible,
     rollCount,
+    qrCodeDataUrl: qrByReportId?.get(report.id),
   })).join('');
 
   return `
@@ -230,9 +237,13 @@ const buildReportCardsPdfHtml = ({ school, classRow, term, nextTerm, reports, re
   .sig-date { margin: 2px 0; font-size: 11px; color: #666; }
 
   .footer {
-    display: flex; justify-content: space-between; border-top: 1px solid #ddd; padding-top: 10px;
+    display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #ddd; padding-top: 10px;
     margin-top: auto; font-size: 10.5px; color: #777;
   }
+  .footer-verify { display: flex; align-items: center; gap: 6px; }
+  .footer-verify .qr { width: 36px; height: 36px; }
+  .footer-verify .qr-label { font-size: 9px; }
+  .footer-meta { display: flex; gap: 16px; }
 </style>
 </head>
 <body>${pages}</body>

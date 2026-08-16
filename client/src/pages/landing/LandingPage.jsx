@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { usePageTransition } from '../../context/PageTransitionContext';
 import HeroIllustration from '../../components/landing/HeroIllustration';
 import Reveal from '../../components/landing/Reveal';
+import LoginModal from '../../components/auth/LoginModal';
 
 function LogoMark() {
   return (
@@ -78,8 +78,8 @@ const ROLES = [
 export default function LandingPage() {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const { goTo } = usePageTransition();
   const [scrolled, setScrolled] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -108,7 +108,7 @@ export default function LandingPage() {
         <button
           type="button"
           className="landing-nav-cta"
-          onClick={(e) => (isAuthenticated ? navigate('/dashboard') : goTo('/login', e))}
+          onClick={() => (isAuthenticated ? navigate('/dashboard') : setLoginOpen(true))}
         >
           {isAuthenticated ? 'Go to Dashboard' : 'Login'}
         </button>
@@ -122,7 +122,7 @@ export default function LandingPage() {
             announcements into one system built for Creche-to-Basic-9 schools.
           </Reveal>
           <Reveal className="landing-hero-ctas" delay={240}>
-            <button type="button" className="landing-btn-primary" onClick={(e) => goTo('/login', e)}>Login</button>
+            <button type="button" className="landing-btn-primary" onClick={() => setLoginOpen(true)}>Login</button>
             <button type="button" className="landing-btn-secondary" onClick={() => scrollTo('features')}>See Features</button>
           </Reveal>
           <Reveal className="landing-badges" delay={360}>
@@ -169,9 +169,15 @@ export default function LandingPage() {
           <span>School Manager</span>
         </div>
         <p>Built for Ghanaian Creche-to-Basic-9 private schools.</p>
-        <button type="button" className="landing-footer-login" onClick={(e) => goTo('/login', e)}>Login</button>
+        <button type="button" className="landing-footer-login" onClick={() => setLoginOpen(true)}>Login</button>
         <p className="landing-copyright">&copy; {new Date().getFullYear()} School Manager.</p>
       </footer>
+
+      <LoginModal
+        isOpen={loginOpen}
+        onClose={() => setLoginOpen(false)}
+        onSuccess={() => navigate('/dashboard')}
+      />
     </div>
   );
 }
