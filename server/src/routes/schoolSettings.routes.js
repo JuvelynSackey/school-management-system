@@ -1,0 +1,15 @@
+const express = require('express');
+const controller = require('../controllers/schoolSettings.controller');
+const { updateValidator } = require('../validators/schoolSettings.validators');
+const validate = require('../middleware/validate');
+const authenticate = require('../middleware/authenticate');
+const authorize = require('../middleware/authorize');
+
+const router = express.Router();
+
+router.use(authenticate);
+
+router.get('/', controller.get);
+router.put('/', authorize('admin'), updateValidator, validate, controller.update);
+
+module.exports = router;
