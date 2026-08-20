@@ -9,19 +9,19 @@ const REASON_MESSAGES = {
 };
 
 export default function VerifyDocument() {
-  const { type, id } = useParams();
+  const { type, schoolSlug, id } = useParams();
   const [state, setState] = useState({ loading: true, data: null, error: null });
 
   useEffect(() => {
     let cancelled = false;
     setState({ loading: true, data: null, error: null });
 
-    verifyDocument(type, id)
+    verifyDocument(type, schoolSlug, id)
       .then((data) => { if (!cancelled) setState({ loading: false, data, error: null }); })
       .catch(() => { if (!cancelled) setState({ loading: false, data: null, error: 'lookup_failed' }); });
 
     return () => { cancelled = true; };
-  }, [type, id]);
+  }, [type, schoolSlug, id]);
 
   const { loading, data, error } = state;
   const isValid = data?.valid === true;
@@ -40,7 +40,7 @@ export default function VerifyDocument() {
           <>
             <div className="verify-icon verify-icon--valid">&#10003;</div>
             <h1>Verified Genuine</h1>
-            <p className="verify-school">{data.schoolName || 'School Manager'}</p>
+            <p className="verify-school">{data.schoolName || 'JesManage'}</p>
 
             {data.type === 'receipt' && (
               <dl className="verify-details">
@@ -65,6 +65,15 @@ export default function VerifyDocument() {
                   <div><dt>Average Score</dt><dd>{Number(data.averageScore).toFixed(2)}%</dd></div>
                 )}
                 {data.classPosition && <div><dt>Class Position</dt><dd>{data.classPosition}</dd></div>}
+                <div><dt>Status</dt><dd>{data.status}</dd></div>
+              </dl>
+            )}
+
+            {data.type === 'student' && (
+              <dl className="verify-details">
+                <div><dt>Student</dt><dd>{data.studentName}</dd></div>
+                <div><dt>Admission No.</dt><dd>{data.admissionNo}</dd></div>
+                {data.className && <div><dt>Class</dt><dd>{data.className}</dd></div>}
                 <div><dt>Status</dt><dd>{data.status}</dd></div>
               </dl>
             )}

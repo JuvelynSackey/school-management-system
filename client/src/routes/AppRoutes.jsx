@@ -4,6 +4,10 @@ import RoleRoute from '../components/guards/RoleRoute';
 import AppShell from '../components/layout/AppShell';
 import LandingPage from '../pages/landing/LandingPage';
 import Login from '../pages/auth/Login';
+import ForgotPassword from '../pages/auth/ForgotPassword';
+import ResetPassword from '../pages/auth/ResetPassword';
+import VerifyEmail from '../pages/auth/VerifyEmail';
+import ForcedPasswordChange from '../pages/auth/ForcedPasswordChange';
 import Dashboard from '../pages/dashboard/Dashboard';
 import TermList from '../pages/terms/TermList';
 import ClassList from '../pages/classes/ClassList';
@@ -11,6 +15,7 @@ import SubjectList from '../pages/subjects/SubjectList';
 import HouseList from '../pages/houses/HouseList';
 import TeacherList from '../pages/teachers/TeacherList';
 import StudentList from '../pages/students/StudentList';
+import AdmissionsList from '../pages/admissions/AdmissionsList';
 import StudentProfile from '../pages/students/StudentProfile';
 import MyProfile from '../pages/students/MyProfile';
 import Attendance from '../pages/attendance/Attendance';
@@ -18,34 +23,52 @@ import Results from '../pages/results/Results';
 import Fees from '../pages/fees/Fees';
 import ReportsHub from '../pages/reports/ReportsHub';
 import SchoolSettings from '../pages/settings/SchoolSettings';
+import AuditLogPage from '../pages/audit/AuditLogPage';
+import AnalyticsPage from '../pages/analytics/AnalyticsPage';
+import AssessmentSheetsPage from '../pages/assessmentSheets/AssessmentSheetsPage';
+import MyAccount from '../pages/account/MyAccount';
 import Announcements from '../pages/announcements/Announcements';
 import Unauthorized from '../pages/errors/Unauthorized';
 import NotFound from '../pages/errors/NotFound';
 import VerifyDocument from '../pages/verify/VerifyDocument';
+import SuperAdminRoutes from '../superAdmin/SuperAdminRoutes';
 
 export default function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route path="/verify/:type/:id" element={<VerifyDocument />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route path="/verify/:type/:schoolSlug/:id" element={<VerifyDocument />} />
+      <Route path="/super-admin/*" element={<SuperAdminRoutes />} />
 
       <Route element={<ProtectedRoute />}>
+        <Route path="/change-password" element={<ForcedPasswordChange />} />
         <Route element={<AppShell />}>
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/account" element={<MyAccount />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
 
           <Route element={<RoleRoute roles={['admin']} />}>
+            <Route path="/admissions" element={<AdmissionsList />} />
             <Route path="/terms" element={<TermList />} />
             <Route path="/classes" element={<ClassList />} />
             <Route path="/subjects" element={<SubjectList />} />
             <Route path="/houses" element={<HouseList />} />
             <Route path="/teachers" element={<TeacherList />} />
             <Route path="/reports" element={<ReportsHub />} />
+            <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/school-settings" element={<SchoolSettings />} />
+            <Route path="/audit-log" element={<AuditLogPage />} />
           </Route>
 
           <Route element={<RoleRoute roles={['admin', 'teacher']} />}>
             <Route path="/students" element={<StudentList />} />
+            <Route path="/assessment-sheets" element={<AssessmentSheetsPage />} />
+          </Route>
+
+          <Route element={<RoleRoute roles={['admin', 'teacher', 'parent']} />}>
             <Route path="/students/:id" element={<StudentProfile />} />
           </Route>
 
@@ -53,8 +76,10 @@ export default function AppRoutes() {
             <Route path="/profile" element={<MyProfile />} />
           </Route>
 
-          <Route path="/attendance" element={<Attendance />} />
-          <Route path="/results" element={<Results />} />
+          <Route element={<RoleRoute roles={['admin', 'teacher', 'student']} />}>
+            <Route path="/attendance" element={<Attendance />} />
+            <Route path="/results" element={<Results />} />
+          </Route>
 
           <Route element={<RoleRoute roles={['admin', 'student']} />}>
             <Route path="/fees" element={<Fees />} />

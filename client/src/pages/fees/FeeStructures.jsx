@@ -5,7 +5,11 @@ import { formatCurrency } from '../../utils/currency';
 import Modal from '../../components/common/Modal';
 
 const STAGES = ['Creche', 'Nursery', 'KG', 'Primary', 'JHS'];
-const emptyForm = { name: '', amount: '', academicTermId: '' };
+const CATEGORIES = ['Tuition', 'Feeding', 'ClassActivity', 'PTA', 'Other'];
+const CATEGORY_BADGE = {
+  Tuition: 'badge-neutral', Feeding: 'badge-success', ClassActivity: 'badge-warning', PTA: 'badge-rose', Other: 'badge-neutral',
+};
+const emptyForm = { name: '', category: 'Tuition', amount: '', academicTermId: '' };
 const emptyApply = { target: 'class', classId: '', stage: '', dueDate: '' };
 
 export default function FeeStructures({ classes, terms }) {
@@ -24,7 +28,9 @@ export default function FeeStructures({ classes, terms }) {
 
   const openNew = () => { setForm(emptyForm); setFormError(''); setEditing('new'); };
   const openEdit = (structure) => {
-    setForm({ name: structure.name, amount: structure.amount, academicTermId: structure.academicTermId || '' });
+    setForm({
+      name: structure.name, category: structure.category || 'Tuition', amount: structure.amount, academicTermId: structure.academicTermId || '',
+    });
     setFormError('');
     setEditing(structure);
   };
@@ -94,11 +100,12 @@ export default function FeeStructures({ classes, terms }) {
         {error && <div className="alert-error">{error}</div>}
         {!isLoading && !error && (
           <table>
-            <thead><tr><th>Name</th><th>Amount</th><th>Term</th><th /></tr></thead>
+            <thead><tr><th>Name</th><th>Category</th><th>Amount</th><th>Term</th><th /></tr></thead>
             <tbody>
               {structures.map((s) => (
                 <tr key={s.id}>
                   <td>{s.name}</td>
+                  <td><span className={`badge ${CATEGORY_BADGE[s.category] || 'badge-neutral'}`}>{s.category || 'Tuition'}</span></td>
                   <td>{formatCurrency(s.amount)}</td>
                   <td>{s.academicTerm?.name || 'Any term'}</td>
                   <td>
@@ -110,7 +117,7 @@ export default function FeeStructures({ classes, terms }) {
                   </td>
                 </tr>
               ))}
-              {structures.length === 0 && <tr><td colSpan={4} className="muted">No fee structures yet.</td></tr>}
+              {structures.length === 0 && <tr><td colSpan={5} className="muted">No fee structures yet.</td></tr>}
             </tbody>
           </table>
         )}
@@ -123,6 +130,12 @@ export default function FeeStructures({ classes, terms }) {
             <label className="field">
               <span>Name</span>
               <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. JHS Tuition" required />
+            </label>
+            <label className="field">
+              <span>Category</span>
+              <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
             </label>
             <label className="field">
               <span>Amount (GH₵)</span>

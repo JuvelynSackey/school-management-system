@@ -1,4 +1,4 @@
-const { SCALE } = require('./grading.service');
+const { getLogoDataUrl } = require('./branding.service');
 
 const ORDINALS = { 1: 'st', 2: 'nd', 3: 'rd' };
 const ordinal = (n) => {
@@ -10,27 +10,29 @@ const ordinal = (n) => {
 const initialsOf = (firstName, lastName) => `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase();
 
 // e.g. A1 Excellent | B2 Very Good | B3 Good | C4-C6 Credit | D7-E8 Pass | F9 Fail
-const gradingKeyLine = () => {
+const gradingKeyLine = (bands) => {
+  const sorted = [...bands].sort((a, b) => b.min - a.min);
   const seen = new Set();
   const parts = [];
-  SCALE.forEach(({ grade, label }) => {
+  sorted.forEach(({ grade, label }) => {
     const key = label;
     if (seen.has(key)) return;
     seen.add(key);
-    const gradesForLabel = SCALE.filter((s) => s.label === label).map((s) => s.grade);
+    const gradesForLabel = sorted.filter((s) => s.label === label).map((s) => s.grade);
     const gradeRange = gradesForLabel.length > 1 ? `${gradesForLabel[0]}-${gradesForLabel[gradesForLabel.length - 1]}` : gradesForLabel[0];
     parts.push(`${gradeRange} ${label}`);
   });
   return parts.join(' | ');
 };
 
-const overallGrade = (averageScore) => {
+const overallGrade = (averageScore, bands) => {
   if (averageScore === null || averageScore === undefined) return '—';
-  const match = SCALE.find((tier) => Number(averageScore) >= tier.min);
-  return match ? match.grade : 'F9';
+  const sorted = [...bands].sort((a, b) => b.min - a.min);
+  const match = sorted.find((tier) => Number(averageScore) >= tier.min);
+  return match ? match.grade : (sorted[sorted.length - 1]?.grade || 'F9');
 };
 
-const buildStudentPageHtml = ({ school, classRow, term, nextTerm, report, results, totalPossible, rollCount, qrCodeDataUrl }) => {
+const buildStudentPageHtml = ({ school, classRow, term, nextTerm, report, results, totalPossible, rollCount, qrCodeDataUrl, scheme, attributeNameById }) => {
   const isLocked = report.status === 'Locked';
   const watermark = !isLocked ? '<div class="watermark">DRAFT — NOT YET APPROVED</div>' : '';
 
@@ -60,10 +62,13 @@ const buildStudentPageHtml = ({ school, classRow, term, nextTerm, report, result
   const contactLine = [school.address, school.phone && `Tel: ${school.phone}`, school.email]
     .filter(Boolean).join(' &nbsp;|&nbsp; ');
 
+  const logoDataUrl = getLogoDataUrl(school.logoUrl);
+
   return `
     <section class="page">
       ${watermark}
       <div class="header">
+        ${logoDataUrl ? `<img class="school-logo" src="${logoDataUrl}" alt="${school.name || 'School'} logo" />` : ''}
         <h1>${school.name || 'School Name Not Set'}</h1>
         ${school.motto ? `<p class="motto">${school.motto}</p>` : ''}
         ${contactLine ? `<p class="contact">${contactLine}</p>` : ''}
@@ -86,6 +91,11 @@ const buildStudentPageHtml = ({ school, classRow, term, nextTerm, report, result
             <td><strong>Roll Count:</strong> ${rollCount} Pupils</td>
             <td><strong>Next Term Begins:</strong> ${nextTermBegins}</td>
           </tr>
+          ${(report.student.category || report.student.programme) ? `
+          <tr>
+            <td><strong>Category:</strong> ${report.student.category || '—'}</td>
+            ${report.student.programme ? `<td><strong>Programme:</strong> ${report.student.programme}</td>` : '<td></td>'}
+          </tr>` : ''}
         </table>
       </div>
 
@@ -101,18 +111,46 @@ const buildStudentPageHtml = ({ school, classRow, term, nextTerm, report, result
 
       <table class="subjects">
         <thead>
-          <tr><th>Subject</th><th>Class (50%)</th><th>Exam (50%)</th><th>Total</th><th>Grade</th><th>Position</th></tr>
+          <tr><th>Subject</th><th>Class (${scheme.classScoreMax})</th><th>Exam (${scheme.examScoreMax})</th><th>Total</th><th>Grade</th><th>Position</th></tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
-      <p class="grading-key"><strong>Grading Key:</strong> ${gradingKeyLine()}</p>
+      <p class="grading-key"><strong>Grading Key:</strong> ${gradingKeyLine(scheme.bands)}</p>
 
       <div class="performance-summary">
+        <div class="perf-item"><span>Total Score</span><strong>${Number(report.totalMarksObtained || 0)} / ${totalPossible}</strong></div>
         <div class="perf-item"><span>Average</span><strong>${Number(report.averageScore || 0).toFixed(2)}%</strong></div>
-        <div class="perf-item"><span>Overall Grade</span><strong>${overallGrade(report.averageScore)}</strong></div>
+        <div class="perf-item"><span>Overall Grade</span><strong>${overallGrade(report.averageScore, scheme.bands)}</strong></div>
         <div class="perf-item"><span>Class Position</span><strong>${ordinal(report.classPosition)}</strong></div>
         <div class="perf-item"><span>Subjects Passed</span><strong>${subjectsPassed} / ${results.length}</strong></div>
       </div>
+
+      ${school.performanceChartEnabled ? `
+      <div class="chart-section">
+        <p class="chart-title">PERFORMANCE OVERVIEW</p>
+        ${results.map((r) => {
+          const subjectMax = scheme.classScoreMax + scheme.examScoreMax;
+          const pct = subjectMax > 0 ? Math.min(100, (Number(r.totalScore) / subjectMax) * 100) : 0;
+          return `
+          <div class="chart-row">
+            <span class="chart-label">${(r.subject?.name || '').toUpperCase()}</span>
+            <div class="chart-track"><div class="chart-fill" style="width:${pct.toFixed(1)}%"></div></div>
+            <span class="chart-value">${Number(r.totalScore).toFixed(0)}</span>
+          </div>`;
+        }).join('')}
+      </div>` : ''}
+
+      ${report.personalAttributeRatings?.length ? `
+      <table class="attributes">
+        <thead><tr><th>Personal Attribute</th><th>Rating</th></tr></thead>
+        <tbody>
+          ${report.personalAttributeRatings.map((r) => `
+          <tr>
+            <td>${attributeNameById?.get(r.attributeId?.toString()) || 'Attribute'}</td>
+            <td>${r.rating}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>` : ''}
 
       <div class="remarks-box">
         <p class="remarks-label">CLASS TEACHER&apos;S REMARKS</p>
@@ -153,7 +191,7 @@ const buildStudentPageHtml = ({ school, classRow, term, nextTerm, report, result
   `;
 };
 
-const buildReportCardsPdfHtml = ({ school, classRow, term, nextTerm, reports, resultsByStudent, totalPossible, rollCount, qrByReportId }) => {
+const buildReportCardsPdfHtml = ({ school, classRow, term, nextTerm, reports, resultsByStudent, totalPossible, rollCount, qrByReportId, scheme }) => {
   const pages = reports.map((report) => buildStudentPageHtml({
     school,
     classRow,
@@ -164,6 +202,7 @@ const buildReportCardsPdfHtml = ({ school, classRow, term, nextTerm, reports, re
     totalPossible,
     rollCount,
     qrCodeDataUrl: qrByReportId?.get(report.id),
+    scheme,
   })).join('');
 
   return `
@@ -189,6 +228,7 @@ const buildReportCardsPdfHtml = ({ school, classRow, term, nextTerm, reports, re
   }
 
   .header { text-align: center; border-bottom: 4px solid #322c7c; padding-bottom: 14px; margin-bottom: 20px; }
+  .header .school-logo { width: 56px; height: 56px; object-fit: contain; margin-bottom: 6px; }
   .header h1 { margin: 0; font-size: 28px; color: #322c7c; letter-spacing: 0.5px; }
   .header .motto { margin: 4px 0; font-size: 13px; font-style: italic; color: #7c4a24; }
   .header .contact { margin: 4px 0; font-size: 12px; color: #555; }
@@ -217,6 +257,10 @@ const buildReportCardsPdfHtml = ({ school, classRow, term, nextTerm, reports, re
   table.subjects td.center { text-align: center; }
   .grading-key { font-size: 11px; color: #555; margin: 0 0 20px; }
 
+  table.attributes { width: 60%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 20px; }
+  table.attributes th, table.attributes td { border: 1px solid #ccc; padding: 7px 10px; text-align: left; }
+  table.attributes th { background: #f4f3f8; }
+
   .performance-summary { display: flex; gap: 14px; margin-bottom: 20px; }
   .perf-item {
     flex: 1; text-align: center; background: #f4f3f8; border-radius: 8px; padding: 16px 8px;
@@ -224,6 +268,14 @@ const buildReportCardsPdfHtml = ({ school, classRow, term, nextTerm, reports, re
   }
   .perf-item span { display: block; font-size: 11px; color: #666; margin-bottom: 6px; }
   .perf-item strong { font-size: 20px; color: #322c7c; }
+
+  .chart-section { margin-bottom: 20px; }
+  .chart-title { font-size: 11.5px; font-weight: bold; color: #322c7c; letter-spacing: 0.5px; margin: 0 0 10px; }
+  .chart-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .chart-label { width: 110px; flex-shrink: 0; font-size: 10.5px; color: #444; text-align: right; }
+  .chart-track { flex: 1; height: 14px; background: #eee; border-radius: 3px; overflow: hidden; }
+  .chart-fill { height: 100%; background: linear-gradient(90deg, #322c7c, #f5c344); border-radius: 3px; }
+  .chart-value { width: 28px; flex-shrink: 0; font-size: 10.5px; color: #322c7c; font-weight: bold; }
 
   .remarks-box { border: 1px solid #ccc; border-radius: 6px; padding: 12px 14px; margin-bottom: 16px; min-height: 60px; }
   .remarks-label { margin: 0 0 6px; font-size: 11.5px; font-weight: bold; color: #322c7c; letter-spacing: 0.5px; }

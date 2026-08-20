@@ -11,11 +11,13 @@ const rules = {
     { model: 'Attendance', field: 'recordedBy', action: 'setNull' },
     { model: 'Payment', field: 'receivedBy', action: 'setNull' },
     { model: 'Announcement', field: 'createdBy', action: 'setNull' },
+    { model: 'AuditLog', field: 'actorId', action: 'setNull' },
   ],
   Teacher: [
     { model: 'Class', field: 'classTeacherId', action: 'setNull' },
     { model: 'TeacherSubjectAssignment', field: 'teacherId', action: 'cascade' },
     { model: 'Result', field: 'recordedBy', action: 'setNull' },
+    { model: 'ResultSheet', field: 'submittedBy', action: 'setNull' },
   ],
   Student: [
     { model: 'StudentGuardian', field: 'studentId', action: 'cascade' },
@@ -25,6 +27,8 @@ const rules = {
     { model: 'TerminalReport', field: 'studentId', action: 'cascade' },
     { model: 'Fee', field: 'studentId', action: 'cascade' },
     { model: 'Announcement', field: 'targetStudentId', action: 'cascade' },
+    { model: 'Admission', field: 'enrolledStudentId', action: 'setNull' },
+    { model: 'FeedingCharge', field: 'studentId', action: 'cascade' },
   ],
   Class: [
     { model: 'Student', field: 'classId', action: 'setNull' },
@@ -32,8 +36,11 @@ const rules = {
     { model: 'TeacherSubjectAssignment', field: 'classId', action: 'cascade' },
     { model: 'Attendance', field: 'classId', action: 'cascade' },
     { model: 'Result', field: 'classId', action: 'cascade' },
+    { model: 'ResultSheet', field: 'classId', action: 'cascade' },
     { model: 'TerminalReport', field: 'classId', action: 'cascade' },
     { model: 'Announcement', field: 'targetClassId', action: 'cascade' },
+    { model: 'Admission', field: 'desiredClassId', action: 'setNull' },
+    { model: 'FeedingCharge', field: 'classId', action: 'cascade' },
   ],
   House: [
     { model: 'Student', field: 'houseId', action: 'setNull' },
@@ -45,12 +52,14 @@ const rules = {
     { model: 'ClassSubject', field: 'subjectId', action: 'cascade' },
     { model: 'TeacherSubjectAssignment', field: 'subjectId', action: 'cascade' },
     { model: 'Result', field: 'subjectId', action: 'cascade' },
+    { model: 'ResultSheet', field: 'subjectId', action: 'cascade' },
   ],
   AcademicTerm: [
     { model: 'ClassSubject', field: 'academicTermId', action: 'cascade' },
     { model: 'TeacherSubjectAssignment', field: 'academicTermId', action: 'cascade' },
     { model: 'Attendance', field: 'academicTermId', action: 'setNull' },
     { model: 'Result', field: 'academicTermId', action: 'cascade' },
+    { model: 'ResultSheet', field: 'academicTermId', action: 'cascade' },
     { model: 'TerminalReport', field: 'academicTermId', action: 'cascade' },
     { model: 'FeeStructure', field: 'academicTermId', action: 'setNull' },
     { model: 'Fee', field: 'academicTermId', action: 'setNull' },
@@ -60,6 +69,7 @@ const rules = {
   ],
   Fee: [
     { model: 'Payment', field: 'feeId', action: 'cascade' },
+    { model: 'FeedingCharge', field: 'feeId', action: 'cascade' },
   ],
 };
 

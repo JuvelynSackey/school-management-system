@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useApiResource from '../../hooks/useApiResource';
-import { listStudents, createStudent, updateStudent, deleteStudent } from '../../api/students.api';
+import {
+  listStudents, createStudent, updateStudent, deleteStudent, downloadIdCardsPdf, getWaecExportPreview, downloadWaecExport,
+} from '../../api/students.api';
 import { listClasses } from '../../api/classes.api';
 import { listHouses } from '../../api/houses.api';
 import { lookupGuardianByPhone } from '../../api/guardians.api';
@@ -16,7 +18,7 @@ const emptyGuardian = (contactPriority) => ({
 
 const emptyForm = () => ({
   email: '', admissionNo: '', firstName: '', lastName: '', gender: '', dateOfBirth: '', classId: '', houseId: '',
-  address: '', admissionDate: '',
+  address: '', admissionDate: '', category: '', programme: '', waecIndexNumber: '',
   guardians: [emptyGuardian('primary')],
   safetyNotes: [],
 });
@@ -45,6 +47,41 @@ export default function StudentList() {
   const [formError, setFormError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [createdCredentials, setCreatedCredentials] = useState(null);
+  const [isPrintingCards, setIsPrintingCards] = useState(false);
+  const [printError, setPrintError] = useState('');
+  const [isCheckingWaec, setIsCheckingWaec] = useState(false);
+  const [waecIssues, setWaecIssues] = useState(null); // null = no check run yet / dismissed
+
+  const handlePrintIdCards = async () => {
+    setIsPrintingCards(true);
+    setPrintError('');
+    try {
+      const className = classes.find((c) => c.id === classFilter)?.name || 'class';
+      await downloadIdCardsPdf(classFilter, `id-cards-${className}.pdf`);
+    } catch (err) {
+      setPrintError(err.response?.data?.message || 'Failed to generate ID cards.');
+    } finally {
+      setIsPrintingCards(false);
+    }
+  };
+
+  const handleWaecExport = async () => {
+    setIsCheckingWaec(true);
+    setPrintError('');
+    try {
+      const preview = await getWaecExportPreview(classFilter);
+      if (!preview.ready) {
+        setWaecIssues(preview.issues);
+        return;
+      }
+      const className = classes.find((c) => c.id === classFilter)?.name || 'class';
+      await downloadWaecExport(classFilter, `waec-candidates-${className}.csv`);
+    } catch (err) {
+      setPrintError(err.response?.data?.message || 'Failed to check or export WAEC candidate data.');
+    } finally {
+      setIsCheckingWaec(false);
+    }
+  };
 
   useEffect(() => {
     listClasses().then(setClasses).catch(() => setClasses([]));
@@ -73,6 +110,9 @@ export default function StudentList() {
       houseId: student.houseId || '',
       address: student.address || '',
       admissionDate: student.admissionDate || '',
+      category: student.category || '',
+      programme: student.programme || '',
+      waecIndexNumber: student.waecIndexNumber || '',
       guardians: guardians.length ? guardians : [emptyGuardian('primary')],
       safetyNotes: (student.safetyNotes || []).map((n) => ({ type: n.type, note: n.note })),
     });
@@ -183,6 +223,7 @@ export default function StudentList() {
       </div>
 
       <div className="panel">
+        {printError && <div className="alert-error">{printError}</div>}
         <div className="toolbar" style={{ marginBottom: 16 }}>
           <input
             placeholder="Search by name or admission no..."
@@ -199,6 +240,16 @@ export default function StudentList() {
               <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
               Show archived
             </label>
+          )}
+          {canEdit && classFilter && (
+            <button type="button" className="btn-secondary" onClick={handlePrintIdCards} disabled={isPrintingCards}>
+              {isPrintingCards ? 'Generating…' : 'Print ID Cards'}
+            </button>
+          )}
+          {canEdit && classFilter && (
+            <button type="button" className="btn-secondary" onClick={handleWaecExport} disabled={isCheckingWaec}>
+              {isCheckingWaec ? 'Checking…' : 'WAEC Export'}
+            </button>
           )}
         </div>
 
@@ -304,6 +355,33 @@ export default function StudentList() {
               <span>Admission Date</span>
               <input type="date" value={form.admissionDate} onChange={(e) => setForm({ ...form, admissionDate: e.target.value })} />
             </label>
+            <label className="field">
+              <span>Category</span>
+              <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+                <option value="">—</option>
+                <option value="Day">Day</option>
+                <option value="Boarding">Boarding</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>Programme</span>
+              <input
+                value={form.programme}
+                onChange={(e) => setForm({ ...form, programme: e.target.value })}
+                placeholder="e.g. General Science (SHS only)"
+              />
+            </label>
+            {editing !== 'new' && (
+              <label className="field">
+                <span>WAEC/BECE Index Number</span>
+                <input
+                  value={form.waecIndexNumber}
+                  onChange={(e) => setForm({ ...form, waecIndexNumber: e.target.value })}
+                  placeholder="Assigned closer to candidate registration"
+                  maxLength={20}
+                />
+              </label>
+            )}
 
             <h3 style={{ fontSize: 14, margin: '20px 0 8px' }}>Guardians</h3>
             {form.guardians.map((g, index) => (
@@ -394,6 +472,29 @@ export default function StudentList() {
           </div>
           <div className="modal-actions">
             <button type="button" className="btn-primary" onClick={() => setCreatedCredentials(null)}>Done</button>
+          </div>
+        </Modal>
+      )}
+
+      {waecIssues && (
+        <Modal title="WAEC/BECE Export — Data Missing" onClose={() => setWaecIssues(null)}>
+          <p className="muted" style={{ marginBottom: 12 }}>
+            {waecIssues.length} candidate{waecIssues.length === 1 ? '' : 's'} in this class are missing required data.
+            Fix these first, then try the export again.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {waecIssues.map((issue) => (
+              <div key={issue.studentId} className="panel" style={{ padding: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <p style={{ fontWeight: 600, margin: 0 }}>{issue.name} <span className="muted" style={{ fontWeight: 400 }}>({issue.admissionNo})</span></p>
+                  <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>Missing: {issue.missingFields.join(', ')}</p>
+                </div>
+                <button type="button" className="btn-secondary" onClick={() => navigate(`/students/${issue.studentId}`)}>Fix</button>
+              </div>
+            ))}
+          </div>
+          <div className="modal-actions">
+            <button type="button" className="btn-secondary" onClick={() => setWaecIssues(null)}>Close</button>
           </div>
         </Modal>
       )}

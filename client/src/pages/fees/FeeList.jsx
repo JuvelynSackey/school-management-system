@@ -8,8 +8,14 @@ import { createAnnouncement } from '../../api/announcements.api';
 import { formatCurrency } from '../../utils/currency';
 import Modal from '../../components/common/Modal';
 import FeeStructures from './FeeStructures';
+import DailyFeedingPanel from './DailyFeedingPanel';
+import ArrearsPanel from './ArrearsPanel';
 
 const PAYMENT_METHODS = ['Cash', 'Bank Transfer', 'Mobile Money', 'Card', 'Cheque', 'Other'];
+const CATEGORIES = ['Tuition', 'Feeding', 'ClassActivity', 'PTA', 'Other'];
+const CATEGORY_BADGE = {
+  Tuition: 'badge-neutral', Feeding: 'badge-success', ClassActivity: 'badge-warning', PTA: 'badge-rose', Other: 'badge-neutral',
+};
 
 const statusBadge = (status) => {
   if (status === 'Paid') return <span className="badge badge-success">Paid</span>;
@@ -17,12 +23,13 @@ const statusBadge = (status) => {
   return <span className="badge badge-danger">Pending</span>;
 };
 
-const emptyForm = { studentId: '', academicTermId: '', feeType: '', amountDue: '', dueDate: '' };
+const emptyForm = { studentId: '', academicTermId: '', feeType: '', category: 'Tuition', amountDue: '', dueDate: '' };
 const emptyPayment = { amountPaid: '', paymentDate: new Date().toISOString().slice(0, 10), paymentMethod: 'Cash', referenceNo: '', notes: '' };
 
 export default function FeeList() {
-  const [view, setView] = useState('fees'); // 'fees' | 'structures'
+  const [view, setView] = useState('fees'); // 'fees' | 'structures' | 'feeding' | 'arrears'
   const [classFilter, setClassFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
   const [overdueOnly, setOverdueOnly] = useState(false);
   const [classes, setClasses] = useState([]);
   const [students, setStudents] = useState([]);
@@ -30,9 +37,10 @@ export default function FeeList() {
 
   const params = {
     ...(classFilter ? { classId: classFilter } : {}),
+    ...(categoryFilter ? { category: categoryFilter } : {}),
     ...(overdueOnly ? { overdue: 'true' } : {}),
   };
-  const { data: fees, isLoading, error, reload } = useApiResource(() => listFees(params), [classFilter, overdueOnly]);
+  const { data: fees, isLoading, error, reload } = useApiResource(() => listFees(params), [classFilter, categoryFilter, overdueOnly]);
 
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -139,13 +147,17 @@ export default function FeeList() {
     <div>
       <div className="toolbar">
         <h1>Fees</h1>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button type="button" className={view === 'fees' ? 'btn-primary' : 'btn-secondary'} onClick={() => { setView('fees'); reload(); }}>Fees</button>
           <button type="button" className={view === 'structures' ? 'btn-primary' : 'btn-secondary'} onClick={() => setView('structures')}>Fee Structures</button>
+          <button type="button" className={view === 'feeding' ? 'btn-primary' : 'btn-secondary'} onClick={() => setView('feeding')}>Daily Feeding</button>
+          <button type="button" className={view === 'arrears' ? 'btn-primary' : 'btn-secondary'} onClick={() => setView('arrears')}>Arrears</button>
         </div>
       </div>
 
       {view === 'structures' && <FeeStructures classes={classes} terms={terms} />}
+      {view === 'feeding' && <DailyFeedingPanel classes={classes} />}
+      {view === 'arrears' && <ArrearsPanel classes={classes} />}
 
       {view === 'fees' && (
         <>
@@ -154,6 +166,10 @@ export default function FeeList() {
               <select value={classFilter} onChange={(e) => setClassFilter(e.target.value)}>
                 <option value="">All classes</option>
                 {classes.map((c) => <option key={c.id} value={c.id}>{c.name} {c.section}</option>)}
+              </select>
+              <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+                <option value="">All categories</option>
+                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
                 <input type="checkbox" checked={overdueOnly} onChange={(e) => setOverdueOnly(e.target.checked)} />
@@ -168,13 +184,14 @@ export default function FeeList() {
             {!isLoading && !error && (
               <table>
                 <thead>
-                  <tr><th>Student</th><th>Fee Type</th><th>Due</th><th>Paid</th><th>Balance</th><th>Status</th><th /></tr>
+                  <tr><th>Student</th><th>Fee Type</th><th>Category</th><th>Due</th><th>Paid</th><th>Balance</th><th>Status</th><th /></tr>
                 </thead>
                 <tbody>
                   {fees.map((fee) => (
                     <tr key={fee.id}>
                       <td>{fee.student?.firstName} {fee.student?.lastName}</td>
                       <td>{fee.feeType}</td>
+                      <td><span className={`badge ${CATEGORY_BADGE[fee.category] || 'badge-neutral'}`}>{fee.category || 'Tuition'}</span></td>
                       <td>{formatCurrency(fee.amountDue)}</td>
                       <td>{formatCurrency(fee.amountPaid)}</td>
                       <td>{formatCurrency(fee.balance)}</td>
@@ -190,7 +207,7 @@ export default function FeeList() {
                       </td>
                     </tr>
                   ))}
-                  {fees.length === 0 && <tr><td colSpan={7} className="muted">No fees found.</td></tr>}
+                  {fees.length === 0 && <tr><td colSpan={8} className="muted">No fees found.</td></tr>}
                 </tbody>
               </table>
             )}
@@ -219,6 +236,12 @@ export default function FeeList() {
             <label className="field">
               <span>Fee Type</span>
               <input value={form.feeType} onChange={(e) => setForm({ ...form, feeType: e.target.value })} placeholder="e.g. Tuition" required />
+            </label>
+            <label className="field">
+              <span>Category</span>
+              <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
             </label>
             <label className="field">
               <span>Amount Due (GH₵)</span>

@@ -8,9 +8,12 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "db:setup": "node scripts/setup-db.js",
-    "db:seed": "node scripts/seed.js"
+    "db:seed": "node scripts/seed.js",
+    "db:create-super-admin": "node scripts/create-super-admin.js",
+    "test": "jest --runInBand"
   },
   "dependencies": {
+    "archiver": "^7.0.1",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -21,10 +24,17 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.9.0",
     "morgan": "^1.10.0",
+    "multer": "^2.2.0",
+    "node-cron": "^4.6.0",
+    "nodemailer": "^9.0.5",
+    "pdf-lib": "^1.17.1",
     "puppeteer": "^25.7.0",
     "qrcode": "^1.5.4"
   },
   "devDependencies": {
-    "nodemon": "^3.1.7"
+    "jest": "^30.4.2",
+    "mongodb-memory-server": "^11.2.0",
+    "nodemon": "^3.1.7",
+    "supertest": "^7.2.2"
   }
 }

@@ -30,8 +30,8 @@ export function AuthProvider({ children }) {
       .finally(() => setIsLoading(false));
   }, [logout]);
 
-  const login = useCallback(async (email, password, remember = true) => {
-    const { token, user: loggedInUser } = await loginRequest(email, password);
+  const login = useCallback(async (schoolCode, identifier, password, remember = true) => {
+    const { token, user: loggedInUser } = await loginRequest(schoolCode, identifier, password);
     setToken(token, remember);
     setUser(loggedInUser);
     return loggedInUser;
@@ -43,6 +43,7 @@ export function AuthProvider({ children }) {
     isAuthenticated: Boolean(user),
     login,
     logout,
+    setUser,
   }), [user, isLoading, login, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

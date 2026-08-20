@@ -1,7 +1,9 @@
 const mongoose = require('mongoose');
 const idTransformPlugin = require('../plugins/idTransform');
+const tenantScopePlugin = require('../plugins/tenantScope');
 
 const resultSchema = new mongoose.Schema({
+  schoolId: { type: mongoose.Schema.Types.ObjectId, ref: 'School', index: true },
   studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Student', required: true },
   subjectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Subject', required: true },
   classId: { type: mongoose.Schema.Types.ObjectId, ref: 'Class', required: true },
@@ -15,7 +17,7 @@ const resultSchema = new mongoose.Schema({
   recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Teacher', default: null },
 }, { timestamps: true });
 
-resultSchema.index({ studentId: 1, subjectId: 1, academicTermId: 1 }, { unique: true });
+resultSchema.index({ schoolId: 1, studentId: 1, subjectId: 1, academicTermId: 1 }, { unique: true });
 
 // Was a MySQL GENERATED ALWAYS AS (class_score + exam_score) STORED column.
 resultSchema.pre('save', function computeTotalScore(next) {
@@ -30,5 +32,6 @@ resultSchema.virtual('academicTerm', { ref: 'AcademicTerm', localField: 'academi
 resultSchema.virtual('recorder', { ref: 'Teacher', localField: 'recordedBy', foreignField: '_id', justOne: true });
 
 resultSchema.plugin(idTransformPlugin);
+resultSchema.plugin(tenantScopePlugin);
 
 module.exports = mongoose.model('Result', resultSchema);

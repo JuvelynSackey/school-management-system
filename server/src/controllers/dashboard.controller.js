@@ -1,8 +1,9 @@
 const {
-  Student, Teacher, Class, Subject, Attendance, Fee, Payment, AcademicTerm, TerminalReport,
+  Student, Teacher, Class, Subject, Attendance, Fee, Payment, AcademicTerm, TerminalReport, SchoolSettings,
 } = require('../models');
 const asyncHandler = require('../middleware/asyncHandler');
 const { getTeacherClassIds } = require('../services/teacherScope.service');
+const { getParentStudentIds } = require('../services/parentScope.service');
 const { getFeeBalance } = require('../services/fees.service');
 
 const STAGES = ['Creche', 'Nursery', 'KG', 'Primary', 'JHS'];
@@ -100,9 +101,24 @@ const getAdminDashboard = async () => {
     termReportApprovalPercent = totalReportsCount > 0 ? (lockedCount / totalReportsCount) * 100 : null;
   }
 
+  // --- Setup readiness (surfaced as a banner until the school is fully set up) ---
+  const settings = await SchoolSettings.findOne();
+  const setupChecklist = {
+    hasLogo: Boolean(settings?.logoUrl),
+    hasClasses: classCount > 0,
+    hasTeachers: teacherCount > 0,
+    hasStudents: studentCount > 0,
+  };
+  const completedCount = Object.values(setupChecklist).filter(Boolean).length;
+  const setupStatus = {
+    ...setupChecklist,
+    percentComplete: Math.round((completedCount / Object.keys(setupChecklist).length) * 100),
+  };
+
   return {
     role: 'admin',
     counts: { students: studentCount, teachers: teacherCount, classes: classCount, subjects: subjectCount },
+    setupStatus,
     attendanceStats,
     todayAttendancePercent,
     termReportApprovalPercent,
@@ -163,10 +179,42 @@ const getStudentDashboard = async (userId) => {
   return { role: 'student', attendanceStats, feeStats };
 };
 
+const getParentDashboard = async (userId) => {
+  const { studentIds } = await getParentStudentIds(userId);
+  const children = await Student.find({ _id: { $in: studentIds } })
+    .populate('class', 'name section')
+    .select('firstName lastName admissionNo classId status');
+
+  const childSummaries = await Promise.all(children.map(async (child) => {
+    const records = await Attendance.find({ studentId: child.id });
+    const attendanceStats = records.reduce((acc, r) => {
+      acc[r.status] = (acc[r.status] || 0) + 1;
+      acc.total += 1;
+      return acc;
+    }, { total: 0, Present: 0, Absent: 0, Late: 0, Excused: 0 });
+
+    const fees = await Fee.find({ studentId: child.id });
+    const feeStats = await sumFeeStats(fees);
+
+    return {
+      id: child.id,
+      firstName: child.firstName,
+      lastName: child.lastName,
+      admissionNo: child.admissionNo,
+      className: child.class ? `${child.class.name} ${child.class.section || ''}`.trim() : null,
+      attendanceStats,
+      feeStats,
+    };
+  }));
+
+  return { role: 'parent', children: childSummaries };
+};
+
 const getDashboard = asyncHandler(async (req, res) => {
   let data;
   if (req.user.role === 'admin') data = await getAdminDashboard();
   else if (req.user.role === 'teacher') data = await getTeacherDashboard(req.user.id);
+  else if (req.user.role === 'parent') data = await getParentDashboard(req.user.id);
   else data = await getStudentDashboard(req.user.id);
 
   res.json({ success: true, data });

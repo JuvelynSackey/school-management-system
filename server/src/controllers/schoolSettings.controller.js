@@ -2,18 +2,34 @@ const { SchoolSettings } = require('../models');
 const asyncHandler = require('../middleware/asyncHandler');
 const { findOrCreate } = require('../utils/findOrCreate');
 
-// Singleton settings document — auto-created with blank defaults on first read.
+// One settings document per school — auto-created with blank defaults on first read.
 const get = asyncHandler(async (req, res) => {
-  const [settings] = await findOrCreate(SchoolSettings, { where: {} });
+  const [settings] = await findOrCreate(SchoolSettings, { where: { schoolId: req.user.schoolId } });
   res.json({ success: true, data: settings });
 });
 
 const update = asyncHandler(async (req, res) => {
-  const { name, motto, address, phone, email } = req.body;
+  const {
+    name, motto, address, phone, email, reportCardFeeGateEnabled, performanceChartEnabled, communicationChannelsEnabled,
+    feedingFeeEnabled, feedingRatePerDay,
+  } = req.body;
   const settings = await SchoolSettings.findOneAndUpdate(
-    {},
+    { schoolId: req.user.schoolId },
     { $set: {
-      name: name ?? '', motto: motto ?? '', address: address ?? '', phone: phone ?? '', email: email ?? '',
+      name: name ?? '',
+      motto: motto ?? '',
+      address: address ?? '',
+      phone: phone ?? '',
+      email: email ?? '',
+      reportCardFeeGateEnabled: Boolean(reportCardFeeGateEnabled),
+      performanceChartEnabled: Boolean(performanceChartEnabled),
+      communicationChannelsEnabled: {
+        email: Boolean(communicationChannelsEnabled?.email),
+        sms: Boolean(communicationChannelsEnabled?.sms),
+        whatsapp: Boolean(communicationChannelsEnabled?.whatsapp),
+      },
+      feedingFeeEnabled: Boolean(feedingFeeEnabled),
+      feedingRatePerDay: feedingRatePerDay || 0,
     } },
     { upsert: true, new: true },
   );

@@ -1,3 +1,5 @@
+const { getLogoDataUrl } = require('./branding.service');
+
 const formatCurrency = (amount) => `GH₵ ${Number(amount).toFixed(2)}`;
 
 // Payment ids are Mongo ObjectIds now, not small sequential integers, so a
@@ -14,6 +16,7 @@ const buildReceiptHtml = ({ school, payment, fee, student, totalFee, balance, re
 
   const contactLine = [school.address, school.phone && `Tel: ${school.phone}`, school.email]
     .filter(Boolean).join(' &nbsp;|&nbsp; ');
+  const logoDataUrl = getLogoDataUrl(school.logoUrl);
 
   return `
 <!doctype html>
@@ -26,6 +29,7 @@ const buildReceiptHtml = ({ school, payment, fee, student, totalFee, balance, re
   .page { display: flex; flex-direction: column; min-height: 640px; padding: 18px 26px; }
 
   .header { text-align: center; border-bottom: 3px solid #322c7c; padding-bottom: 8px; margin-bottom: 10px; }
+  .header .school-logo { width: 34px; height: 34px; object-fit: contain; margin-bottom: 4px; }
   .header h1 { margin: 0; font-size: 18px; color: #322c7c; letter-spacing: 0.5px; }
   .header .motto { margin: 2px 0; font-size: 10px; font-style: italic; color: #7c4a24; }
   .header .contact { margin: 2px 0; font-size: 9.5px; color: #555; }
@@ -77,6 +81,7 @@ const buildReceiptHtml = ({ school, payment, fee, student, totalFee, balance, re
 <body>
   <div class="page">
     <div class="header">
+      ${logoDataUrl ? `<img class="school-logo" src="${logoDataUrl}" alt="${school.name || 'School'} logo" />` : ''}
       <h1>${school.name || 'School Name Not Set'}</h1>
       ${school.motto ? `<p class="motto">${school.motto}</p>` : ''}
       ${contactLine ? `<p class="contact">${contactLine}</p>` : ''}
@@ -99,6 +104,7 @@ const buildReceiptHtml = ({ school, payment, fee, student, totalFee, balance, re
     <p class="section-label">PAYMENT INFORMATION</p>
     <table class="info">
       <tr><td class="label">Fee Type</td><td class="value">${fee.feeType}</td></tr>
+      <tr><td class="label">Category</td><td class="value">${fee.category || 'Tuition'}</td></tr>
       <tr><td class="label">Payment Method</td><td class="value">${payment.paymentMethod}</td></tr>
       ${payment.referenceNo ? `<tr><td class="label">Reference No.</td><td class="value">${payment.referenceNo}</td></tr>` : ''}
       <tr><td class="label">Received By</td><td class="value">${receivedByName || '—'}</td></tr>

@@ -1,4 +1,4 @@
-const { body } = require('express-validator');
+const { body, query } = require('express-validator');
 
 const guardianArrayValidator = [
   body('guardians').optional().isArray({ max: 2 }).withMessage('At most 2 guardians (primary + secondary)'),
@@ -27,6 +27,8 @@ const createValidator = [
   body('houseId').optional({ nullable: true }).isMongoId(),
   body('address').optional({ nullable: true }).trim(),
   body('admissionDate').optional({ nullable: true, checkFalsy: true }).isISO8601(),
+  body('category').optional({ nullable: true, checkFalsy: true }).isIn(['Day', 'Boarding']),
+  body('programme').optional({ nullable: true }).trim().isLength({ max: 100 }),
   ...guardianArrayValidator,
   ...safetyNotesArrayValidator,
 ];
@@ -41,9 +43,22 @@ const updateValidator = [
   body('houseId').optional({ nullable: true }).isMongoId(),
   body('address').optional({ nullable: true }).trim(),
   body('admissionDate').optional({ nullable: true, checkFalsy: true }).isISO8601(),
+  body('category').optional({ nullable: true, checkFalsy: true }).isIn(['Day', 'Boarding']),
+  body('programme').optional({ nullable: true }).trim().isLength({ max: 100 }),
   body('status').optional().isIn(['active', 'inactive', 'archived']),
+  body('waecIndexNumber').optional({ nullable: true, checkFalsy: true }).trim().isLength({ max: 20 }),
   ...guardianArrayValidator,
   ...safetyNotesArrayValidator,
 ];
 
-module.exports = { createValidator, updateValidator };
+const idCardsValidator = [
+  query('classId').isMongoId(),
+];
+
+const waecExportValidator = [
+  query('classId').isMongoId(),
+];
+
+module.exports = {
+  createValidator, updateValidator, idCardsValidator, waecExportValidator,
+};

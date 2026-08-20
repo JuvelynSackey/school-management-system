@@ -2,6 +2,7 @@ const { body } = require('express-validator');
 
 const structureValidator = [
   body('name').trim().notEmpty().withMessage('Name is required'),
+  body('category').optional().isIn(['Tuition', 'Feeding', 'ClassActivity', 'PTA', 'Other']).withMessage('Invalid category'),
   body('amount').isFloat({ min: 0 }).withMessage('Amount must be a positive number'),
   body('academicTermId').optional({ nullable: true }).isMongoId(),
 ];

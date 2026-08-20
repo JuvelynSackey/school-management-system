@@ -1,6 +1,7 @@
 import apiClient from './client';
 
 export const listFees = (params = {}) => apiClient.get('/fees', { params }).then((res) => res.data.data);
+export const getArrearsSummary = (params = {}) => apiClient.get('/fees/arrears-summary', { params }).then((res) => res.data.data);
 export const getMyFees = () => apiClient.get('/fees/me').then((res) => res.data.data);
 export const getPayments = (feeId) => apiClient.get(`/fees/${feeId}/payments`).then((res) => res.data.data);
 export const createFee = (payload) => apiClient.post('/fees', payload).then((res) => res.data.data);

@@ -1,7 +1,8 @@
-const { Attendance, Student } = require('../models');
+const { Attendance, Student, Class } = require('../models');
 const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/AppError');
 const { getTeacherClassIds } = require('../services/teacherScope.service');
+const { getParentStudentIds } = require('../services/parentScope.service');
 
 const assertClassAccess = async (req, classId) => {
   if (req.user.role === 'admin') return;
@@ -47,6 +48,7 @@ const recordBulk = asyncHandler(async (req, res, next) => {
   if (!classId || !date || !Array.isArray(records)) {
     return next(new AppError('classId, date, and records are required', 400));
   }
+  if (!(await Class.findById(classId))) return next(new AppError('Class not found', 400));
 
   await assertClassAccess(req, classId);
 
@@ -81,6 +83,12 @@ const getForStudent = asyncHandler(async (req, res, next) => {
   if (req.user.role === 'teacher') {
     const { classIds } = await getTeacherClassIds(req.user.id);
     if (!classIds.includes(student.classId?.toString())) {
+      return next(new AppError('You do not have permission to view this record', 403));
+    }
+  }
+  if (req.user.role === 'parent') {
+    const { studentIds } = await getParentStudentIds(req.user.id);
+    if (!studentIds.includes(student.id)) {
       return next(new AppError('You do not have permission to view this record', 403));
     }
   }

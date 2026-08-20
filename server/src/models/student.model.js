@@ -1,9 +1,11 @@
 const mongoose = require('mongoose');
 const idTransformPlugin = require('../plugins/idTransform');
+const tenantScopePlugin = require('../plugins/tenantScope');
 
 const studentSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
-  admissionNo: { type: String, required: true, unique: true, maxlength: 50 },
+  schoolId: { type: mongoose.Schema.Types.ObjectId, ref: 'School', index: true },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  admissionNo: { type: String, required: true, maxlength: 50 },
   firstName: { type: String, required: true, maxlength: 80 },
   lastName: { type: String, required: true, maxlength: 80 },
   gender: { type: String, default: null },
@@ -12,9 +14,23 @@ const studentSchema = new mongoose.Schema({
   houseId: { type: mongoose.Schema.Types.ObjectId, ref: 'House', default: null },
   address: { type: String, default: null },
   admissionDate: { type: String, default: null },
+  category: { type: String, enum: ['Day', 'Boarding', null], default: null },
+  programme: { type: String, default: null, maxlength: 100 },
   status: { type: String, required: true, enum: ['active', 'inactive', 'archived'], default: 'active' },
+  photoUrl: { type: String, default: null },
+  // No `default: null` here on purpose — same reasoning as subject.model.js's
+  // `code` field: a sparse unique index only skips documents where the field
+  // is truly absent, not ones explicitly set to null, so an explicit default
+  // would make every student without a WAEC index number collide.
+  waecIndexNumber: { type: String, maxlength: 20 },
 }, { timestamps: true });
 
+studentSchema.index({ schoolId: 1, userId: 1 }, { unique: true });
+studentSchema.index({ schoolId: 1, admissionNo: 1 }, { unique: true });
+studentSchema.index({ schoolId: 1, waecIndexNumber: 1 }, {
+  unique: true,
+  partialFilterExpression: { waecIndexNumber: { $type: 'string' } },
+});
 studentSchema.virtual('user', { ref: 'User', localField: 'userId', foreignField: '_id', justOne: true });
 studentSchema.virtual('class', { ref: 'Class', localField: 'classId', foreignField: '_id', justOne: true });
 studentSchema.virtual('house', { ref: 'House', localField: 'houseId', foreignField: '_id', justOne: true });
@@ -26,5 +42,6 @@ studentSchema.virtual('terminalReports', { ref: 'TerminalReport', localField: '_
 studentSchema.virtual('guardianLinks', { ref: 'StudentGuardian', localField: '_id', foreignField: 'studentId' });
 
 studentSchema.plugin(idTransformPlugin);
+studentSchema.plugin(tenantScopePlugin);
 
 module.exports = mongoose.model('Student', studentSchema);

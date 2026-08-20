@@ -1,34 +1,26 @@
-import { useEffect, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 
-// Fades/slides children in once they scroll into view. Plain IntersectionObserver,
-// no animation library — matches this app's existing "no extra deps" convention.
-export default function Reveal({ children, className = '', delay = 0, as: Tag = 'div' }) {
-  const ref = useRef(null);
-  const [visible, setVisible] = useState(false);
+// Fades/slides children in once they scroll into view, via Framer Motion's
+// whileInView. Same external API as the plain-IntersectionObserver version
+// this replaced (children/className/delay/as), so every call site in
+// LandingPage.jsx needed no changes.
+const VARIANTS = {
+  hidden: { opacity: 0, y: 24 },
+  visible: { opacity: 1, y: 0 },
+};
 
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return undefined;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setVisible(true);
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.15 },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
+export default function Reveal({ children, className = '', delay = 0, as = 'div' }) {
+  const MotionTag = motion[as] || motion.div;
   return (
-    <Tag
-      ref={ref}
-      className={`landing-reveal${visible ? ' is-visible' : ''}${className ? ` ${className}` : ''}`}
-      style={delay ? { transitionDelay: `${delay}ms` } : undefined}
+    <MotionTag
+      className={className}
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true, amount: 0.15 }}
+      variants={VARIANTS}
+      transition={{ duration: 0.6, delay: delay / 1000, ease: [0.16, 1, 0.3, 1] }}
     >
       {children}
-    </Tag>
+    </MotionTag>
   );
 }

@@ -3,8 +3,18 @@ import useApiResource from '../../hooks/useApiResource';
 import { listAnnouncements, createAnnouncement, deleteAnnouncement } from '../../api/announcements.api';
 import { listClasses } from '../../api/classes.api';
 import { listStudents } from '../../api/students.api';
+import { getChannelStatus } from '../../api/notifications.api';
 
-const emptyForm = { message: '', targetType: 'school', targetClassId: '', targetStudentId: '' };
+const emptyForm = {
+  message: '', targetType: 'school', targetClassId: '', targetStudentId: '', channels: ['in_app'],
+};
+
+const CHANNEL_LABELS = { email: 'Email', sms: 'SMS', whatsapp: 'WhatsApp' };
+
+const deliveryLogLabel = (entry) => {
+  if (entry.status === 'sent') return `${CHANNEL_LABELS[entry.channel] || entry.channel}: sent to ${entry.recipientCount} guardian(s)`;
+  return `${CHANNEL_LABELS[entry.channel] || entry.channel}: not sent (provider not configured) — would have reached ${entry.recipientCount} guardian(s)`;
+};
 
 const targetLabel = (a) => {
   if (a.targetType === 'school') return 'Whole School';
@@ -16,6 +26,7 @@ export default function AnnouncementComposer() {
   const { data: announcements, isLoading, error, reload } = useApiResource(listAnnouncements);
   const [classes, setClasses] = useState([]);
   const [students, setStudents] = useState([]);
+  const [channelStatus, setChannelStatus] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [formError, setFormError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -24,7 +35,15 @@ export default function AnnouncementComposer() {
   useEffect(() => {
     listClasses().then(setClasses).catch(() => setClasses([]));
     listStudents().then(setStudents).catch(() => setStudents([]));
+    getChannelStatus().then(setChannelStatus).catch(() => setChannelStatus(null));
   }, []);
+
+  const toggleChannel = (channel) => {
+    setForm((f) => ({
+      ...f,
+      channels: f.channels.includes(channel) ? f.channels.filter((c) => c !== channel) : [...f.channels, channel],
+    }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -37,6 +56,7 @@ export default function AnnouncementComposer() {
         targetType: form.targetType,
         targetClassId: form.targetType === 'class' ? form.targetClassId : undefined,
         targetStudentId: form.targetType === 'student' ? form.targetStudentId : undefined,
+        channels: form.channels,
       });
       setForm(emptyForm);
       setMessage('Announcement logged.');
@@ -61,7 +81,7 @@ export default function AnnouncementComposer() {
       <div className="panel">
         <h2>New Announcement</h2>
         <p className="muted" style={{ marginBottom: 14 }}>
-          SMS sending isn&apos;t connected yet — messages are logged here and shown on the recipients&apos; in-app notice board.
+          Messages always post to the recipients&apos; in-app notice board. Email/SMS/WhatsApp delivery is logged here too, but won&apos;t actually send until a provider is connected.
         </p>
         <form onSubmit={handleSubmit}>
           {formError && <div className="alert-error">{formError}</div>}
@@ -103,6 +123,28 @@ export default function AnnouncementComposer() {
               </select>
             </label>
           )}
+          <label className="field">
+            <span>Also deliver via</span>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
+                <input type="checkbox" checked disabled />
+                In-App
+              </label>
+              {['email', 'sms', 'whatsapp'].map((channel) => (
+                <label key={channel} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
+                  <input
+                    type="checkbox"
+                    checked={form.channels.includes(channel)}
+                    onChange={() => toggleChannel(channel)}
+                  />
+                  {CHANNEL_LABELS[channel]}
+                  {channelStatus && !channelStatus[channel]?.configured && (
+                    <span className="badge badge-neutral" style={{ fontSize: 11 }}>Not configured</span>
+                  )}
+                </label>
+              ))}
+            </div>
+          </label>
           <button type="submit" className="btn-primary" disabled={isSaving}>{isSaving ? 'Sending...' : 'Send'}</button>
         </form>
       </div>
@@ -117,7 +159,14 @@ export default function AnnouncementComposer() {
             <tbody>
               {announcements.map((a) => (
                 <tr key={a.id}>
-                  <td style={{ maxWidth: 320 }}>{a.message}</td>
+                  <td style={{ maxWidth: 320 }}>
+                    {a.message}
+                    {a.deliveryLog?.length > 0 && (
+                      <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                        {a.deliveryLog.map((entry) => <div key={entry.channel}>{deliveryLogLabel(entry)}</div>)}
+                      </div>
+                    )}
+                  </td>
                   <td>{targetLabel(a)}</td>
                   <td>{a.category === 'fee_reminder' ? <span className="badge badge-warning">Fee Reminder</span> : <span className="badge badge-neutral">General</span>}</td>
                   <td>{a.creator?.fullName || '—'}</td>

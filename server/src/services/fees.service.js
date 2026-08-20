@@ -1,4 +1,4 @@
-const { Payment } = require('../models');
+const { Payment, Fee } = require('../models');
 
 const getFeeBalance = async (fee) => {
   const payments = await Payment.find({ feeId: fee.id });
@@ -10,6 +10,12 @@ const getFeeBalance = async (fee) => {
   return { amountPaid, balance, status };
 };
 
+const getOutstandingBalanceForStudentTerm = async (studentId, academicTermId) => {
+  const fees = await Fee.find({ studentId, academicTermId });
+  const balances = await Promise.all(fees.map(getFeeBalance));
+  return balances.reduce((sum, b) => sum + Math.max(b.balance, 0), 0);
+};
+
 const refreshFeeStatus = async (fee) => {
   const { status } = await getFeeBalance(fee);
   if (fee.status !== status) {
@@ -19,4 +25,4 @@ const refreshFeeStatus = async (fee) => {
   return status;
 };
 
-module.exports = { getFeeBalance, refreshFeeStatus };
+module.exports = { getFeeBalance, refreshFeeStatus, getOutstandingBalanceForStudentTerm };

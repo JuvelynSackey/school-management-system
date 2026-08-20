@@ -1,9 +1,18 @@
-const { Result, Student, Subject, AcademicTerm, Teacher, TerminalReport } = require('../models');
+const { Result, Student, Subject, AcademicTerm, Teacher, TerminalReport, Class, ResultSheet, User } = require('../models');
 const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/AppError');
-const { computeGrade } = require('../services/grading.service');
+const { computeGradeWithScheme, getSchemeForSchool } = require('../services/grading.service');
+const anomalyDetection = require('../services/anomalyDetection.service');
+const performanceInsights = require('../services/performanceInsights.service');
+const aiService = require('../services/ai.service');
 const { getTeacherClassIds } = require('../services/teacherScope.service');
-const { recalculateSubjectPositions } = require('../services/terminalReports.service');
+const { getParentStudentIds } = require('../services/parentScope.service');
+const { recalculateSubjectPositions, computeAggregatesForStudent, recalculateClassPositions } = require('../services/terminalReports.service');
+const { getSchoolAdminEmails } = require('../services/guardianRecipients.service');
+const auditLog = require('../services/auditLog.service');
+const notifications = require('../services/notifications.service');
+
+const safeDispatch = (args) => notifications.dispatch(args).catch((err) => console.error('[notifications] dispatch failed:', err.message));
 
 const assertClassAccess = async (req, classId) => {
   if (req.user.role === 'admin') return;
@@ -36,6 +45,7 @@ const getRoster = asyncHandler(async (req, res, next) => {
   const roster = students.map((s) => {
     const existing = byStudent.get(s.id);
     return {
+      resultId: existing?.id ?? null,
       studentId: s.id,
       firstName: s.firstName,
       lastName: s.lastName,
@@ -51,24 +61,69 @@ const getRoster = asyncHandler(async (req, res, next) => {
   res.json({ success: true, data: roster });
 });
 
+// GET /results/anomalies?classId=&subjectId=&academicTermId=
+// Purely advisory (JesManage Intelligence, Stage 6 Phase 2): surfaces
+// "worth a second look" flags for the admin's sheet-review screen. Deliberately
+// separate from getRoster so a teacher's routine roster load never pays for
+// this extra computation — it only runs when an admin actually opens Review.
+// Never blocks recordBulk or approve; a flag is a badge, not a gate.
+const getAnomalies = asyncHandler(async (req, res, next) => {
+  const { classId, subjectId, academicTermId } = req.query;
+  if (!classId || !subjectId || !academicTermId) {
+    return next(new AppError('classId, subjectId, and academicTermId are required', 400));
+  }
+  await assertClassAccess(req, classId);
+
+  const scheme = await getSchemeForSchool(req.user.schoolId);
+  const flags = await anomalyDetection.detectAnomalies({
+    classId, subjectId, academicTermId, scheme,
+  });
+
+  let aiSummary = null;
+  if (flags.length > 0 && aiService.isAIConfigured()) {
+    try {
+      aiSummary = await aiService.generateAnomalySummary(flags);
+    } catch {
+      aiSummary = null; // enrichment only — the deterministic flags below still stand on their own
+    }
+  }
+
+  res.json({ success: true, data: { flags, aiSummary } });
+});
+
 // POST /results/bulk { classId, subjectId, academicTermId, records: [{studentId, classScore, examScore, remarks}] }
 const recordBulk = asyncHandler(async (req, res, next) => {
   const { classId, subjectId, academicTermId, records } = req.body;
   if (!classId || !subjectId || !academicTermId || !Array.isArray(records)) {
     return next(new AppError('classId, subjectId, academicTermId, and records are required', 400));
   }
+  const classDoc = await Class.findById(classId);
+  if (!classDoc) return next(new AppError('Class not found', 400));
+  const subjectDoc = await Subject.findById(subjectId);
+  if (!subjectDoc) return next(new AppError('Subject not found', 400));
 
   await assertClassAccess(req, classId);
 
+  const sheet = await ResultSheet.findOne({ classId, subjectId, academicTermId });
+  if (sheet && (sheet.status === 'Submitted' || sheet.status === 'Approved')) {
+    return next(new AppError('This subject\'s scores are submitted for review and can no longer be edited. Ask an admin to reject or reopen before editing.', 400, undefined, 'RESULT_LOCKED'));
+  }
+
   const studentIds = records.map((r) => r.studentId);
   const lockedCount = await TerminalReport.countDocuments({
-    studentId: { $in: studentIds }, academicTermId, status: 'Locked',
+    studentId: { $in: studentIds }, academicTermId, status: { $in: ['Locked', 'Published'] },
   });
   if (lockedCount > 0) {
-    return next(new AppError('One or more students\' terminal reports are locked for this term. Ask an admin to unlock before editing scores.', 400));
+    return next(new AppError('One or more students\' terminal reports are locked for this term. Ask an admin to unlock before editing scores.', 400, undefined, 'RESULT_LOCKED'));
   }
 
   const teacher = req.user.role === 'teacher' ? await Teacher.findOne({ userId: req.user.id }) : null;
+  const scheme = await getSchemeForSchool(req.user.schoolId);
+
+  const outOfRange = records.find((r) => Number(r.classScore) > scheme.classScoreMax || Number(r.examScore) > scheme.examScoreMax);
+  if (outOfRange) {
+    return next(new AppError(`Class score cannot exceed ${scheme.classScoreMax} and exam score cannot exceed ${scheme.examScoreMax}`, 400));
+  }
 
   await Promise.all(records.map((r) => Result.findOneAndUpdate(
     { studentId: r.studentId, subjectId, academicTermId },
@@ -81,7 +136,7 @@ const recordBulk = asyncHandler(async (req, res, next) => {
         classScore: r.classScore,
         examScore: r.examScore,
         totalScore: Number(r.classScore) + Number(r.examScore),
-        grade: computeGrade(r.classScore, r.examScore),
+        grade: computeGradeWithScheme(r.classScore, r.examScore, scheme),
         remarks: r.remarks || null,
         recordedBy: teacher?.id || null,
       },
@@ -91,13 +146,163 @@ const recordBulk = asyncHandler(async (req, res, next) => {
 
   await recalculateSubjectPositions(classId, subjectId, academicTermId);
 
+  await auditLog.record({
+    req,
+    action: 'result.recordBulk',
+    entityType: 'Result',
+    description: `Recorded ${records.length} score(s) for ${classDoc.name} ${classDoc.section || ''} — ${subjectDoc.name}`.trim(),
+    metadata: { classId, subjectId, academicTermId, count: records.length },
+  });
+
   const results = await Result.find({ classId, subjectId, academicTermId });
   res.json({ success: true, data: results });
 });
 
+// POST /results/report-conflict { classId, subjectId, academicTermId, message }
+// The teacher-side counterpart to admin's amendResult: a queued offline
+// write that was rejected as RESULT_LOCKED (the sheet/report moved on while
+// they were offline) can't be silently retried or discarded into nothing —
+// this escalates it to the school's admins instead, same notification path
+// already used for resultSheet.submit.
+const reportConflict = asyncHandler(async (req, res, next) => {
+  const { classId, subjectId, academicTermId, message } = req.body;
+  if (!classId || !subjectId || !academicTermId) {
+    return next(new AppError('classId, subjectId, and academicTermId are required', 400));
+  }
+  const [classDoc, subjectDoc] = await Promise.all([
+    Class.findById(classId),
+    Subject.findById(subjectId),
+  ]);
+  const description = `${classDoc ? `${classDoc.name} ${classDoc.section || ''}`.trim() : 'Unknown class'} — ${subjectDoc?.name || 'Unknown subject'}`;
+
+  await auditLog.record({
+    req,
+    action: 'result.conflictReported',
+    entityType: 'ResultSheet',
+    description: `Offline sync conflict reported for ${description}: ${message || 'no details given'}`,
+    metadata: { classId, subjectId, academicTermId, message },
+  });
+
+  const adminRecipients = await getSchoolAdminEmails(req.user.schoolId);
+  if (adminRecipients.length) {
+    const actor = await User.findById(req.user.id).select('fullName');
+    safeDispatch({
+      channel: 'email',
+      message: `${actor?.fullName || 'A teacher'} hit an offline sync conflict for ${description}: ${message || 'their offline changes could not be applied because the result had already moved on.'}`,
+      recipients: adminRecipients,
+    });
+  }
+
+  res.json({ success: true, data: null });
+});
+
+// POST /results/:id/amend { classScore, examScore, reason }  (admin only)
+// A single-row correction for after a ResultSheet is already Approved,
+// without a full resultSheets.controller.js reopen() back to Draft. Does
+// NOT force the ResultSheet/TerminalReport status backward — an amendment
+// is a correction, not a re-review request, so if the report is already
+// Published the fix still applies immediately (a silently-stale published
+// PDF would be worse than a live correction outside the review flow).
+const amendResult = asyncHandler(async (req, res, next) => {
+  const result = await Result.findById(req.params.id);
+  if (!result) return next(new AppError('Result not found', 404));
+
+  const { classScore, examScore, reason } = req.body;
+  if (!reason || !reason.trim()) return next(new AppError('A reason is required to amend a result', 400));
+
+  const sheet = await ResultSheet.findOne({ classId: result.classId, subjectId: result.subjectId, academicTermId: result.academicTermId });
+  if (!sheet || sheet.status !== 'Approved') {
+    return next(new AppError('Only results belonging to an approved sheet can be amended. Use the normal edit flow otherwise.', 400));
+  }
+
+  const scheme = await getSchemeForSchool(req.user.schoolId);
+  if (Number(classScore) > scheme.classScoreMax || Number(examScore) > scheme.examScoreMax) {
+    return next(new AppError(`Class score cannot exceed ${scheme.classScoreMax} and exam score cannot exceed ${scheme.examScoreMax}`, 400));
+  }
+
+  const before = {
+    classScore: result.classScore, examScore: result.examScore, totalScore: result.totalScore, grade: result.grade,
+  };
+
+  result.classScore = classScore;
+  result.examScore = examScore;
+  result.totalScore = Number(classScore) + Number(examScore);
+  result.grade = computeGradeWithScheme(classScore, examScore, scheme);
+  await result.save();
+
+  const after = {
+    classScore: result.classScore, examScore: result.examScore, totalScore: result.totalScore, grade: result.grade,
+  };
+
+  await recalculateSubjectPositions(result.classId, result.subjectId, result.academicTermId);
+  const aggregates = await computeAggregatesForStudent(result.studentId, result.classId, result.academicTermId);
+  await TerminalReport.findOneAndUpdate(
+    { studentId: result.studentId, academicTermId: result.academicTermId },
+    { $set: aggregates },
+  );
+  await recalculateClassPositions(result.classId, result.academicTermId);
+
+  const [student, subject] = await Promise.all([
+    Student.findById(result.studentId),
+    Subject.findById(result.subjectId),
+  ]);
+  await auditLog.record({
+    req,
+    action: 'result.amend',
+    entityType: 'Result',
+    entityId: result.id,
+    description: `Amended ${subject?.name || 'a subject'} score for ${student ? `${student.firstName} ${student.lastName}` : 'a student'}: ${reason}`,
+    metadata: {
+      before, after, reason, studentId: result.studentId, subjectId: result.subjectId, classId: result.classId, academicTermId: result.academicTermId,
+    },
+  });
+
+  res.json({ success: true, data: result });
+});
+
 const populateForHistory = (query) => query
   .populate('subject', 'name')
-  .populate('academicTerm', 'name');
+  .populate('academicTerm', 'name startDate');
+
+// A student's own history is visible to: themselves, a parent linked to
+// them, a teacher whose currently-assigned classes include the student's
+// CURRENT class (the same simplification getForStudent has always used —
+// it doesn't re-derive which class the student was in for each historical
+// term), or any admin. Shared by getForStudent and getInsights since
+// insights are built from exactly the same underlying history.
+const assertStudentAccess = async (req, student) => {
+  if (req.user.role === 'student' && student.userId.toString() !== req.user.id) {
+    throw new AppError('You do not have permission to view this record', 403);
+  }
+  if (req.user.role === 'teacher') {
+    const { classIds } = await getTeacherClassIds(req.user.id);
+    if (!classIds.includes(student.classId?.toString())) {
+      throw new AppError('You do not have permission to view this record', 403);
+    }
+  }
+  if (req.user.role === 'parent') {
+    const { studentIds } = await getParentStudentIds(req.user.id);
+    if (!studentIds.includes(student.id)) {
+      throw new AppError('You do not have permission to view this record', 403);
+    }
+  }
+};
+
+// Students/parents only ever see a subject's scores once that subject's
+// ResultSheet has been Approved — admin/teacher see everything, including
+// in-progress drafts, since they need it for review and management.
+const filterToApprovedOnly = async (results) => {
+  if (results.length === 0) return results;
+  const sheets = await ResultSheet.find({
+    $or: results.map((r) => ({ classId: r.classId, subjectId: r.subjectId, academicTermId: r.academicTermId })),
+  });
+  const approvedKeys = new Set(
+    sheets
+      .filter((s) => s.status === 'Approved')
+      .map((s) => `${s.classId}:${s.subjectId}:${s.academicTermId}`),
+  );
+  return results.filter((r) => approvedKeys.has(`${r.classId}:${r.subjectId}:${r.academicTermId}`));
+};
 
 // GET /results/student/:studentId
 const getForStudent = asyncHandler(async (req, res, next) => {
@@ -105,17 +310,16 @@ const getForStudent = asyncHandler(async (req, res, next) => {
   const student = await Student.findById(studentId);
   if (!student) return next(new AppError('Student not found', 404));
 
-  if (req.user.role === 'student' && student.userId.toString() !== req.user.id) {
-    return next(new AppError('You do not have permission to view this record', 403));
-  }
-  if (req.user.role === 'teacher') {
-    const { classIds } = await getTeacherClassIds(req.user.id);
-    if (!classIds.includes(student.classId?.toString())) {
-      return next(new AppError('You do not have permission to view this record', 403));
-    }
+  try {
+    await assertStudentAccess(req, student);
+  } catch (err) {
+    return next(err);
   }
 
-  const results = await populateForHistory(Result.find({ studentId })).sort({ createdAt: -1 });
+  let results = await populateForHistory(Result.find({ studentId })).sort({ createdAt: -1 });
+  if (req.user.role === 'student' || req.user.role === 'parent') {
+    results = await filterToApprovedOnly(results);
+  }
 
   res.json({ success: true, data: results });
 });
@@ -125,9 +329,57 @@ const getMyResults = asyncHandler(async (req, res, next) => {
   const student = await Student.findOne({ userId: req.user.id });
   if (!student) return next(new AppError('Student profile not found', 404));
 
-  const results = await populateForHistory(Result.find({ studentId: student.id })).sort({ createdAt: -1 });
+  let results = await populateForHistory(Result.find({ studentId: student.id })).sort({ createdAt: -1 });
+  results = await filterToApprovedOnly(results);
 
   res.json({ success: true, data: results });
 });
 
-module.exports = { getRoster, recordBulk, getForStudent, getMyResults };
+// GET /results/insights/:studentId
+// JesManage Intelligence, Stage 6 Phase 3: built from exactly the same
+// approved-results history getForStudent already returns — a deterministic
+// multi-term trend plus this term's strongest/needs-attention subjects,
+// with an optional 2-3 sentence AI narrative layered on top when configured.
+// Same ownership boundary as getForStudent, since it's the same data.
+const getInsights = asyncHandler(async (req, res, next) => {
+  const { studentId } = req.params;
+  const student = await Student.findById(studentId);
+  if (!student) return next(new AppError('Student not found', 404));
+
+  try {
+    await assertStudentAccess(req, student);
+  } catch (err) {
+    return next(err);
+  }
+
+  let results = await populateForHistory(Result.find({ studentId }));
+  if (req.user.role === 'student' || req.user.role === 'parent') {
+    results = await filterToApprovedOnly(results);
+  }
+
+  const scheme = await getSchemeForSchool(req.user.schoolId);
+  const insights = performanceInsights.computeInsights({ results, scheme });
+
+  let aiNarrative = null;
+  const hasEnoughData = insights.trend.termsCompared > 0
+    || insights.strongestSubjects.length > 0
+    || insights.needsAttentionSubjects.length > 0;
+  if (hasEnoughData && aiService.isAIConfigured()) {
+    try {
+      aiNarrative = await aiService.generatePerformanceNarrative({
+        studentFirstName: student.firstName,
+        trend: insights.trend,
+        strongestSubjects: insights.strongestSubjects.map((s) => s.subjectName),
+        needsAttentionSubjects: insights.needsAttentionSubjects.map((s) => s.subjectName),
+      });
+    } catch {
+      aiNarrative = null; // enrichment only — the deterministic summary below still stands on its own
+    }
+  }
+
+  res.json({ success: true, data: { ...insights, aiNarrative } });
+});
+
+module.exports = {
+  getRoster, getAnomalies, recordBulk, amendResult, reportConflict, getForStudent, getMyResults, getInsights,
+};

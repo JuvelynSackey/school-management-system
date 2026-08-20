@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
@@ -16,6 +17,14 @@ app.use(express.json());
 if (config.nodeEnv !== 'test') {
   app.use(morgan('dev'));
 }
+
+// Uploaded assets (school logos, etc.) — served with an explicit
+// cross-origin allowance since helmet's default Cross-Origin-Resource-Policy
+// would otherwise block the client (a different origin in dev) from loading
+// these as <img> sources.
+app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
+  setHeaders: (res) => res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin'),
+}));
 
 app.use('/api', routes);
 

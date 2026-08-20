@@ -1,6 +1,7 @@
 // Mirrors server/src/services/grading.service.js — for instant UI feedback only;
-// the server-computed grade after save is authoritative.
-const SCALE = [
+// the server-computed grade after save is authoritative. Falls back to the
+// default NaCCA scale when a school-specific scheme hasn't loaded yet.
+const DEFAULT_SCALE = [
   { min: 80, grade: 'A1' },
   { min: 70, grade: 'B2' },
   { min: 65, grade: 'B3' },
@@ -12,12 +13,13 @@ const SCALE = [
   { min: 0, grade: 'F9' },
 ];
 
-export const computeGrade = (classScore, examScore) => {
+export const computeGrade = (classScore, examScore, bands = DEFAULT_SCALE) => {
   if (classScore === '' || examScore === '' || classScore === null || examScore === null) return null;
   const total = Number(classScore) + Number(examScore);
   if (Number.isNaN(total)) return null;
-  const match = SCALE.find((tier) => total >= tier.min);
-  return match ? match.grade : 'F9';
+  const sorted = [...bands].sort((a, b) => b.min - a.min);
+  const match = sorted.find((tier) => total >= tier.min);
+  return match ? match.grade : (sorted[sorted.length - 1]?.grade || 'F9');
 };
 
 const GOOD_GRADES = ['A1', 'B2', 'B3'];

@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react';
 import { getMyResults } from '../../api/results.api';
+import { getMyStudentProfile } from '../../api/students.api';
 import { gradeBadgeClass } from '../../utils/grading';
+import ReportCardsPanel from '../../components/results/ReportCardsPanel';
+import PerformanceInsightsPanel from '../../components/results/PerformanceInsightsPanel';
 
 export default function MyResults() {
   const [results, setResults] = useState([]);
+  const [studentId, setStudentId] = useState(null);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -12,6 +16,7 @@ export default function MyResults() {
       .then(setResults)
       .catch((err) => setError(err.response?.data?.message || 'Failed to load results.'))
       .finally(() => setIsLoading(false));
+    getMyStudentProfile().then((s) => setStudentId(s.id)).catch(() => {});
   }, []);
 
   return (
@@ -19,6 +24,8 @@ export default function MyResults() {
       <h1>My Results</h1>
       {isLoading && <p className="muted">Loading...</p>}
       {error && <div className="alert-error">{error}</div>}
+      {!isLoading && !error && studentId && <PerformanceInsightsPanel studentId={studentId} />}
+      {!isLoading && !error && studentId && <ReportCardsPanel studentId={studentId} />}
       {!isLoading && !error && (
         <div className="panel">
           <table>

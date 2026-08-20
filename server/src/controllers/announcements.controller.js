@@ -2,15 +2,18 @@ const { Announcement, Student } = require('../models');
 const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/AppError');
 const { getTeacherClassIds } = require('../services/teacherScope.service');
+const { getParentStudentIds } = require('../services/parentScope.service');
+const { resolveGuardianRecipients } = require('../services/guardianRecipients.service');
+const notifications = require('../services/notifications.service');
 
 const populateForDisplay = (query) => query
   .populate('targetClass', 'name section')
   .populate('targetStudent', 'firstName lastName')
   .populate('creator', 'fullName');
 
-// POST /announcements { message, targetType, targetClassId?, targetStudentId?, category? }
+// POST /announcements { message, targetType, targetClassId?, targetStudentId?, category?, channels? }
 const create = asyncHandler(async (req, res, next) => {
-  const { message, targetType, targetClassId, targetStudentId, category } = req.body;
+  const { message, targetType, targetClassId, targetStudentId, category, channels } = req.body;
 
   if (targetType === 'class' && !targetClassId) {
     return next(new AppError('targetClassId is required when targetType is "class"', 400));
@@ -19,6 +22,8 @@ const create = asyncHandler(async (req, res, next) => {
     return next(new AppError('targetStudentId is required when targetType is "student"', 400));
   }
 
+  const requestedChannels = Array.isArray(channels) && channels.length ? channels : ['in_app'];
+
   const announcement = await Announcement.create({
     message,
     category: category || 'general',
@@ -26,8 +31,20 @@ const create = asyncHandler(async (req, res, next) => {
     targetClassId: targetType === 'class' ? targetClassId : null,
     targetStudentId: targetType === 'student' ? targetStudentId : null,
     deliveryStatus: 'logged',
+    channels: requestedChannels,
     createdBy: req.user.id,
   });
+
+  const externalChannels = requestedChannels.filter((c) => c !== 'in_app');
+  if (externalChannels.length > 0) {
+    const recipients = await resolveGuardianRecipients({ targetType, targetClassId, targetStudentId });
+    const deliveryLog = await Promise.all(externalChannels.map((channel) => notifications.dispatch({
+      channel, message, recipients,
+    })));
+    announcement.deliveryLog = deliveryLog;
+    announcement.deliveryStatus = deliveryLog.some((d) => d.status === 'sent') ? 'sent' : 'logged';
+    await announcement.save();
+  }
 
   const full = await populateForDisplay(Announcement.findById(announcement.id));
   res.status(201).json({ success: true, data: full });
@@ -70,6 +87,17 @@ const getMyNoticeBoard = asyncHandler(async (req, res, next) => {
       $or: [
         { targetType: 'school' },
         { targetType: 'class', targetClassId: { $in: classIds } },
+      ],
+    };
+  } else if (req.user.role === 'parent') {
+    const { studentIds } = await getParentStudentIds(req.user.id);
+    const children = await Student.find({ _id: { $in: studentIds } }, { classId: 1 });
+    const classIds = children.map((c) => c.classId).filter(Boolean);
+    where = {
+      $or: [
+        { targetType: 'school' },
+        { targetType: 'class', targetClassId: { $in: classIds } },
+        { targetType: 'student', targetStudentId: { $in: studentIds } },
       ],
     };
   } else {

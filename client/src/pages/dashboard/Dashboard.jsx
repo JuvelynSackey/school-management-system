@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getDashboard } from '../../api/dashboard.api';
 import { listAnnouncements } from '../../api/announcements.api';
+import { getAtRiskStudents } from '../../api/earlyWarning.api';
 import { formatCurrency } from '../../utils/currency';
 import QuickActionsGrid from '../../components/common/QuickActionsGrid';
 
@@ -21,18 +22,128 @@ export default function Dashboard() {
 
   return (
     <div>
-      <h1>Welcome, {user?.fullName}</h1>
-      <p className="muted" style={{ marginBottom: 24 }}>Role: {user?.role}</p>
+      {data?.role !== 'admin' && (
+        <>
+          <h1>Welcome, {user?.fullName}</h1>
+          <p className="muted" style={{ marginBottom: 24 }}>Role: {user?.role}</p>
+        </>
+      )}
 
       {isLoading && <p className="muted">Loading...</p>}
       {error && <div className="alert-error">{error}</div>}
 
       {!isLoading && !error && data && (
         <>
-          {data.role === 'admin' && <AdminDashboard data={data} />}
+          {data.role === 'admin' && <AdminDashboard data={data} user={user} />}
           {data.role === 'teacher' && <TeacherDashboard data={data} />}
           {data.role === 'student' && <StudentDashboard data={data} />}
+          {data.role === 'parent' && <ParentDashboard data={data} />}
         </>
+      )}
+    </div>
+  );
+}
+
+function StudentsIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3.5l9 5-9 5-9-5 9-5Z" />
+      <path d="M5 10.5V16c0 1.5 3 3 7 3s7-1.5 7-3v-5.5" />
+    </svg>
+  );
+}
+function TeachersIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="6" width="16" height="13" rx="2.5" />
+      <path d="M9 6V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V6" />
+      <path d="M4 11h16" />
+    </svg>
+  );
+}
+function ClassesIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3.5 8.5L12 4l8.5 4.5L12 13 3.5 8.5Z" />
+      <path d="M7 10.5V15c0 1.4 2.2 2.5 5 2.5s5-1.1 5-2.5v-4.5" />
+    </svg>
+  );
+}
+function SubjectsIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H19a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H5.5A1.5 1.5 0 0 1 4 18.5v-14Z" />
+      <path d="M4 18.5A1.5 1.5 0 0 1 5.5 17H20" />
+    </svg>
+  );
+}
+
+function StatCard({ icon, label, value, tone, index = 0 }) {
+  return (
+    <div className={`stat-card stat-card-${tone} dash-reveal`} style={{ '--stagger': index }}>
+      <span className="stat-card-icon">{icon}</span>
+      <div>
+        <div className="stat-card-label">{label}</div>
+        <div className="stat-card-value">{value}</div>
+      </div>
+    </div>
+  );
+}
+
+const SETUP_CHECKLIST_ITEMS = [
+  { key: 'hasLogo', label: 'School logo uploaded', to: '/school-settings' },
+  { key: 'hasClasses', label: 'Classes provisioned', to: '/classes' },
+  { key: 'hasTeachers', label: 'Teachers added', to: '/teachers' },
+  { key: 'hasStudents', label: 'Students enrolled', to: '/students' },
+];
+
+function SetupReadinessBanner({ setupStatus, schoolSlug }) {
+  const dismissKey = `setup-banner-dismissed-${schoolSlug || 'default'}`;
+  const [dismissed, setDismissed] = useState(() => localStorage.getItem(dismissKey) === 'true');
+
+  if (!setupStatus || setupStatus.percentComplete >= 100 || dismissed) return null;
+
+  const dismiss = () => {
+    localStorage.setItem(dismissKey, 'true');
+    setDismissed(true);
+  };
+
+  return (
+    <div className="panel dash-reveal" style={{ marginBottom: 20, borderLeft: '4px solid var(--accent)' }}>
+      <div className="toolbar" style={{ marginBottom: 8 }}>
+        <h2 style={{ margin: 0 }}>School Setup — {setupStatus.percentComplete}% Complete</h2>
+        <button type="button" className="link-btn" onClick={dismiss}>Dismiss</button>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {SETUP_CHECKLIST_ITEMS.map((item) => (
+          <div key={item.key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>{setupStatus[item.key] ? '✔️' : '⏳'}</span>
+            {setupStatus[item.key] ? (
+              <span>{item.label}</span>
+            ) : (
+              <Link to={item.to}>Action needed: {item.label}</Link>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function WelcomeBanner({ user, pendingApprovalsCount }) {
+  const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+  return (
+    <div className="welcome-banner dash-reveal">
+      <div>
+        <h2>Welcome back, {user?.fullName?.split(' ')[0] || 'Admin'}</h2>
+        <p className="welcome-banner-date">{today}</p>
+      </div>
+      {pendingApprovalsCount > 0 ? (
+        <Link to="/results" className="welcome-banner-cta">
+          {pendingApprovalsCount} report{pendingApprovalsCount === 1 ? '' : 's'} awaiting your approval →
+        </Link>
+      ) : (
+        <span className="welcome-banner-note">Everything&apos;s on track today ✓</span>
       )}
     </div>
   );
@@ -50,15 +161,15 @@ function AttendanceCards({ stats }) {
   );
 }
 
-function ProgressStatCard({ label, percent, tone }) {
+function RingStat({ label, percent, tone, index = 0 }) {
   const pct = percent === null || percent === undefined ? null : Math.round(percent);
+  const deg = pct === null ? 0 : (pct / 100) * 360;
   return (
-    <div className="progress-stat-card">
-      <div className="progress-stat-label">{label}</div>
-      <div className="progress-stat-value">{pct === null ? '—' : `${pct}%`}</div>
-      <div className="progress-stat-bar">
-        <div className={`progress-stat-fill progress-stat-fill-${tone}`} style={{ width: `${pct ?? 0}%` }} />
+    <div className="ring-stat-card dash-reveal" style={{ '--stagger': index }}>
+      <div className={`ring-stat-circle ring-stat-${tone}`} style={{ '--ring-deg': `${deg}deg` }}>
+        <span className="ring-stat-value">{pct === null ? '—' : `${pct}%`}</span>
       </div>
+      <span className="ring-stat-label">{label}</span>
     </div>
   );
 }
@@ -126,12 +237,63 @@ function AnnouncementsFeed() {
   );
 }
 
+const FLAG_LABELS = {
+  low_attendance: 'Low Attendance',
+  academic_decline: 'Academic Decline',
+  failing_multiple_subjects: 'Failing Subjects',
+};
+
+// JesManage Intelligence, Stage 6 Phase 4 — shared between AdminDashboard
+// (whole school) and TeacherDashboard (their own classes only; the server
+// enforces that scoping, this component doesn't need to know which). Quiet
+// by default: renders nothing at all if nobody is currently flagged, same
+// as PerformanceInsightsPanel's "not enough to say" behavior.
+function AtRiskStudentsPanel({ index }) {
+  const [data, setData] = useState(null);
+
+  useEffect(() => {
+    getAtRiskStudents().then(setData).catch(() => setData({ students: [], aiSynthesis: null }));
+  }, []);
+
+  if (!data || data.students.length === 0) return null;
+
+  return (
+    <div className="panel dash-reveal" style={{ '--stagger': index }}>
+      <h2>⚠️ Students Who May Need Attention</h2>
+      {data.aiSynthesis && <p className="alert-warning" style={{ fontSize: 13 }}>🧠 {data.aiSynthesis}</p>}
+      <table>
+        <thead><tr><th>Name</th><th>Class</th><th>Flags</th><th>Fee Balance</th></tr></thead>
+        <tbody>
+          {data.students.map((s) => (
+            <tr key={s.studentId}>
+              <td><Link to={`/students/${s.studentId}`}>{s.firstName} {s.lastName}</Link></td>
+              <td>{s.className || '—'}</td>
+              <td>
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  {s.academicFlags.map((f) => (
+                    <span key={f.type} className="badge badge-warning" title={f.message}>
+                      {FLAG_LABELS[f.type] || f.type}
+                    </span>
+                  ))}
+                </div>
+              </td>
+              <td>{s.outstandingBalance > 0 ? formatCurrency(s.outstandingBalance) : '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="muted" style={{ fontSize: 11.5, marginTop: 6 }}>
+        Advisory only — a starting point for a supportive conversation, never a rule or an automatic action.
+      </p>
+    </div>
+  );
+}
+
 const STAGE_LABELS = ['Creche', 'Nursery', 'KG', 'Primary', 'JHS'];
 
-function AdminDashboard({ data }) {
-  const { user } = useAuth();
+function AdminDashboard({ data, user }) {
   const {
-    counts, attendanceStats, todayAttendancePercent, termReportApprovalPercent, feeStats, currentTermFeeStats,
+    counts, setupStatus, attendanceStats, todayAttendancePercent, termReportApprovalPercent, feeStats, currentTermFeeStats,
     classEnrolmentByStage, attendanceMonitor, alerts, recentActivity,
   } = data;
 
@@ -144,22 +306,34 @@ function AdminDashboard({ data }) {
   return (
     <div className="dashboard-grid">
       <div className="dashboard-main">
+        <SetupReadinessBanner setupStatus={setupStatus} schoolSlug={user?.schoolSlug} />
+        <WelcomeBanner user={user} pendingApprovalsCount={alerts.pendingApprovalsCount} />
+
+        <div className="stat-card-row">
+          <StatCard icon={<StudentsIcon />} label="Enrolment" value={counts.students} tone="accent" index={0} />
+          <StatCard icon={<TeachersIcon />} label="Teachers" value={counts.teachers} tone="success" index={1} />
+          <StatCard icon={<ClassesIcon />} label="Classes" value={counts.classes} tone="rose" index={2} />
+          <StatCard icon={<SubjectsIcon />} label="Subjects" value={counts.subjects} tone="warning" index={3} />
+        </div>
+
         {/* Progress KPIs */}
         <div className="progress-stat-row">
-          <ProgressStatCard label="Today's Attendance" percent={todayAttendancePercent} tone="accent" />
-          <ProgressStatCard label="Term Fee Collection" percent={feeCollectionPercent} tone="success" />
-          <ProgressStatCard label="Term Report Approval" percent={termReportApprovalPercent} tone="warning" />
+          <RingStat label="Today's Attendance" percent={todayAttendancePercent} tone="accent" index={4} />
+          <RingStat label="Term Fee Collection" percent={feeCollectionPercent} tone="success" index={5} />
+          <RingStat label="Term Report Approval" percent={termReportApprovalPercent} tone="warning" index={6} />
         </div>
 
         <QuickActionsGrid />
 
-        <div className="panel">
+        <div className="panel dash-reveal" style={{ '--stagger': 7 }}>
           <h2>Daily Attendance Monitor</h2>
           <AttendanceMonitor rows={attendanceMonitor} />
         </div>
 
         {/* Alerts */}
-        <div className="panel">
+        <AtRiskStudentsPanel index={7.5} />
+
+        <div className="panel dash-reveal" style={{ '--stagger': 8 }}>
           <h2>Alerts</h2>
           {!hasAlerts && <p className="muted">No alerts — everything looks good.</p>}
           {hasAlerts && (
@@ -189,7 +363,7 @@ function AdminDashboard({ data }) {
         </div>
 
         {/* Class enrolment breakdown */}
-        <div className="panel">
+        <div className="panel dash-reveal" style={{ '--stagger': 9 }}>
           <h2>Class Enrolment Breakdown</h2>
           {STAGE_LABELS.map((stage) => {
             const count = classEnrolmentByStage[stage] || 0;
@@ -203,19 +377,12 @@ function AdminDashboard({ data }) {
           })}
         </div>
 
-        <div className="cards">
-          <div className="card"><div>Enrolment</div><div className="num">{counts.students}</div></div>
-          <div className="card"><div>Teachers</div><div className="num">{counts.teachers}</div></div>
-          <div className="card"><div>Classes</div><div className="num">{counts.classes}</div></div>
-          <div className="card"><div>Subjects</div><div className="num">{counts.subjects}</div></div>
-        </div>
-
-        <div className="panel">
+        <div className="panel dash-reveal" style={{ '--stagger': 10 }}>
           <h2>Today&apos;s Attendance</h2>
           <AttendanceCards stats={attendanceStats} />
         </div>
 
-        <div className="panel">
+        <div className="panel dash-reveal" style={{ '--stagger': 11 }}>
           <h2>Fee Overview (All Time)</h2>
           <div className="cards" style={{ marginBottom: 0 }}>
             <div className="card"><div>Total Due</div><div className="num">{formatCurrency(feeStats.totalDue)}</div></div>
@@ -224,7 +391,7 @@ function AdminDashboard({ data }) {
           </div>
         </div>
 
-        <div className="panel">
+        <div className="panel dash-reveal" style={{ '--stagger': 12 }}>
           <h2>Recent Students</h2>
           <table>
             <thead><tr><th>Name</th><th>Admission No.</th></tr></thead>
@@ -237,7 +404,7 @@ function AdminDashboard({ data }) {
           </table>
         </div>
 
-        <div className="panel">
+        <div className="panel dash-reveal" style={{ '--stagger': 13 }}>
           <h2>Recent Payments</h2>
           <table>
             <thead><tr><th>Student</th><th>Amount</th><th>Date</th></tr></thead>
@@ -276,7 +443,36 @@ function TeacherDashboard({ data }) {
         <h2>Today&apos;s Attendance (My Classes)</h2>
         <AttendanceCards stats={attendanceStats} />
       </div>
+      <AtRiskStudentsPanel />
     </>
+  );
+}
+
+function ParentDashboard({ data }) {
+  const { children } = data;
+  return (
+    <div>
+      <h2 style={{ marginBottom: 16 }}>My Children</h2>
+      {children.length === 0 && <p className="muted">No children are linked to your account yet — ask the school admin to link you as a guardian.</p>}
+      <div className="dashboard-grid">
+        {children.map((child) => (
+          <Link key={child.id} to={`/students/${child.id}`} className="panel" style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
+            <h3 style={{ marginTop: 0 }}>{child.firstName} {child.lastName}</h3>
+            <p className="muted" style={{ marginBottom: 16 }}>
+              {child.admissionNo} · {child.className || 'Unassigned class'}
+            </p>
+            <div className="cards" style={{ marginBottom: 12 }}>
+              <div className="card"><div>Present</div><div className="num">{child.attendanceStats.Present}</div></div>
+              <div className="card"><div>Absent</div><div className="num">{child.attendanceStats.Absent}</div></div>
+            </div>
+            <div className="cards" style={{ marginBottom: 0 }}>
+              <div className="card"><div>Fees Due</div><div className="num">{formatCurrency(child.feeStats.totalDue)}</div></div>
+              <div className="card"><div>Outstanding</div><div className="num">{formatCurrency(child.feeStats.outstanding)}</div></div>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
   );
 }
 

@@ -11,16 +11,19 @@ const list = asyncHandler(async (req, res) => {
 });
 
 const create = asyncHandler(async (req, res) => {
-  const { name, amount, academicTermId } = req.body;
-  const structure = await FeeStructure.create({ name, amount, academicTermId: academicTermId || null });
+  const { name, category, amount, academicTermId } = req.body;
+  const structure = await FeeStructure.create({
+    name, category: category || 'Tuition', amount, academicTermId: academicTermId || null,
+  });
   res.status(201).json({ success: true, data: structure });
 });
 
 const update = asyncHandler(async (req, res, next) => {
   const structure = await FeeStructure.findById(req.params.id);
   if (!structure) return next(new AppError('Fee structure not found', 404));
-  const { name, amount, academicTermId } = req.body;
+  const { name, category, amount, academicTermId } = req.body;
   structure.name = name ?? structure.name;
+  structure.category = category ?? structure.category;
   structure.amount = amount ?? structure.amount;
   structure.academicTermId = academicTermId === undefined ? structure.academicTermId : academicTermId;
   await structure.save();
@@ -44,6 +47,7 @@ const apply = asyncHandler(async (req, res, next) => {
   const where = { status: 'active' };
   if (target === 'class') {
     if (!classId) return next(new AppError('classId is required for target=class', 400));
+    if (!(await Class.findById(classId))) return next(new AppError('Class not found', 400));
     where.classId = classId;
   } else if (target === 'stage') {
     if (!stage) return next(new AppError('stage is required for target=stage', 400));
@@ -70,6 +74,7 @@ const apply = asyncHandler(async (req, res, next) => {
       },
       defaults: {
         feeType: structure.name,
+        category: structure.category,
         amountDue: structure.amount,
         dueDate: dueDate || null,
         status: 'Pending',

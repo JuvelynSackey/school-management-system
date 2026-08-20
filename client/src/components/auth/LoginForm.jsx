@@ -1,5 +1,15 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+
+function SchoolIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3l9 5-9 5-9-5 9-5Z" />
+      <path d="M5 10.5V16c0 1.5 3 3 7 3s7-1.5 7-3v-5.5" />
+    </svg>
+  );
+}
 
 function MailIcon() {
   return (
@@ -28,9 +38,10 @@ function EyeIcon({ open }) {
 // Shared by the dedicated /login page and LoginModal (opened from the
 // landing page) — same fields/behavior, the host decides what happens
 // after a successful login via onSuccess.
-export default function LoginForm({ onSuccess }) {
+export default function LoginForm({ onSuccess, defaultSchoolCode = '' }) {
   const { login } = useAuth();
-  const [email, setEmail] = useState('');
+  const [schoolCode, setSchoolCode] = useState(defaultSchoolCode);
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
@@ -42,7 +53,7 @@ export default function LoginForm({ onSuccess }) {
     setError('');
     setIsSubmitting(true);
     try {
-      await login(email, password, remember);
+      await login(schoolCode, identifier, password, remember);
       onSuccess?.();
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed. Please try again.');
@@ -53,19 +64,32 @@ export default function LoginForm({ onSuccess }) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <h1>Login</h1>
-      <p className="cosmic-subtitle">Welcome back, please login to your account</p>
+      <h1>Welcome Back 👋</h1>
+      <p className="cosmic-subtitle">Sign in to continue to your dashboard</p>
 
       {error && <div className="alert-error">{error}</div>}
 
       <label className="cosmic-field">
         <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          type="text"
+          placeholder="School Code"
+          value={schoolCode}
+          onChange={(e) => setSchoolCode(e.target.value)}
           required
-          autoFocus
+          autoFocus={!defaultSchoolCode}
+          disabled={isSubmitting}
+        />
+        <span className="cosmic-field-icon"><SchoolIcon /></span>
+      </label>
+
+      <label className="cosmic-field">
+        <input
+          type="text"
+          placeholder="Email or Phone"
+          value={identifier}
+          onChange={(e) => setIdentifier(e.target.value)}
+          required
+          autoFocus={Boolean(defaultSchoolCode)}
           disabled={isSubmitting}
         />
         <span className="cosmic-field-icon"><MailIcon /></span>
@@ -90,10 +114,15 @@ export default function LoginForm({ onSuccess }) {
         </button>
       </label>
 
-      <label className="cosmic-remember">
-        <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-        <span>Remember Me</span>
-      </label>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <label className="cosmic-remember">
+          <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+          <span>Remember Me</span>
+        </label>
+        <Link to={`/forgot-password${schoolCode ? `?school=${encodeURIComponent(schoolCode)}` : ''}`} style={{ color: 'rgba(255,255,255,0.65)', fontSize: 12.5 }}>
+          Forgot password?
+        </Link>
+      </div>
 
       <button type="submit" className="cosmic-submit" disabled={isSubmitting}>
         {isSubmitting ? 'Logging in...' : 'LOGIN'}
