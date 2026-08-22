@@ -50,19 +50,23 @@ export default function AppShell() {
       </aside>
       <div className="app-main">
         <header className="topbar">
-          <button type="button" className="menu-toggle" aria-label="Open menu" onClick={() => setSidebarOpen(true)}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
-          </button>
-          <div className="topbar-user">
-            <span className="user-name">{user?.fullName}</span>
-            <span className="user-role">{user?.role}</span>
+          <div className="topbar-left">
+            <button type="button" className="menu-toggle" aria-label="Open menu" onClick={() => setSidebarOpen(true)}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
+            </button>
+            <div className="topbar-user">
+              <span className="user-name">{user?.fullName}</span>
+              <span className="user-role">{user?.role}</span>
+            </div>
           </div>
-          {user?.role === 'admin' && (
-            <button type="button" className="btn-secondary" onClick={() => setAskOpen(true)}>🔎 Ask JesManage</button>
-          )}
-          <OfflineIndicator />
-          <ThemeToggle />
-          <button type="button" className="btn-secondary" onClick={logout}>Log out</button>
+          <div className="topbar-actions">
+            {user?.role === 'admin' && (
+              <button type="button" className="btn-secondary" onClick={() => setAskOpen(true)}>🔎 Ask JesManage</button>
+            )}
+            <OfflineIndicator />
+            <ThemeToggle />
+            <button type="button" className="btn-secondary" onClick={logout}>Log out</button>
+          </div>
         </header>
         {askOpen && <AskJesManage onClose={() => setAskOpen(false)} />}
         <main className="page-content">

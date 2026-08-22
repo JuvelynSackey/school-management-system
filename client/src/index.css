@@ -361,8 +361,10 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); opacity: 1
   background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
-.topbar-user { text-align: right; }
-.user-name { display: block; font-weight: 500; color: var(--text-h); font-size: 14px; }
+.topbar-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.topbar-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.topbar-user { text-align: right; min-width: 0; }
+.user-name { display: block; font-weight: 500; color: var(--text-h); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .user-role { display: block; font-size: 12px; text-transform: capitalize; color: var(--text-muted); }
 
 /* Mobile menu toggle — hidden on desktop, shown left-of-everything in the
@@ -375,10 +377,24 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); opacity: 1
 }
 .sidebar-backdrop { display: none; }
 
+/* Belt-and-suspenders: the page itself must never scroll sideways,
+   regardless of what any individual element does — real device viewports
+   (notches, dynamic toolbars) can differ slightly from what a headless
+   browser reports. */
+html, body { overflow-x: hidden; max-width: 100%; }
+
 @media (max-width: 860px) {
   .menu-toggle { display: flex; }
-  .topbar { justify-content: flex-start; flex-wrap: wrap; gap: 10px; padding: 12px 14px; }
-  .topbar-user { text-align: left; margin-right: auto; }
+  /* Two deliberate rows instead of 6 flex items competing for wrap
+     positions unpredictably: hamburger+user always on row 1, the action
+     buttons (Ask JesManage / offline status / theme / logout) always
+     together on their own row 2, right-aligned and shrunk to fit. */
+  .topbar { flex-wrap: wrap; gap: 8px 10px; padding: 10px 14px; }
+  .topbar-left { flex: 1 1 auto; min-width: 0; }
+  .topbar-user { text-align: left; min-width: 0; flex: 1 1 auto; }
+  .topbar-actions { flex: 1 1 100%; justify-content: flex-end; gap: 6px; }
+  .topbar-actions .btn-secondary { padding: 6px 10px; font-size: 12.5px; }
+  .topbar-actions .badge { font-size: 11px; padding: 3px 8px; }
 
   /* Off-canvas drawer instead of a permanent flex column — the sidebar no
      longer takes up part of the viewport width by default, it slides in

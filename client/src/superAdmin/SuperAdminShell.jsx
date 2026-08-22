@@ -27,14 +27,18 @@ export default function SuperAdminShell() {
       </aside>
       <div className="app-main">
         <header className="topbar">
-          <button type="button" className="menu-toggle" aria-label="Open menu" onClick={() => setSidebarOpen(true)}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
-          </button>
-          <div className="topbar-user">
-            <span className="user-name">{superAdmin?.fullName}</span>
+          <div className="topbar-left">
+            <button type="button" className="menu-toggle" aria-label="Open menu" onClick={() => setSidebarOpen(true)}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
+            </button>
+            <div className="topbar-user">
+              <span className="user-name">{superAdmin?.fullName}</span>
+            </div>
           </div>
-          <ThemeToggle />
-          <button type="button" className="btn-secondary" onClick={logout}>Log out</button>
+          <div className="topbar-actions">
+            <ThemeToggle />
+            <button type="button" className="btn-secondary" onClick={logout}>Log out</button>
+          </div>
         </header>
         <main className="page-content">
           <Outlet />
