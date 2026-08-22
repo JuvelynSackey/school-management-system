@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { askAdminQuery } from '../../api/aiQuery.api';
 import { formatCurrency } from '../../utils/currency';
 import Modal from './Modal';
@@ -65,20 +65,24 @@ function ResultsTable({ intent, rows }) {
 // fixed set of read-only query types and extracts a few parameters — see
 // aiQuery.controller.js for the actual security boundary. This component
 // just asks the question and renders whatever structured answer comes back.
-export default function AskJesManage({ onClose }) {
-  const [question, setQuestion] = useState('');
+//
+// initialQuestion: set when CommandPalette hands off a free-text query —
+// pre-fills and auto-asks immediately, since picking that option from the
+// palette already signals "ask this," not "let me review it first."
+export default function AskJesManage({ onClose, initialQuestion }) {
+  const [question, setQuestion] = useState(initialQuestion || '');
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [isAsking, setIsAsking] = useState(false);
+  const askedInitialRef = useRef(false);
 
-  const handleAsk = async (e) => {
-    e.preventDefault();
-    if (!question.trim()) return;
+  const ask = async (q) => {
+    if (!q.trim()) return;
     setIsAsking(true);
     setError('');
     setResult(null);
     try {
-      const data = await askAdminQuery(question);
+      const data = await askAdminQuery(q);
       setResult(data);
     } catch (err) {
       setError(err.response?.data?.code === 'AI_NOT_CONFIGURED'
@@ -87,6 +91,19 @@ export default function AskJesManage({ onClose }) {
     } finally {
       setIsAsking(false);
     }
+  };
+
+  useEffect(() => {
+    if (initialQuestion && !askedInitialRef.current) {
+      askedInitialRef.current = true;
+      ask(initialQuestion);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleAsk = (e) => {
+    e.preventDefault();
+    ask(question);
   };
 
   return (

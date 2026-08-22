@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useSuperAdminAuth } from './SuperAdminAuthContext';
 import ThemeToggle from '../components/common/ThemeToggle';
+import CommandPalette from '../components/common/CommandPalette';
+import { SUPER_ADMIN_NAV_ITEMS } from '../config/navItems';
 
 export default function SuperAdminShell() {
   const { superAdmin, logout } = useSuperAdminAuth();
@@ -16,13 +18,11 @@ export default function SuperAdminShell() {
           <span>Platform Admin</span>
         </div>
         <nav className="sidebar-nav" onClick={() => setSidebarOpen(false)}>
-          <NavLink to="/super-admin/dashboard" className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}>Dashboard</NavLink>
-          <NavLink to="/super-admin/schools" className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}>Schools</NavLink>
-          <NavLink to="/super-admin/users" className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}>Platform Users</NavLink>
-          <NavLink to="/super-admin/audit-log" className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}>Global Audit Log</NavLink>
-          <NavLink to="/super-admin/security" className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}>Security Center</NavLink>
-          <NavLink to="/super-admin/settings" className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}>Platform Settings</NavLink>
-          <NavLink to="/super-admin/backups" className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}>Backup &amp; Recovery</NavLink>
+          {SUPER_ADMIN_NAV_ITEMS.map((item) => (
+            <NavLink key={item.to} to={item.to} className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}>
+              {item.label}
+            </NavLink>
+          ))}
         </nav>
       </aside>
       <div className="app-main">
@@ -44,6 +44,7 @@ export default function SuperAdminShell() {
           <Outlet />
         </main>
       </div>
+      <CommandPalette navItems={SUPER_ADMIN_NAV_ITEMS} enableAI={false} onAskJesManage={() => {}} />
     </div>
   );
 }
