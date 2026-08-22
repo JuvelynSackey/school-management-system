@@ -1,5 +1,6 @@
 const {
   Student, Teacher, Class, Subject, Attendance, Fee, Payment, AcademicTerm, TerminalReport, SchoolSettings,
+  TeacherSubjectAssignment, ResultSheet,
 } = require('../models');
 const asyncHandler = require('../middleware/asyncHandler');
 const { getTeacherClassIds } = require('../services/teacherScope.service');
@@ -91,6 +92,29 @@ const getAdminDashboard = async () => {
     total: overdueBalances.reduce((sum, b) => sum + b.balance, 0),
   };
 
+  // Distinct teachers with at least one assignment whose result sheet for
+  // the current term is still Draft/Rejected (or doesn't exist yet) — an
+  // "unsubmitted marks" count for the Action Center. TeacherSubjectAssignment
+  // and ClassSubject both use a null academicTermId to mean "every term",
+  // so this join is purely by (classId, subjectId), not term-qualified on
+  // the assignment side.
+  let teachersUnsubmittedCount = 0;
+  if (currentTerm) {
+    const [assignments, currentTermSheets] = await Promise.all([
+      TeacherSubjectAssignment.find({}, { teacherId: 1, classId: 1, subjectId: 1 }),
+      ResultSheet.find({ academicTermId: currentTerm.id }, { classId: 1, subjectId: 1, status: 1 }),
+    ]);
+    const statusByPair = new Map(currentTermSheets.map((s) => [`${s.classId}:${s.subjectId}`, s.status]));
+    const teachersPending = new Set();
+    assignments.forEach((a) => {
+      const status = statusByPair.get(`${a.classId}:${a.subjectId}`);
+      if (!status || status === 'Draft' || status === 'Rejected') {
+        teachersPending.add(a.teacherId.toString());
+      }
+    });
+    teachersUnsubmittedCount = teachersPending.size;
+  }
+
   // --- Term report approval progress ---
   let termReportApprovalPercent = null;
   if (currentTerm) {
@@ -130,6 +154,7 @@ const getAdminDashboard = async () => {
       pendingApprovalsCount,
       unassignedClasses,
       overdueFees,
+      teachersUnsubmittedCount,
     },
     recentActivity: {
       students: recentStudents,

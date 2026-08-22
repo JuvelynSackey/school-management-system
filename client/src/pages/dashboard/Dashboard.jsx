@@ -248,17 +248,24 @@ const FLAG_LABELS = {
 // enforces that scoping, this component doesn't need to know which). Quiet
 // by default: renders nothing at all if nobody is currently flagged, same
 // as PerformanceInsightsPanel's "not enough to say" behavior.
-function AtRiskStudentsPanel({ index }) {
-  const [data, setData] = useState(null);
+//
+// AdminDashboard now needs this same data for the Action Center's
+// "declining performance" count, so it fetches once and passes it down via
+// `data` — this component only fetches its own copy when no `data` prop is
+// given (TeacherDashboard's usage, unchanged).
+function AtRiskStudentsPanel({ index, data: externalData }) {
+  const [internalData, setInternalData] = useState(null);
 
   useEffect(() => {
-    getAtRiskStudents().then(setData).catch(() => setData({ students: [], aiSynthesis: null }));
-  }, []);
+    if (externalData !== undefined) return;
+    getAtRiskStudents().then(setInternalData).catch(() => setInternalData({ students: [], aiSynthesis: null }));
+  }, [externalData]);
 
+  const data = externalData !== undefined ? externalData : internalData;
   if (!data || data.students.length === 0) return null;
 
   return (
-    <div className="panel dash-reveal" style={{ '--stagger': index }}>
+    <div className="panel dash-reveal" id="at-risk-students" style={{ '--stagger': index }}>
       <h2>⚠️ Students Who May Need Attention</h2>
       {data.aiSynthesis && <p className="alert-warning" style={{ fontSize: 13 }}>🧠 {data.aiSynthesis}</p>}
       <table>
@@ -291,17 +298,76 @@ function AtRiskStudentsPanel({ index }) {
 
 const STAGE_LABELS = ['Creche', 'Nursery', 'KG', 'Primary', 'JHS'];
 
+// "How is my school doing today?" (headline stats) is answered by the cards
+// above this; "what do I actually need to do about it?" is answered here —
+// one place instead of the old Alerts panel plus a separately-scrolled-to
+// at-risk table. Declining-performance count is derived from the SAME
+// at-risk fetch AdminDashboard already needs for the detail panel further
+// down (see id="at-risk-students") rather than a second API call.
+function ActionCenter({ alerts, decliningCount, index }) {
+  const items = [
+    alerts.pendingApprovalsCount > 0 && {
+      key: 'approvals',
+      to: '/results',
+      text: `${alerts.pendingApprovalsCount} result sheet${alerts.pendingApprovalsCount === 1 ? '' : 's'} awaiting review`,
+    },
+    decliningCount > 0 && {
+      key: 'declining',
+      to: '#at-risk-students',
+      text: `${decliningCount} student${decliningCount === 1 ? '' : 's'} showing declining performance`,
+    },
+    alerts.teachersUnsubmittedCount > 0 && {
+      key: 'unsubmitted',
+      to: '/results',
+      text: `${alerts.teachersUnsubmittedCount} teacher${alerts.teachersUnsubmittedCount === 1 ? '' : 's'} ${alerts.teachersUnsubmittedCount === 1 ? "hasn't" : "haven't"} submitted marks yet`,
+    },
+    alerts.overdueFees.count > 0 && {
+      key: 'fees',
+      to: '/fees',
+      text: `${alerts.overdueFees.count} overdue fee${alerts.overdueFees.count === 1 ? '' : 's'} totaling ${formatCurrency(alerts.overdueFees.total)}`,
+    },
+    alerts.unassignedClasses.length > 0 && {
+      key: 'unassigned',
+      to: '/classes',
+      text: `${alerts.unassignedClasses.length} class${alerts.unassignedClasses.length === 1 ? '' : 'es'} with no homeroom teacher`,
+    },
+  ].filter(Boolean);
+
+  return (
+    <div className="panel dash-reveal" style={{ '--stagger': index }}>
+      <h2>🔔 Action Center</h2>
+      {items.length === 0 && <p className="muted">Nothing needs your attention right now — everything looks good.</p>}
+      {items.length > 0 && (
+        <div className="alert-list">
+          {items.map((item) => (
+            <Link key={item.key} className="alert-row" to={item.to}>
+              <span>{item.text}</span>
+              <span className="chevron">→</span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminDashboard({ data, user }) {
   const {
     counts, setupStatus, attendanceStats, todayAttendancePercent, termReportApprovalPercent, feeStats, currentTermFeeStats,
     classEnrolmentByStage, attendanceMonitor, alerts, recentActivity,
   } = data;
 
+  const [atRiskData, setAtRiskData] = useState(null);
+  useEffect(() => {
+    getAtRiskStudents().then(setAtRiskData).catch(() => setAtRiskData({ students: [], aiSynthesis: null }));
+  }, []);
+  const decliningCount = (atRiskData?.students || [])
+    .filter((s) => s.academicFlags.some((f) => f.type === 'academic_decline')).length;
+
   const maxStageCount = Math.max(1, ...STAGE_LABELS.map((s) => classEnrolmentByStage[s] || 0));
   const feeCollectionPercent = currentTermFeeStats.totalDue > 0
     ? (currentTermFeeStats.totalPaid / currentTermFeeStats.totalDue) * 100
     : null;
-  const hasAlerts = alerts.pendingApprovalsCount > 0 || alerts.unassignedClasses.length > 0 || alerts.overdueFees.count > 0;
 
   return (
     <div className="dashboard-grid">
@@ -316,51 +382,23 @@ function AdminDashboard({ data, user }) {
           <StatCard icon={<SubjectsIcon />} label="Subjects" value={counts.subjects} tone="warning" index={3} />
         </div>
 
+        <ActionCenter alerts={alerts} decliningCount={decliningCount} index={4} />
+
         {/* Progress KPIs */}
         <div className="progress-stat-row">
-          <RingStat label="Today's Attendance" percent={todayAttendancePercent} tone="accent" index={4} />
-          <RingStat label="Term Fee Collection" percent={feeCollectionPercent} tone="success" index={5} />
-          <RingStat label="Term Report Approval" percent={termReportApprovalPercent} tone="warning" index={6} />
+          <RingStat label="Today's Attendance" percent={todayAttendancePercent} tone="accent" index={5} />
+          <RingStat label="Term Fee Collection" percent={feeCollectionPercent} tone="success" index={6} />
+          <RingStat label="Term Report Approval" percent={termReportApprovalPercent} tone="warning" index={7} />
         </div>
 
         <QuickActionsGrid />
 
-        <div className="panel dash-reveal" style={{ '--stagger': 7 }}>
+        <div className="panel dash-reveal" style={{ '--stagger': 8 }}>
           <h2>Daily Attendance Monitor</h2>
           <AttendanceMonitor rows={attendanceMonitor} />
         </div>
 
-        {/* Alerts */}
-        <AtRiskStudentsPanel index={7.5} />
-
-        <div className="panel dash-reveal" style={{ '--stagger': 8 }}>
-          <h2>Alerts</h2>
-          {!hasAlerts && <p className="muted">No alerts — everything looks good.</p>}
-          {hasAlerts && (
-            <div className="alert-list">
-              {alerts.pendingApprovalsCount > 0 && (
-                <Link className="alert-row" to="/results">
-                  <span>{alerts.pendingApprovalsCount} terminal report{alerts.pendingApprovalsCount === 1 ? '' : 's'} awaiting your approval</span>
-                  <span className="chevron">→</span>
-                </Link>
-              )}
-              {alerts.unassignedClasses.length > 0 && (
-                <Link className="alert-row" to="/classes">
-                  <span>
-                    {alerts.unassignedClasses.length} class{alerts.unassignedClasses.length === 1 ? '' : 'es'} with no homeroom teacher: {alerts.unassignedClasses.map((c) => `${c.name}${c.section ? ' ' + c.section : ''}`).join(', ')}
-                  </span>
-                  <span className="chevron">→</span>
-                </Link>
-              )}
-              {alerts.overdueFees.count > 0 && (
-                <Link className="alert-row" to="/fees">
-                  <span>{alerts.overdueFees.count} overdue fee{alerts.overdueFees.count === 1 ? '' : 's'} totaling {formatCurrency(alerts.overdueFees.total)}</span>
-                  <span className="chevron">→</span>
-                </Link>
-              )}
-            </div>
-          )}
-        </div>
+        <AtRiskStudentsPanel data={atRiskData} index={8.5} />
 
         {/* Class enrolment breakdown */}
         <div className="panel dash-reveal" style={{ '--stagger': 9 }}>

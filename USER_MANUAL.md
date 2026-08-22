@@ -77,8 +77,12 @@ other. The Super Admin's dashboard covers the platform itself:
 This is the main operational role for a single school. From the Admin
 dashboard you can reach:
 
-- **Dashboard** — a snapshot: student/staff counts, pending results
-  awaiting approval, attendance and fee summaries, recent activity
+- **Dashboard** — a snapshot: student/staff counts, attendance and fee
+  summaries, recent activity, and an **Action Center** listing exactly
+  what needs your attention right now (result sheets awaiting review,
+  students showing declining performance, teachers who haven't
+  submitted marks, overdue fees, classes with no homeroom teacher) —
+  each item links straight to where you'd act on it
 - **Students** — enroll students, search/filter the roster, view a full
   student profile (attendance history, results, fee balance), archive a
   student who has left. From a student's profile you can upload or
