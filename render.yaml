@@ -1,0 +1,67 @@
+# Render blueprint — one combined web service. Express (server/) serves the
+# built React client (client/dist) directly, so the app and its API share a
+# single URL/origin — no CORS wiring needed between them, no second service.
+#
+# Import this file on Render's "Create new project" screen. You'll still be
+# prompted to fill in the `sync: false` values by hand — they're secrets or
+# deployment-specific values that don't belong committed to the repo.
+#
+# KNOWN LIMITATION — read before relying on file uploads in production:
+# server/uploads/ (school logos, student photos) is a local, EPHEMERAL disk
+# on Render's free/starter plans. A redeploy or restart wipes it. The `disk`
+# block below (commented out) is the fix, but it requires a paid instance
+# type — Render doesn't support persistent disks on the free tier. Until
+# either that's added or uploads move to something like S3/Cloudinary,
+# treat uploaded logos/photos as not-guaranteed-to-survive-a-redeploy.
+services:
+  - type: web
+    name: jesmanage
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start -w server
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Your MongoDB Atlas connection string (Atlas is already a replica
+      # set, which the app needs for its multi-document transactions —
+      # nothing extra required there). Paste it in on Render's dashboard.
+      - key: MONGODB_URI
+        sync: false
+      # Render generates a random value for this on first deploy — you
+      # never have to invent or paste one in.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 8h
+      # Baked into the client build at build time (Vite env vars are
+      # compile-time, not runtime) — a relative path so the built client
+      # calls whatever origin it's actually served from, not a hardcoded
+      # host. Same-origin deploy, so CLIENT_ORIGIN/CORS isn't load-bearing
+      # here and is left at its safe default rather than configured.
+      - key: VITE_API_URL
+        value: /api
+      # Optional — leave blank to keep the AI Remark Assistant / Anomaly
+      # Detection / Performance Insights / Early-Warning / Ask JesManage
+      # gated off, exactly like in local dev with no key set.
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.0-flash
+      # Optional — leave blank to keep email notifications silently
+      # skipped, same as local dev.
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+    # Uncomment once on a paid plan, to stop uploads/ from being wiped on
+    # every redeploy — see the KNOWN LIMITATION note above.
+    # disk:
+    #   name: uploads
+    #   mountPath: /opt/render/project/src/server/uploads
+    #   sizeGB: 1
