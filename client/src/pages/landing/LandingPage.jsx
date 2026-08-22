@@ -77,6 +77,42 @@ const FEATURES = [
   { icon: 'multiSchool', title: 'Multi-School Ready', desc: 'One platform, many schools — each with its own data, staff, and pupils, fully separated.' },
 ];
 
+const INTELLIGENCE_ICONS = {
+  remark: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2.5l1.8 4.6 4.7.6-3.5 3.3 1 4.6-4-2.4-4 2.4 1-4.6-3.5-3.3 4.7-.6L12 2.5Z" />
+    </svg>
+  ),
+  anomaly: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 18l4-8 3 4 3-6 3 4 3-6" />
+    </svg>
+  ),
+  insights: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 20V13M11 20V7M17 20V11" /><path d="M3 20h18" />
+    </svg>
+  ),
+  warning: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3.5l9.5 16.5H2.5L12 3.5Z" /><path d="M12 10v4.5" /><circle cx="12" cy="17.3" r="0.9" fill="currentColor" stroke="none" />
+    </svg>
+  ),
+  ask: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 10v4a2 2 0 0 0 2 2h1l3 5V3l-3 5H5a2 2 0 0 0-2 2Z" /><path d="M13 8.5a4 4 0 0 1 0 7" />
+    </svg>
+  ),
+};
+
+const INTELLIGENCE_FEATURES = [
+  { icon: 'remark', title: 'Remark Assistant', desc: 'Suggests report-card remarks from a student’s own term data — a teacher always reviews, edits, or writes their own.' },
+  { icon: 'anomaly', title: 'Anomaly Detection', desc: 'Flags a sharp score drop or a class/exam score mismatch before an admin approves — a nudge to double-check, not a block.' },
+  { icon: 'insights', title: 'Performance Insights', desc: 'A plain-language read on a student’s multi-term trend, alongside the numbers already on their profile.' },
+  { icon: 'warning', title: 'Early-Warning', desc: 'Surfaces students who may need academic attention — never a diagnosis, never automatic, always a human decision next.' },
+  { icon: 'ask', title: 'Ask JesManage', desc: 'Admins ask a school question in plain English and get a straight answer, read-only, from the school’s own real data.' },
+];
+
 const ROLES = [
   {
     title: 'Admins',
@@ -190,6 +226,7 @@ export default function LandingPage() {
           <button type="button" onClick={() => scrollTo('home')}>Home</button>
           <button type="button" onClick={() => scrollTo('features')}>Features</button>
           <button type="button" onClick={() => scrollTo('how-it-works')}>How It Works</button>
+          <button type="button" onClick={() => scrollTo('intelligence')}>Intelligence</button>
           <button type="button" onClick={() => scrollTo('roles')}>Roles</button>
           <button type="button" onClick={() => scrollTo('faq')}>FAQ</button>
         </div>
@@ -219,7 +256,7 @@ export default function LandingPage() {
             <span className="landing-badge">QR-verified documents</span>
           </Reveal>
           <Reveal className="landing-strip" delay={440}>
-            Students <span>•</span> Teachers <span>•</span> Attendance <span>•</span> Results <span>•</span> Fees <span>•</span> Report Cards
+            Students <span>•</span> Teachers <span>•</span> Attendance <span>•</span> Results <span>•</span> Fees <span>•</span> Report Cards <span>•</span> Intelligence
           </Reveal>
         </div>
         <Reveal className="landing-hero-illustration" delay={150}>
@@ -260,7 +297,33 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section id="roles" className="landing-section">
+      <section id="intelligence" className="landing-section">
+        <Reveal as="h2">Meet JesManage Intelligence</Reveal>
+        <Reveal as="p" className="landing-section-subtitle">
+          Turn the results, attendance, and fee data a school already has into a second opinion —
+          never a decision. Every suggestion is reviewed, edited, or dismissed by a real person before it counts.
+        </Reveal>
+        <div className="landing-feature-grid">
+          {INTELLIGENCE_FEATURES.map((f, i) => (
+            <Reveal key={f.title} delay={i * 70}>
+              <TiltCard className="landing-feature-card">
+                <span className="quick-action-icon landing-feature-icon">{INTELLIGENCE_ICONS[f.icon]}</span>
+                <h3>{f.title}</h3>
+                <p>{f.desc}</p>
+              </TiltCard>
+            </Reveal>
+          ))}
+          <Reveal delay={INTELLIGENCE_FEATURES.length * 70}>
+            <TiltCard className="landing-feature-card">
+              <span className="quick-action-icon landing-feature-icon">✓</span>
+              <h3>AI assists. Staff decide.</h3>
+              <p>A school switches Intelligence on with one setting. Until then, everything works exactly the same — just without the extra insight.</p>
+            </TiltCard>
+          </Reveal>
+        </div>
+      </section>
+
+      <section id="roles" className="landing-section landing-section-alt">
         <Reveal as="h2">Built for Every Role</Reveal>
         <div className="landing-roles-grid">
           {ROLES.map((r, i) => (
@@ -277,7 +340,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section id="faq" className="landing-section landing-section-alt">
+      <section id="faq" className="landing-section">
         <Reveal as="h2">Frequently Asked Questions</Reveal>
         <Reveal className="faq-wrap">
           <FaqAccordion />
