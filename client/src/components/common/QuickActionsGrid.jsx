@@ -21,6 +21,19 @@ const ICONS = {
       <path d="M14 2.5V8h5M8 12.5h8M8 16.5h8" />
     </svg>
   ),
+  attendance: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3.5" y="4.5" width="17" height="16" rx="2.5" />
+      <path d="M3.5 9.5h17M8 3v3M16 3v3" />
+      <path d="M8.5 14l2.2 2.2L15.5 12" />
+    </svg>
+  ),
+  reports: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 20.5V4.5a1 1 0 0 1 1-1h9.5L19 8v12.5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1Z" />
+      <path d="M8.5 12.5v5M12 10v7.5M15.5 14v3.5" />
+    </svg>
+  ),
 };
 
 const DEFAULT_ACTIONS = [

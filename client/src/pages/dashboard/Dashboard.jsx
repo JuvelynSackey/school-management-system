@@ -1,11 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer,
+} from 'recharts';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { getDashboard } from '../../api/dashboard.api';
 import { listAnnouncements } from '../../api/announcements.api';
 import { getAtRiskStudents } from '../../api/earlyWarning.api';
+import { getAcademicAnalytics } from '../../api/analytics.api';
 import { formatCurrency } from '../../utils/currency';
 import QuickActionsGrid from '../../components/common/QuickActionsGrid';
+
+// Same validated single-hue used for the "subject average" bar in
+// AnalyticsPage.jsx — kept identical here so the two "average by subject"
+// visuals in the app read as the same metric everywhere.
+const ACADEMIC_BAR_COLOR = '#2a78d6';
+const CHROME = {
+  light: { grid: '#e1e0d9', axis: '#c3c2b7' },
+  dark: { grid: '#3a3760', axis: '#8783ab' },
+};
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -61,19 +75,20 @@ function TeachersIcon() {
     </svg>
   );
 }
-function ClassesIcon() {
+function AttendanceIcon() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3.5 8.5L12 4l8.5 4.5L12 13 3.5 8.5Z" />
-      <path d="M7 10.5V15c0 1.4 2.2 2.5 5 2.5s5-1.1 5-2.5v-4.5" />
+      <rect x="3.5" y="4.5" width="17" height="16" rx="2.5" />
+      <path d="M3.5 9.5h17M8 3v3M16 3v3" />
+      <path d="M8.5 14l2.2 2.2L15.5 12" />
     </svg>
   );
 }
-function SubjectsIcon() {
+function FeesIcon() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H19a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H5.5A1.5 1.5 0 0 1 4 18.5v-14Z" />
-      <path d="M4 18.5A1.5 1.5 0 0 1 5.5 17H20" />
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5v9M14.8 9.8c0-1.3-1.3-2.3-2.8-2.3s-2.8.9-2.8 2c0 3 5.6 1.5 5.6 4.5 0 1.1-1.3 2-2.8 2s-2.8-1-2.8-2.3" />
     </svg>
   );
 }
@@ -193,22 +208,6 @@ function AttendanceMonitor({ rows }) {
         ))}
       </tbody>
     </table>
-  );
-}
-
-function ProfileCard({ user }) {
-  const initials = (user?.fullName || '?')
-    .split(' ')
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
-  return (
-    <div className="panel profile-card">
-      <div className="profile-avatar">{initials}</div>
-      <div className="profile-name">{user?.fullName}</div>
-      <div className="profile-role muted" style={{ textTransform: 'capitalize' }}>{user?.role}</div>
-    </div>
   );
 }
 
@@ -351,10 +350,112 @@ function ActionCenter({ alerts, decliningCount, index }) {
   );
 }
 
+// Everything the redesigned dashboard doesn't consider first-screen material
+// (Action Center, setup checklist, recent activity, etc.) lives behind this
+// toggle instead of being deleted — collapsed by default so the landing
+// view stays to the 3 sections the school actually asked for.
+function CollapsibleSection({ children }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="dashboard-more">
+      <button type="button" className="dashboard-more-toggle" onClick={() => setOpen((v) => !v)}>
+        <span>{open ? 'Hide' : 'Show'} more detail</span>
+        <span className={`dashboard-more-chevron${open ? ' is-open' : ''}`}>▾</span>
+      </button>
+      {open && <div className="dashboard-more-content">{children}</div>}
+    </div>
+  );
+}
+
+// "How is my school doing today?" — the one chart the redesigned dashboard
+// asks for, covering average performance and best-performing subjects in a
+// single visual (a reference line at the school-wide average across a bar
+// per subject), plus a compact pointer to students needing attention rather
+// than the full table (that detail lives in AtRiskStudentsPanel, below the
+// fold) so this panel stays glanceable.
+function AcademicOverview({ currentTermId, atRiskData, index }) {
+  const { isDark } = useTheme();
+  const chrome = isDark ? CHROME.dark : CHROME.light;
+  const [academic, setAcademic] = useState(null);
+
+  useEffect(() => {
+    if (!currentTermId) { setAcademic({ subjectAverages: [] }); return; }
+    getAcademicAnalytics(currentTermId).then(setAcademic).catch(() => setAcademic({ subjectAverages: [] }));
+  }, [currentTermId]);
+
+  const { overallAverage, topSubjects } = useMemo(() => {
+    const rows = academic?.subjectAverages || [];
+    if (rows.length === 0) return { overallAverage: null, topSubjects: [] };
+    const totalResults = rows.reduce((sum, r) => sum + r.resultCount, 0);
+    const weighted = rows.reduce((sum, r) => sum + r.average * r.resultCount, 0);
+    return {
+      overallAverage: totalResults > 0 ? Math.round((weighted / totalResults) * 10) / 10 : null,
+      topSubjects: [...rows].sort((a, b) => b.average - a.average).slice(0, 5),
+    };
+  }, [academic]);
+
+  const chartData = topSubjects.map((s) => ({ name: s.subjectName, Average: s.average }));
+  const atRiskCount = atRiskData?.students?.length || 0;
+
+  return (
+    <div className="panel dash-reveal" style={{ '--stagger': index }}>
+      <h2>Academic Overview</h2>
+
+      {academic === null && <p className="muted">Loading…</p>}
+
+      {academic !== null && topSubjects.length === 0 && (
+        <p className="muted">No results recorded yet this term.</p>
+      )}
+
+      {topSubjects.length > 0 && (
+        <>
+          <div className="academic-overview-headline">
+            <span className="academic-overview-score">{overallAverage}%</span>
+            <span className="muted">average score across all subjects this term</span>
+          </div>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={chrome.grid} vertical={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke={chrome.axis} />
+              <YAxis tick={{ fontSize: 12 }} stroke={chrome.axis} domain={[0, 100]} />
+              <Tooltip />
+              {overallAverage !== null && (
+                <ReferenceLine y={overallAverage} stroke={chrome.axis} strokeDasharray="4 4" />
+              )}
+              <Bar dataKey="Average" fill={ACADEMIC_BAR_COLOR} radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+          <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>Best-performing subjects, dashed line marks the school average.</p>
+        </>
+      )}
+
+      {atRiskCount > 0 && (
+        <div className="academic-overview-attention">
+          <h3>⚠️ {atRiskCount} student{atRiskCount === 1 ? '' : 's'} may need attention</h3>
+          <ul>
+            {atRiskData.students.slice(0, 3).map((s) => (
+              <li key={s.studentId}><Link to={`/students/${s.studentId}`}>{s.firstName} {s.lastName}</Link></li>
+            ))}
+          </ul>
+          <a href="#at-risk-students" className="link-btn">See full list →</a>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const ADMIN_QUICK_ACTIONS = [
+  { icon: 'personPlus', label: 'Register Student', to: '/students' },
+  { icon: 'document', label: 'Enter Results', to: '/results' },
+  { icon: 'attendance', label: 'Record Attendance', to: '/attendance' },
+  { icon: 'wallet', label: 'Record Payment', to: '/fees' },
+  { icon: 'reports', label: 'Generate Reports', to: '/reports' },
+];
+
 function AdminDashboard({ data, user }) {
   const {
-    counts, setupStatus, attendanceStats, todayAttendancePercent, termReportApprovalPercent, feeStats, currentTermFeeStats,
-    classEnrolmentByStage, attendanceMonitor, alerts, recentActivity,
+    counts, setupStatus, currentTermId, attendanceStats, todayAttendancePercent, termReportApprovalPercent, feeStats,
+    currentTermFeeStats, classEnrolmentByStage, attendanceMonitor, alerts, recentActivity,
   } = data;
 
   const [atRiskData, setAtRiskData] = useState(null);
@@ -370,38 +471,44 @@ function AdminDashboard({ data, user }) {
     : null;
 
   return (
-    <div className="dashboard-grid">
-      <div className="dashboard-main">
-        <SetupReadinessBanner setupStatus={setupStatus} schoolSlug={user?.schoolSlug} />
-        <WelcomeBanner user={user} pendingApprovalsCount={alerts.pendingApprovalsCount} />
+    <div>
+      <SetupReadinessBanner setupStatus={setupStatus} schoolSlug={user?.schoolSlug} />
+      <WelcomeBanner user={user} pendingApprovalsCount={alerts.pendingApprovalsCount} />
 
-        <div className="stat-card-row">
-          <StatCard icon={<StudentsIcon />} label="Enrolment" value={counts.students} tone="accent" index={0} />
-          <StatCard icon={<TeachersIcon />} label="Teachers" value={counts.teachers} tone="success" index={1} />
-          <StatCard icon={<ClassesIcon />} label="Classes" value={counts.classes} tone="rose" index={2} />
-          <StatCard icon={<SubjectsIcon />} label="Subjects" value={counts.subjects} tone="warning" index={3} />
-        </div>
+      {/* "How is my school doing today?" */}
+      <div className="stat-card-row">
+        <StatCard icon={<StudentsIcon />} label="Students" value={counts.students} tone="accent" index={0} />
+        <StatCard icon={<TeachersIcon />} label="Teachers" value={counts.teachers} tone="success" index={1} />
+        <StatCard
+          icon={<AttendanceIcon />}
+          label="Attendance Today"
+          value={todayAttendancePercent === null ? '—' : `${Math.round(todayAttendancePercent)}%`}
+          tone="rose"
+          index={2}
+        />
+        <StatCard icon={<FeesIcon />} label="Fees Collected" value={formatCurrency(currentTermFeeStats.totalPaid)} tone="warning" index={3} />
+      </div>
 
-        <ActionCenter alerts={alerts} decliningCount={decliningCount} index={4} />
+      <AcademicOverview currentTermId={currentTermId} atRiskData={atRiskData} index={4} />
 
-        {/* Progress KPIs */}
+      <QuickActionsGrid actions={ADMIN_QUICK_ACTIONS} />
+
+      <CollapsibleSection>
+        <ActionCenter alerts={alerts} decliningCount={decliningCount} index={0} />
+
         <div className="progress-stat-row">
-          <RingStat label="Today's Attendance" percent={todayAttendancePercent} tone="accent" index={5} />
-          <RingStat label="Term Fee Collection" percent={feeCollectionPercent} tone="success" index={6} />
-          <RingStat label="Term Report Approval" percent={termReportApprovalPercent} tone="warning" index={7} />
+          <RingStat label="Term Fee Collection" percent={feeCollectionPercent} tone="success" index={1} />
+          <RingStat label="Term Report Approval" percent={termReportApprovalPercent} tone="warning" index={2} />
         </div>
 
-        <QuickActionsGrid />
-
-        <div className="panel dash-reveal" style={{ '--stagger': 8 }}>
+        <div className="panel dash-reveal" style={{ '--stagger': 3 }}>
           <h2>Daily Attendance Monitor</h2>
           <AttendanceMonitor rows={attendanceMonitor} />
         </div>
 
-        <AtRiskStudentsPanel data={atRiskData} index={8.5} />
+        <AtRiskStudentsPanel data={atRiskData} index={4} />
 
-        {/* Class enrolment breakdown */}
-        <div className="panel dash-reveal" style={{ '--stagger': 9 }}>
+        <div className="panel dash-reveal" style={{ '--stagger': 5 }}>
           <h2>Class Enrolment Breakdown</h2>
           {STAGE_LABELS.map((stage) => {
             const count = classEnrolmentByStage[stage] || 0;
@@ -415,12 +522,12 @@ function AdminDashboard({ data, user }) {
           })}
         </div>
 
-        <div className="panel dash-reveal" style={{ '--stagger': 10 }}>
+        <div className="panel dash-reveal" style={{ '--stagger': 6 }}>
           <h2>Today&apos;s Attendance</h2>
           <AttendanceCards stats={attendanceStats} />
         </div>
 
-        <div className="panel dash-reveal" style={{ '--stagger': 11 }}>
+        <div className="panel dash-reveal" style={{ '--stagger': 7 }}>
           <h2>Fee Overview (All Time)</h2>
           <div className="cards" style={{ marginBottom: 0 }}>
             <div className="card"><div>Total Due</div><div className="num">{formatCurrency(feeStats.totalDue)}</div></div>
@@ -429,7 +536,7 @@ function AdminDashboard({ data, user }) {
           </div>
         </div>
 
-        <div className="panel dash-reveal" style={{ '--stagger': 12 }}>
+        <div className="panel dash-reveal" style={{ '--stagger': 8 }}>
           <h2>Recent Students</h2>
           <table>
             <thead><tr><th>Name</th><th>Admission No.</th></tr></thead>
@@ -442,7 +549,7 @@ function AdminDashboard({ data, user }) {
           </table>
         </div>
 
-        <div className="panel dash-reveal" style={{ '--stagger': 13 }}>
+        <div className="panel dash-reveal" style={{ '--stagger': 9 }}>
           <h2>Recent Payments</h2>
           <table>
             <thead><tr><th>Student</th><th>Amount</th><th>Date</th></tr></thead>
@@ -454,12 +561,9 @@ function AdminDashboard({ data, user }) {
             </tbody>
           </table>
         </div>
-      </div>
 
-      <div className="dashboard-rail">
-        <ProfileCard user={user} />
         <AnnouncementsFeed />
-      </div>
+      </CollapsibleSection>
     </div>
   );
 }

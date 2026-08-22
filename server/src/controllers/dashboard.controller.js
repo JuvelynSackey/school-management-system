@@ -142,6 +142,7 @@ const getAdminDashboard = async () => {
   return {
     role: 'admin',
     counts: { students: studentCount, teachers: teacherCount, classes: classCount, subjects: subjectCount },
+    currentTermId: currentTerm?.id || null,
     setupStatus,
     attendanceStats,
     todayAttendancePercent,
