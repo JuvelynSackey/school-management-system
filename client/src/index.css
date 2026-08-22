@@ -365,6 +365,46 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); opacity: 1
 .user-name { display: block; font-weight: 500; color: var(--text-h); font-size: 14px; }
 .user-role { display: block; font-size: 12px; text-transform: capitalize; color: var(--text-muted); }
 
+/* Mobile menu toggle — hidden on desktop, shown left-of-everything in the
+   topbar below the breakpoint. */
+.menu-toggle {
+  display: none;
+  background: none; border: 1px solid var(--border); border-radius: 8px;
+  width: 38px; height: 38px; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--text-h); flex-shrink: 0;
+}
+.sidebar-backdrop { display: none; }
+
+@media (max-width: 860px) {
+  .menu-toggle { display: flex; }
+  .topbar { justify-content: flex-start; flex-wrap: wrap; gap: 10px; padding: 12px 14px; }
+  .topbar-user { text-align: left; margin-right: auto; }
+
+  /* Off-canvas drawer instead of a permanent flex column — the sidebar no
+     longer takes up part of the viewport width by default, it slides in
+     over the content on request. */
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 210;
+    width: 78vw;
+    max-width: 280px;
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
+    box-shadow: 12px 0 32px rgba(8, 6, 20, 0.35);
+  }
+  .sidebar.is-open { transform: translateX(0); }
+
+  .sidebar-backdrop.is-open {
+    display: block;
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(8, 6, 13, 0.45);
+  }
+
+  .page-content { padding: 14px; }
+  .toolbar { flex-wrap: wrap; }
+}
+
 .theme-toggle { display: flex; gap: 2px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 2px; }
 .theme-toggle-btn {
   border: none; background: none; cursor: pointer; font-size: 14px; line-height: 1;
@@ -398,11 +438,16 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); opacity: 1
   box-shadow: 0 1px 2px rgba(20, 16, 60, 0.04);
 }
 
-table { width: 100%; border-collapse: collapse; }
-th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 14px; }
+/* display:block turns the table itself into a horizontally-scrollable
+   container on a narrow screen — no wrapping <div> needed at every call
+   site (there are dozens of raw <table> elements across the app). Row/cell
+   layout is untouched since thead/tbody/tr/td keep their own table-related
+   display values; only the table's own outer box changes. */
+table { width: 100%; max-width: 100%; border-collapse: collapse; display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 14px; white-space: nowrap; }
 th { color: var(--text-muted); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; }
 
-.toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; }
+.toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
 
 /* Modal */
 .modal-overlay {

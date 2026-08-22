@@ -30,17 +30,19 @@ const NAV_ITEMS = [
 export default function AppShell() {
   const { user, logout } = useAuth();
   const [askOpen, setAskOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      {sidebarOpen && <div className="sidebar-backdrop is-open" onClick={() => setSidebarOpen(false)} />}
+      <aside className={`sidebar${sidebarOpen ? ' is-open' : ''}`}>
         <div className="sidebar-brand">
           <img src="/logo.png" alt="JesManage" className="brand-logo" />
           <span>JesManage</span>
         </div>
         <nav className="sidebar-nav">
           {NAV_ITEMS.filter((item) => item.roles.includes(user?.role)).map((item) => (
-            <NavLink key={item.to} to={item.to} className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}>
+            <NavLink key={item.to} to={item.to} onClick={() => setSidebarOpen(false)} className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}>
               {item.label}
             </NavLink>
           ))}
@@ -48,6 +50,9 @@ export default function AppShell() {
       </aside>
       <div className="app-main">
         <header className="topbar">
+          <button type="button" className="menu-toggle" aria-label="Open menu" onClick={() => setSidebarOpen(true)}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
+          </button>
           <div className="topbar-user">
             <span className="user-name">{user?.fullName}</span>
             <span className="user-role">{user?.role}</span>
