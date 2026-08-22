@@ -5,7 +5,7 @@ import ThemeToggle from '../common/ThemeToggle';
 import OfflineIndicator from '../common/OfflineIndicator';
 import AskJesManage from '../common/AskJesManage';
 import CommandPalette from '../common/CommandPalette';
-import { NAV_ITEMS } from '../../config/navItems';
+import { NAV_ITEMS, NAV_GROUPS } from '../../config/navItems';
 
 export default function AppShell() {
   const { user, logout } = useAuth();
@@ -23,11 +23,20 @@ export default function AppShell() {
           <span>JesManage</span>
         </div>
         <nav className="sidebar-nav">
-          {visibleNavItems.map((item) => (
-            <NavLink key={item.to} to={item.to} onClick={() => setSidebarOpen(false)} className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}>
-              {item.label}
-            </NavLink>
-          ))}
+          {NAV_GROUPS.map((group) => {
+            const items = visibleNavItems.filter((item) => item.group === group);
+            if (items.length === 0) return null;
+            return (
+              <div className="sidebar-group" key={group}>
+                {group !== 'MAIN' && <div className="sidebar-group-label">{group}</div>}
+                {items.map((item) => (
+                  <NavLink key={item.to} to={item.to} onClick={() => setSidebarOpen(false)} className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}>
+                    {item.label}
+                  </NavLink>
+                ))}
+              </div>
+            );
+          })}
         </nav>
       </aside>
       <div className="app-main">
