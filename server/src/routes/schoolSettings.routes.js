@@ -4,6 +4,7 @@ const { updateValidator } = require('../validators/schoolSettings.validators');
 const validate = require('../middleware/validate');
 const authenticate = require('../middleware/authenticate');
 const authorize = require('../middleware/authorize');
+const { uploadLogo } = require('../middleware/upload');
 
 const router = express.Router();
 
@@ -11,5 +12,6 @@ router.use(authenticate);
 
 router.get('/', controller.get);
 router.put('/', authorize('admin'), updateValidator, validate, controller.update);
+router.post('/logo', authorize('admin'), uploadLogo, controller.uploadLogo);
 
 module.exports = router;

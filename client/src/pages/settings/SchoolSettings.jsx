@@ -1,9 +1,59 @@
 import { useEffect, useState } from 'react';
-import { getSchoolSettings, updateSchoolSettings } from '../../api/schoolSettings.api';
+import { getSchoolSettings, updateSchoolSettings, uploadSchoolLogo } from '../../api/schoolSettings.api';
 import { getChannelStatus } from '../../api/notifications.api';
 import {
   listPersonalAttributes, createPersonalAttribute, updatePersonalAttribute, deletePersonalAttribute,
 } from '../../api/personalAttributes.api';
+
+function SchoolEmblemIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3l9 5-9 5-9-5 9-5Z" />
+      <path d="M5 10.5V16c0 1.5 3 3 7 3s7-1.5 7-3v-5.5" />
+    </svg>
+  );
+}
+
+function SchoolLogoUpload({ logoUrl, onUploaded }) {
+  const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file next time
+    if (!file) return;
+    setIsUploading(true);
+    setError('');
+    try {
+      const { logoUrl: newLogoUrl } = await uploadSchoolLogo(file);
+      onUploaded(newLogoUrl);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to upload logo.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18 }}>
+      {logoUrl ? (
+        <img src={logoUrl} alt="School logo" style={{ width: 64, height: 64, borderRadius: 12, objectFit: 'cover', border: '1px solid var(--border)' }} />
+      ) : (
+        <div className="profile-avatar" style={{ width: 64, height: 64, marginBottom: 0, borderRadius: 12 }}>
+          <SchoolEmblemIcon />
+        </div>
+      )}
+      <div>
+        <label className="btn-secondary" style={{ cursor: 'pointer', fontSize: 13, display: 'inline-block' }}>
+          {isUploading ? 'Uploading…' : logoUrl ? 'Replace Logo' : 'Upload Logo'}
+          <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFile} disabled={isUploading} style={{ display: 'none' }} />
+        </label>
+        <p className="muted" style={{ fontSize: 11.5, margin: '6px 0 0' }}>JPEG, PNG, or WebP — up to 2MB.</p>
+        {error && <p className="alert-error" style={{ padding: '4px 10px', margin: '6px 0 0', fontSize: 12 }}>{error}</p>}
+      </div>
+    </div>
+  );
+}
 
 const emptyForm = {
   name: '', motto: '', address: '', phone: '', email: '', reportCardFeeGateEnabled: false, performanceChartEnabled: false,
@@ -15,6 +65,7 @@ const CHANNEL_LABELS = { email: 'Email', sms: 'SMS', whatsapp: 'WhatsApp' };
 
 export default function SchoolSettings() {
   const [form, setForm] = useState(emptyForm);
+  const [logoUrl, setLogoUrl] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
@@ -23,19 +74,22 @@ export default function SchoolSettings() {
 
   useEffect(() => {
     getSchoolSettings()
-      .then((data) => setForm({
-        name: data.name || '', motto: data.motto || '', address: data.address || '',
-        phone: data.phone || '', email: data.email || '',
-        reportCardFeeGateEnabled: Boolean(data.reportCardFeeGateEnabled),
-        performanceChartEnabled: Boolean(data.performanceChartEnabled),
-        communicationChannelsEnabled: {
-          email: Boolean(data.communicationChannelsEnabled?.email),
-          sms: Boolean(data.communicationChannelsEnabled?.sms),
-          whatsapp: Boolean(data.communicationChannelsEnabled?.whatsapp),
-        },
-        feedingFeeEnabled: Boolean(data.feedingFeeEnabled),
-        feedingRatePerDay: data.feedingRatePerDay || 0,
-      }))
+      .then((data) => {
+        setLogoUrl(data.logoUrl || null);
+        setForm({
+          name: data.name || '', motto: data.motto || '', address: data.address || '',
+          phone: data.phone || '', email: data.email || '',
+          reportCardFeeGateEnabled: Boolean(data.reportCardFeeGateEnabled),
+          performanceChartEnabled: Boolean(data.performanceChartEnabled),
+          communicationChannelsEnabled: {
+            email: Boolean(data.communicationChannelsEnabled?.email),
+            sms: Boolean(data.communicationChannelsEnabled?.sms),
+            whatsapp: Boolean(data.communicationChannelsEnabled?.whatsapp),
+          },
+          feedingFeeEnabled: Boolean(data.feedingFeeEnabled),
+          feedingRatePerDay: data.feedingRatePerDay || 0,
+        });
+      })
       .catch((err) => setError(err.response?.data?.message || 'Failed to load school settings.'))
       .finally(() => setIsLoading(false));
     getChannelStatus().then(setChannelStatus).catch(() => setChannelStatus(null));
@@ -69,6 +123,8 @@ export default function SchoolSettings() {
           <form onSubmit={handleSubmit}>
             {error && <div className="alert-error">{error}</div>}
             {message && <div className="alert-error" style={{ background: 'var(--accent-bg)', color: 'var(--accent)' }}>{message}</div>}
+
+            <SchoolLogoUpload logoUrl={logoUrl} onUploaded={setLogoUrl} />
 
             <label className="field">
               <span>School Name</span>

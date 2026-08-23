@@ -1,6 +1,8 @@
 const { SchoolSettings } = require('../models');
 const asyncHandler = require('../middleware/asyncHandler');
+const AppError = require('../utils/AppError');
 const { findOrCreate } = require('../utils/findOrCreate');
+const auditLog = require('../services/auditLog.service');
 
 // One settings document per school — auto-created with blank defaults on first read.
 const get = asyncHandler(async (req, res) => {
@@ -36,4 +38,29 @@ const update = asyncHandler(async (req, res) => {
   res.json({ success: true, data: settings });
 });
 
-module.exports = { get, update };
+// POST /school-settings/logo — multipart, req.file populated by the
+// uploadLogo multer middleware before this handler runs.
+const uploadLogo = asyncHandler(async (req, res, next) => {
+  if (!req.file) return next(new AppError('A logo file is required', 400));
+
+  // Absolute URL so the client never has to guess the API host, and so it
+  // can be re-fetched and base64-embedded into report-card PDFs later
+  // regardless of which origin generated the URL.
+  const logoUrl = `${req.protocol}://${req.get('host')}/uploads/logos/${req.file.filename}`;
+
+  const settings = await SchoolSettings.findOneAndUpdate(
+    { schoolId: req.user.schoolId },
+    { $set: { logoUrl } },
+    { upsert: true, new: true },
+  );
+
+  await auditLog.record({
+    req, action: 'schoolSettings.logoUpload', entityType: 'SchoolSettings', entityId: settings.id, description: 'Uploaded the school logo',
+  });
+
+  res.json({ success: true, data: { logoUrl } });
+});
+
+module.exports = {
+  get, update, uploadLogo,
+};

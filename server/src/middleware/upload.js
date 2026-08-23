@@ -12,7 +12,10 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `${req.params.id}-${Date.now()}${ext}`);
+    // Super Admin's route passes the target school via :id; the tenant
+    // admin's own /school-settings/logo route has no :id and relies on the
+    // authenticated request's own schoolId instead.
+    cb(null, `${req.params.id || req.user?.schoolId}-${Date.now()}${ext}`);
   },
 });
 
