@@ -21,7 +21,7 @@ const isAIConfigured = () => {
   return true;
 };
 
-const GEMINI_MODEL = () => process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+const GEMINI_MODEL = () => process.env.GEMINI_MODEL || 'gemini-3.6-flash';
 const GEMINI_URL = () => `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL()}:generateContent`;
 
 // Shared by every AI-backed generator below — one fetch/error-handling path
@@ -46,7 +46,14 @@ const callAI = async (prompt) => {
       },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
+        // gemini-3.6-flash is a "thinking" model — maxOutputTokens covers
+        // its internal reasoning tokens AND the visible answer combined
+        // (a plain 3-sentence remark alone used ~840 thinking + ~180
+        // answer tokens in testing), so 1024 was cutting real answers off
+        // mid-sentence. thinkingConfig: { thinkingBudget: 0 } to disable
+        // reasoning outright was tried first but this model rejects it
+        // with 400 INVALID_ARGUMENT — bumping the budget is what actually works.
+        generationConfig: { temperature: 0.2, maxOutputTokens: 3072 },
       }),
     });
   } catch (fetchErr) {

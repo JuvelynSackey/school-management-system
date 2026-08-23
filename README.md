@@ -335,7 +335,7 @@ npm install          # installs client + server via npm workspaces
 | `JWT_EXPIRES_IN` | token lifetime (default `8h`) |
 | `CLIENT_ORIGIN` | allowed CORS origin, e.g. `http://localhost:5173` |
 | `GEMINI_API_KEY` | optional — activates the AI Remark Assistant (§21) and friends; must start with `AIzaSy` (legacy) or `AQ.` (current default), get one from aistudio.google.com/app/apikey; left blank, everything stays gated to its deterministic fallback |
-| `GEMINI_MODEL` | optional, defaults to `gemini-2.0-flash` |
+| `GEMINI_MODEL` | optional, defaults to `gemini-3.6-flash` |
 
 `client/.env` (copy from `client/.env.example`):
 
@@ -390,7 +390,7 @@ set (e.g. MongoDB Atlas, which is a replica set by default); and set
   **AI Performance Summary**, **Academic Anomaly Detection**,
   **Student Performance Insights**, **Early-Warning Intelligence**, and
   the **Natural-Language Admin Assistant** — powered by Google AI Studio's Gemini API
-  (default model `gemini-2.0-flash`) behind
+  (default model `gemini-3.6-flash`) behind
   `GEMINI_API_KEY`. Only the Admin Assistant hard-requires the key (503 with no fallback if
   it's missing); every other feature has a deterministic template/rules
   fallback and returns `fallbackMode: true` instead of erroring when
