@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { getDashboard } from '../../api/dashboard.api';
 import { listAnnouncements } from '../../api/announcements.api';
+import { listAuditLogs } from '../../api/auditLogs.api';
 import { getAtRiskStudents } from '../../api/earlyWarning.api';
 import { getAcademicAnalytics } from '../../api/analytics.api';
 import { formatCurrency } from '../../utils/currency';
@@ -260,6 +261,49 @@ function AnnouncementsFeed() {
         <div key={a.id} className="announcement-feed-item">
           <p>{a.message}</p>
           <span className="muted">{a.createdAt ? new Date(a.createdAt).toLocaleDateString() : ''}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const relativeTime = (isoDate) => {
+  const diffMs = Date.now() - new Date(isoDate).getTime();
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? '' : 's'} ago`;
+};
+
+// Reuses GET /audit-logs (already built for the full Audit Log page) rather
+// than a new endpoint — just the 5 most recent entries. Auth entries
+// (logins, including failed ones) are filtered out: they're the single
+// noisiest entityType by far and belong in Security Center, not a glanceable
+// "what just happened" feed.
+function RecentActivityFeed() {
+  const [logs, setLogs] = useState(null);
+
+  useEffect(() => {
+    listAuditLogs({ limit: 8 })
+      .then((res) => setLogs(res.logs.filter((l) => l.entityType !== 'Auth').slice(0, 5)))
+      .catch(() => setLogs([]));
+  }, []);
+
+  return (
+    <div className="panel">
+      <div className="toolbar" style={{ marginBottom: 12 }}>
+        <h2 style={{ margin: 0 }}>Recent Activity</h2>
+        <Link to="/audit-log" className="link-btn">View all</Link>
+      </div>
+      {logs === null && <LoadingSpinner label="" size={20} />}
+      {logs && logs.length === 0 && <p className="muted">No recent activity yet.</p>}
+      {logs && logs.map((log) => (
+        <div key={log.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '6px 0' }}>
+          <span>{log.description}</span>
+          <span className="muted" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{relativeTime(log.createdAt)}</span>
         </div>
       ))}
     </div>
@@ -533,6 +577,8 @@ function AdminDashboard({ data, user }) {
 
       <CollapsibleSection>
         <ActionCenter alerts={alerts} decliningCount={decliningCount} index={0} />
+
+        <RecentActivityFeed />
 
         <div className="progress-stat-row">
           <RingStat label="Term Fee Collection" percent={feeCollectionPercent} tone="success" index={1} />
