@@ -380,6 +380,32 @@ const getInsights = asyncHandler(async (req, res, next) => {
   res.json({ success: true, data: { ...insights, aiNarrative } });
 });
 
+// GET /results/academic-history/:studentId — term-over-term overall average
+// plus a per-subject score progression, for the Academic Progress History
+// card on StudentProfile. Same ownership boundary and approved-only
+// filtering as getInsights, since it's built from the same history.
+const getAcademicHistory = asyncHandler(async (req, res, next) => {
+  const { studentId } = req.params;
+  const student = await Student.findById(studentId);
+  if (!student) return next(new AppError('Student not found', 404));
+
+  try {
+    await assertStudentAccess(req, student);
+  } catch (err) {
+    return next(err);
+  }
+
+  let results = await populateForHistory(Result.find({ studentId }));
+  if (req.user.role === 'student' || req.user.role === 'parent') {
+    results = await filterToApprovedOnly(results);
+  }
+
+  const scheme = await getSchemeForSchool(req.user.schoolId);
+  const history = performanceInsights.computeAcademicHistory({ results, scheme });
+
+  res.json({ success: true, data: history });
+});
+
 module.exports = {
-  getRoster, getAnomalies, recordBulk, amendResult, reportConflict, getForStudent, getMyResults, getInsights,
+  getRoster, getAnomalies, recordBulk, amendResult, reportConflict, getForStudent, getMyResults, getInsights, getAcademicHistory,
 };

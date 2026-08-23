@@ -183,3 +183,95 @@ describe('Student Performance Insights', () => {
     });
   });
 });
+
+describe('Academic Progress History', () => {
+  test('builds overall term averages and a per-subject score progression, ordered chronologically', async () => {
+    const school = await fixtures.createSchool(models);
+    const classRow = await fixtures.createClass(models, school._id);
+    const subjectA = await fixtures.createSubject(models, school._id, { name: 'Mathematics' });
+    const subjectB = await fixtures.createSubject(models, school._id, { name: 'Science' });
+    const termOne = await fixtures.createTerm(models, school._id, { termNumber: 1, isCurrent: false, startDate: new Date('2025-01-10'), name: 'Term 1' });
+    const termTwo = await fixtures.createTerm(models, school._id, { termNumber: 2, isCurrent: true, startDate: new Date('2025-05-10'), name: 'Term 2' });
+    const { student } = await fixtures.createStudent(models, school._id, { classId: classRow.id });
+    const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin@history-test.local' });
+    const token = await fixtures.login(app, school.slug, 'admin@history-test.local', password);
+
+    // Term 1: Math 72 -> average 72. Term 2: Math 84, Science 60 -> average 72.
+    await createResult(school._id, {
+      studentId: student.id, subjectId: subjectA.id, classId: classRow.id, academicTermId: termOne.id, classScore: 36, examScore: 36, totalScore: 72,
+    });
+    await createResult(school._id, {
+      studentId: student.id, subjectId: subjectA.id, classId: classRow.id, academicTermId: termTwo.id, classScore: 42, examScore: 42, totalScore: 84,
+    });
+    await createResult(school._id, {
+      studentId: student.id, subjectId: subjectB.id, classId: classRow.id, academicTermId: termTwo.id, classScore: 30, examScore: 30, totalScore: 60,
+    });
+
+    const res = await request(app).get(`/api/results/academic-history/${student.id}`).set(fixtures.authHeader(token));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.overallHistory).toEqual([
+      { term: 'Term 1', average: 72 },
+      { term: 'Term 2', average: 72 },
+    ]);
+    expect(res.body.data.subjectHistory).toEqual([
+      { subject: 'Mathematics', scores: [{ term: 'Term 1', score: 72 }, { term: 'Term 2', score: 84 }] },
+      { subject: 'Science', scores: [{ term: 'Term 2', score: 60 }] },
+    ]);
+  });
+
+  test('a student with no results at all gets an empty, harmless response', async () => {
+    const school = await fixtures.createSchool(models);
+    const classRow = await fixtures.createClass(models, school._id);
+    const { student } = await fixtures.createStudent(models, school._id, { classId: classRow.id });
+    const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin7@history-test.local' });
+    const token = await fixtures.login(app, school.slug, 'admin7@history-test.local', password);
+
+    const res = await request(app).get(`/api/results/academic-history/${student.id}`).set(fixtures.authHeader(token));
+    expect(res.status).toBe(200);
+    expect(res.body.data.overallHistory).toEqual([]);
+    expect(res.body.data.subjectHistory).toEqual([]);
+  });
+
+  test('a student only sees scores from an Approved sheet in their own history, not a Draft one', async () => {
+    const school = await fixtures.createSchool(models);
+    const classRow = await fixtures.createClass(models, school._id);
+    const subjectApproved = await fixtures.createSubject(models, school._id, { name: 'Approved Subject' });
+    const subjectDraft = await fixtures.createSubject(models, school._id, { name: 'Draft Subject' });
+    const term = await fixtures.createTerm(models, school._id, { startDate: new Date('2025-01-10') });
+    const { user, student, password } = await fixtures.createStudent(models, school._id, { classId: classRow.id });
+
+    await createResult(school._id, {
+      studentId: student.id, subjectId: subjectApproved.id, classId: classRow.id, academicTermId: term.id, classScore: 40, examScore: 40, totalScore: 80,
+    });
+    await createResult(school._id, {
+      studentId: student.id, subjectId: subjectDraft.id, classId: classRow.id, academicTermId: term.id, classScore: 20, examScore: 20, totalScore: 40,
+    });
+    const { ResultSheet } = models;
+    await runWithSchool(school._id, async () => ResultSheet.create({
+      schoolId: school._id, classId: classRow.id, subjectId: subjectApproved.id, academicTermId: term.id, status: 'Approved',
+    }));
+    await runWithSchool(school._id, async () => ResultSheet.create({
+      schoolId: school._id, classId: classRow.id, subjectId: subjectDraft.id, academicTermId: term.id, status: 'Draft',
+    }));
+
+    const token = await fixtures.login(app, school.slug, user.email, password);
+    const res = await request(app).get(`/api/results/academic-history/${student.id}`).set(fixtures.authHeader(token));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.subjectHistory).toEqual([{ subject: 'Approved Subject', scores: [{ term: term.name, score: 80 }] }]);
+  });
+
+  test('a student cannot view another student\'s academic history', async () => {
+    const school = await fixtures.createSchool(models);
+    const { user: userA, student: studentA, password: passwordA } = await fixtures.createStudent(models, school._id);
+    const { student: studentB } = await fixtures.createStudent(models, school._id);
+    const token = await fixtures.login(app, school.slug, userA.email, passwordA);
+
+    const ownRes = await request(app).get(`/api/results/academic-history/${studentA.id}`).set(fixtures.authHeader(token));
+    expect(ownRes.status).toBe(200);
+
+    const otherRes = await request(app).get(`/api/results/academic-history/${studentB.id}`).set(fixtures.authHeader(token));
+    expect(otherRes.status).toBe(403);
+  });
+});

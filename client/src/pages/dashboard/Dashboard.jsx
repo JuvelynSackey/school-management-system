@@ -274,12 +274,13 @@ function AtRiskStudentsPanel({ index, data: externalData }) {
             <tr key={s.studentId}>
               <td><Link to={`/students/${s.studentId}`}>{s.firstName} {s.lastName}</Link></td>
               <td>{s.className || '—'}</td>
-              <td>
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              <td style={{ whiteSpace: 'normal' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 280 }}>
                   {s.academicFlags.map((f) => (
-                    <span key={f.type} className="badge badge-warning" title={f.message}>
-                      {FLAG_LABELS[f.type] || f.type}
-                    </span>
+                    <div key={f.type}>
+                      <span className="badge badge-warning">{FLAG_LABELS[f.type] || f.type}</span>
+                      <p className="muted" style={{ fontSize: 11.5, margin: '3px 0 0', whiteSpace: 'normal' }}>{f.message}</p>
+                    </div>
                   ))}
                 </div>
               </td>

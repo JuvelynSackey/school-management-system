@@ -11,6 +11,7 @@ import { useAuth } from '../../context/AuthContext';
 import Modal from '../../components/common/Modal';
 import ReportCardsPanel from '../../components/results/ReportCardsPanel';
 import PerformanceInsightsPanel from '../../components/results/PerformanceInsightsPanel';
+import AcademicHistoryPanel from '../../components/results/AcademicHistoryPanel';
 
 const NOTE_BADGE_CLASS = { medical: 'badge-danger', pickup: 'badge-warning', other: 'badge-neutral' };
 
@@ -302,6 +303,7 @@ export default function StudentProfile() {
           )}
 
           <PerformanceInsightsPanel studentId={id} />
+          <AcademicHistoryPanel studentId={id} />
 
           <div className="panel">
             <h2>Results</h2>

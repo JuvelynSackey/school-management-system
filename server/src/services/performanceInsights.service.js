@@ -67,4 +67,52 @@ const computeInsights = ({ results, scheme }) => {
   return { trend, strongestSubjects, needsAttentionSubjects };
 };
 
-module.exports = { computeInsights };
+// Same input shape and term-ordering rule as computeInsights (sorted by
+// academicTerm.startDate; a term without one can't be placed on a timeline
+// and is excluded) — this just returns the full history instead of
+// collapsing it into a single trend number, for the Academic Progress
+// History card on StudentProfile.
+const computeAcademicHistory = ({ results, scheme }) => {
+  const maxTotal = (scheme?.classScoreMax ?? 50) + (scheme?.examScoreMax ?? 50);
+  const pct = (score) => (maxTotal > 0 ? Math.round((score / maxTotal) * 100) : null);
+
+  const termById = new Map();
+  results.forEach((r) => {
+    const termId = r.academicTerm?.id;
+    const startDate = r.academicTerm?.startDate;
+    if (!termId || !startDate) return;
+    if (!termById.has(termId)) {
+      termById.set(termId, {
+        termId, termName: r.academicTerm.name, startDate, scores: [],
+      });
+    }
+    termById.get(termId).scores.push(r.totalScore);
+  });
+  const orderedTerms = [...termById.values()].sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+
+  const overallHistory = orderedTerms.map((t) => ({
+    term: t.termName,
+    average: pct(t.scores.reduce((sum, v) => sum + v, 0) / t.scores.length),
+  }));
+
+  const bySubject = new Map();
+  results.forEach((r) => {
+    const termId = r.academicTerm?.id;
+    if (!termId || !termById.has(termId)) return;
+    const subjectName = r.subject?.name || 'Unknown subject';
+    if (!bySubject.has(subjectName)) bySubject.set(subjectName, new Map());
+    bySubject.get(subjectName).set(termId, pct(r.totalScore));
+  });
+  const subjectHistory = [...bySubject.entries()]
+    .map(([subject, scoresByTerm]) => ({
+      subject,
+      scores: orderedTerms
+        .filter((t) => scoresByTerm.has(t.termId))
+        .map((t) => ({ term: t.termName, score: scoresByTerm.get(t.termId) })),
+    }))
+    .sort((a, b) => a.subject.localeCompare(b.subject));
+
+  return { overallHistory, subjectHistory };
+};
+
+module.exports = { computeInsights, computeAcademicHistory };

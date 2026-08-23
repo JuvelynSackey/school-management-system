@@ -19,5 +19,6 @@ router.post('/:id/amend', authorize('admin'), amendValidator, validate, controll
 router.post('/report-conflict', authorize('admin', 'teacher'), reportConflictValidator, validate, controller.reportConflict);
 router.get('/student/:studentId', authorize('admin', 'teacher', 'student', 'parent'), controller.getForStudent);
 router.get('/insights/:studentId', authorize('admin', 'teacher', 'student', 'parent'), getInsightsValidator, validate, controller.getInsights);
+router.get('/academic-history/:studentId', authorize('admin', 'teacher', 'student', 'parent'), getInsightsValidator, validate, controller.getAcademicHistory);
 
 module.exports = router;
