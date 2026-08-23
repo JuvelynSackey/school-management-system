@@ -81,7 +81,7 @@ export default function RegisterSchool() {
       <div className="cosmic-orb cosmic-orb-blue" />
       <div className="cosmic-orb cosmic-orb-orange" />
 
-      <div className="cosmic-card" style={{ maxWidth: 440 }}>
+      <div className="cosmic-card" style={{ maxWidth: submitted ? 440 : 560 }}>
         {submitted ? (
           <div>
             <h2 style={{ marginTop: 0 }}>Registration Submitted</h2>
@@ -100,81 +100,83 @@ export default function RegisterSchool() {
           </div>
         ) : (
           <form onSubmit={handleSubmit}>
-            <img src="/logo.png" alt="JesManage" style={{ width: 56, height: 56, borderRadius: 14, marginBottom: 12 }} />
+            <img src="/logo.png" alt="JesManage" style={{ width: 48, height: 48, borderRadius: 12, marginBottom: 10 }} />
             <h2 style={{ marginTop: 0, marginBottom: 4 }}>Register Your School</h2>
-            <p className="muted" style={{ fontSize: 13, marginTop: 0, marginBottom: 20 }}>
-              Modern school management for Ghanaian basic schools
+            <p className="muted" style={{ fontSize: 12.5, marginTop: 0, marginBottom: 16 }}>
+              For Ghanaian basic schools
             </p>
             {error && <div className="alert-error">{error}</div>}
-            <label className="field">
-              <span>School Name</span>
-              <input
-                value={form.schoolName}
-                onChange={(e) => handleNameChange(e.target.value)}
-                placeholder="e.g. Kings Prep Academy"
-                required
-                name="school-name"
-                autoComplete="organization"
-              />
-            </label>
-            <label className="field">
-              <span>School Type (optional)</span>
-              <select
-                value={form.schoolType}
-                onChange={(e) => setForm({ ...form, schoolType: e.target.value })}
-                name="school-type"
-              >
-                <option value="">Select type…</option>
-                <option value="private_basic">Private Basic School</option>
-                <option value="public_basic">Public Basic School</option>
-                <option value="tvet">TVET / Vocational</option>
-                <option value="other">Other</option>
-              </select>
-            </label>
-            <label className="field">
-              <span>Login Code</span>
-              <input
-                value={form.slug}
-                onChange={(e) => setForm({ ...form, slug: e.target.value })}
-                placeholder="e.g. kings-prep"
-                required
-                name="login-code"
-                autoComplete="off"
-                data-1p-ignore
-                data-lpignore="true"
-              />
-            </label>
-            <label className="field">
-              <span>Your Full Name</span>
-              <input
-                value={form.adminFullName}
-                onChange={(e) => setForm({ ...form, adminFullName: e.target.value })}
-                required
-                name="admin-full-name"
-                autoComplete="name"
-              />
-            </label>
-            <label className="field">
-              <span>Your Email</span>
-              <input
-                type="email"
-                value={form.adminEmail}
-                onChange={(e) => setForm({ ...form, adminEmail: e.target.value })}
-                required
-                name="admin-email"
-                autoComplete="email"
-              />
-              <span className="muted" style={{ fontSize: 12, fontWeight: 400 }}>We&apos;ll send a verification link to this address.</span>
-            </label>
-            <label className="field">
-              <span>Phone (optional)</span>
-              <input
-                value={form.adminPhone}
-                onChange={(e) => setForm({ ...form, adminPhone: e.target.value })}
-                name="admin-phone"
-                autoComplete="tel"
-              />
-            </label>
+            <div className="auth-grid">
+              <label className="field">
+                <span>School Name</span>
+                <input
+                  value={form.schoolName}
+                  onChange={(e) => handleNameChange(e.target.value)}
+                  placeholder="e.g. Kings Prep Academy"
+                  required
+                  name="school-name"
+                  autoComplete="organization"
+                />
+              </label>
+              <label className="field">
+                <span>Login Code</span>
+                <input
+                  value={form.slug}
+                  onChange={(e) => setForm({ ...form, slug: e.target.value })}
+                  placeholder="e.g. kings-prep"
+                  required
+                  name="login-code"
+                  autoComplete="off"
+                  data-1p-ignore
+                  data-lpignore="true"
+                />
+              </label>
+              <label className="field">
+                <span>Your Full Name</span>
+                <input
+                  value={form.adminFullName}
+                  onChange={(e) => setForm({ ...form, adminFullName: e.target.value })}
+                  required
+                  name="admin-full-name"
+                  autoComplete="name"
+                />
+              </label>
+              <label className="field">
+                <span>School Type (optional)</span>
+                <select
+                  value={form.schoolType}
+                  onChange={(e) => setForm({ ...form, schoolType: e.target.value })}
+                  name="school-type"
+                >
+                  <option value="">Select type…</option>
+                  <option value="private_basic">Private Basic School</option>
+                  <option value="public_basic">Public Basic School</option>
+                  <option value="tvet">TVET / Vocational</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>Your Email</span>
+                <input
+                  type="email"
+                  value={form.adminEmail}
+                  onChange={(e) => setForm({ ...form, adminEmail: e.target.value })}
+                  required
+                  name="admin-email"
+                  autoComplete="email"
+                />
+                <span className="muted" style={{ fontSize: 12, fontWeight: 400 }}>We&apos;ll send a verification link to this address.</span>
+              </label>
+              <label className="field">
+                <span>Phone (optional)</span>
+                <input
+                  value={form.adminPhone}
+                  onChange={(e) => setForm({ ...form, adminPhone: e.target.value })}
+                  name="admin-phone"
+                  autoComplete="tel"
+                />
+              </label>
+            </div>
             <label className="field">
               <span>Password</span>
               <div style={{ position: 'relative' }}>
