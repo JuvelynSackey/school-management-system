@@ -450,13 +450,23 @@ html, body { overflow-x: hidden; max-width: 100%; }
   .toolbar { flex-wrap: wrap; }
 }
 
-.theme-toggle { display: flex; gap: 2px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 2px; }
-.theme-toggle-btn {
-  border: none; background: none; cursor: pointer; font-size: 14px; line-height: 1;
-  padding: 6px 8px; border-radius: 6px; color: var(--text-muted);
+.theme-toggle { position: relative; }
+.theme-toggle-trigger {
+  border: 1px solid var(--border); background: var(--bg); cursor: pointer; font-size: 16px; line-height: 1;
+  padding: 7px 9px; border-radius: 8px; color: var(--text-muted);
 }
-.theme-toggle-btn:hover { background: var(--surface); }
-.theme-toggle-btn.active { background: var(--accent-bg); }
+.theme-toggle-trigger:hover { background: var(--surface); }
+.theme-toggle-menu {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 20; min-width: 140px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18); padding: 4px; display: flex; flex-direction: column; gap: 2px;
+}
+.theme-toggle-menu-item {
+  display: flex; align-items: center; gap: 8px; border: none; background: none; cursor: pointer;
+  font-size: 13.5px; padding: 8px 10px; border-radius: 6px; color: var(--text); text-align: left; width: 100%;
+}
+.theme-toggle-menu-item:hover { background: var(--bg); }
+.theme-toggle-menu-item.active { background: var(--accent-bg); font-weight: 600; }
 
 .page-content { padding: 24px; text-align: left; flex: 1; }
 .page-loader, .empty-state { padding: 60px 24px; text-align: center; color: var(--text-muted); }
