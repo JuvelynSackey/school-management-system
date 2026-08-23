@@ -128,8 +128,9 @@ const getAdminDashboard = async () => {
   // --- Setup readiness (surfaced as a banner until the school is fully set up) ---
   const settings = await SchoolSettings.findOne();
   const setupChecklist = {
+    hasSchoolInfo: Boolean(settings?.address && settings?.phone),
     hasLogo: Boolean(settings?.logoUrl),
-    hasClasses: classCount > 0,
+    hasClassesAndSubjects: classCount > 0 && subjectCount > 0,
     hasTeachers: teacherCount > 0,
     hasStudents: studentCount > 0,
   };

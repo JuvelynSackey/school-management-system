@@ -16,6 +16,51 @@ beforeAll(async () => {
 afterAll(stopTestServer);
 afterEach(clearTestDb);
 
+describe('Admin dashboard — School setup readiness checklist', () => {
+  test('a brand-new school with nothing configured shows 0% complete, all items outstanding', async () => {
+    const school = await fixtures.createSchool(models);
+    const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin@setup-test.local' });
+    const token = await fixtures.login(app, school.slug, 'admin@setup-test.local', password);
+
+    const res = await request(app).get('/api/dashboard').set(fixtures.authHeader(token));
+    expect(res.status).toBe(200);
+    expect(res.body.data.setupStatus).toEqual({
+      hasSchoolInfo: false, hasLogo: false, hasClassesAndSubjects: false, hasTeachers: false, hasStudents: false, percentComplete: 0,
+    });
+  });
+
+  test('classes with no subjects yet (or vice versa) does not count as "Classes & subjects" complete', async () => {
+    const school = await fixtures.createSchool(models);
+    await fixtures.createClass(models, school._id);
+    const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin2@setup-test.local' });
+    const token = await fixtures.login(app, school.slug, 'admin2@setup-test.local', password);
+
+    const res = await request(app).get('/api/dashboard').set(fixtures.authHeader(token));
+    expect(res.body.data.setupStatus.hasClassesAndSubjects).toBe(false);
+  });
+
+  test('every item complete reports 100%', async () => {
+    const school = await fixtures.createSchool(models);
+    const classRow = await fixtures.createClass(models, school._id);
+    await fixtures.createSubject(models, school._id);
+    await fixtures.createStudent(models, school._id, { classId: classRow.id });
+    await fixtures.createTeacher(models, school._id);
+    const { SchoolSettings } = models;
+    await runWithSchool(school._id, () => SchoolSettings.findOneAndUpdate(
+      { schoolId: school._id },
+      { $set: { address: '1 Main St', phone: '0555000000', logoUrl: 'https://example.com/logo.png' } },
+      { upsert: true },
+    ));
+    const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin3@setup-test.local' });
+    const token = await fixtures.login(app, school.slug, 'admin3@setup-test.local', password);
+
+    const res = await request(app).get('/api/dashboard').set(fixtures.authHeader(token));
+    expect(res.body.data.setupStatus).toEqual({
+      hasSchoolInfo: true, hasLogo: true, hasClassesAndSubjects: true, hasTeachers: true, hasStudents: true, percentComplete: 100,
+    });
+  });
+});
+
 describe('Admin dashboard — Action Center data', () => {
   test('counts a teacher with no result sheet yet as having unsubmitted marks', async () => {
     const school = await fixtures.createSchool(models);

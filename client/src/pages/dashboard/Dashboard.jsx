@@ -107,41 +107,70 @@ function StatCard({ icon, label, value, tone, index = 0 }) {
 }
 
 const SETUP_CHECKLIST_ITEMS = [
-  { key: 'hasLogo', label: 'School logo uploaded', to: '/school-settings' },
-  { key: 'hasClasses', label: 'Classes provisioned', to: '/classes' },
-  { key: 'hasTeachers', label: 'Teachers added', to: '/teachers' },
-  { key: 'hasStudents', label: 'Students enrolled', to: '/students' },
+  { key: 'hasSchoolInfo', label: 'School information', to: '/school-settings' },
+  { key: 'hasLogo', label: 'School logo', to: '/school-settings' },
+  { key: 'hasClassesAndSubjects', label: 'Classes & subjects', to: '/classes' },
+  { key: 'hasTeachers', label: 'Teachers', to: '/teachers' },
+  { key: 'hasStudents', label: 'Students', to: '/students' },
 ];
 
+// "Remind me later" snoozes for a day rather than hiding forever like a
+// plain Dismiss would — the banner is the only nudge toward finishing setup,
+// so losing it permanently to one accidental click would mean a school
+// could stay half-configured indefinitely with nothing telling them.
+const SNOOZE_MS = 24 * 60 * 60 * 1000;
+
 function SetupReadinessBanner({ setupStatus, schoolSlug }) {
-  const dismissKey = `setup-banner-dismissed-${schoolSlug || 'default'}`;
-  const [dismissed, setDismissed] = useState(() => localStorage.getItem(dismissKey) === 'true');
+  const snoozeKey = `setup-banner-snoozed-until-${schoolSlug || 'default'}`;
+  const [snoozedUntil, setSnoozedUntil] = useState(() => Number(localStorage.getItem(snoozeKey)) || 0);
 
-  if (!setupStatus || setupStatus.percentComplete >= 100 || dismissed) return null;
+  if (!setupStatus || setupStatus.percentComplete >= 100 || Date.now() < snoozedUntil) return null;
 
-  const dismiss = () => {
-    localStorage.setItem(dismissKey, 'true');
-    setDismissed(true);
+  const remindLater = () => {
+    const until = Date.now() + SNOOZE_MS;
+    localStorage.setItem(snoozeKey, String(until));
+    setSnoozedUntil(until);
   };
+
+  const nextStep = SETUP_CHECKLIST_ITEMS.find((item) => !setupStatus[item.key]);
 
   return (
     <div className="panel dash-reveal" style={{ marginBottom: 20, borderLeft: '4px solid var(--accent)' }}>
-      <div className="toolbar" style={{ marginBottom: 8 }}>
-        <h2 style={{ margin: 0 }}>School Setup — {setupStatus.percentComplete}% Complete</h2>
-        <button type="button" className="link-btn" onClick={dismiss}>Dismiss</button>
+      <div className="toolbar" style={{ marginBottom: 4 }}>
+        <h2 style={{ margin: 0 }}>School Setup</h2>
+        <button type="button" className="link-btn" onClick={remindLater}>Remind me later</button>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {SETUP_CHECKLIST_ITEMS.map((item) => (
-          <div key={item.key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span>{setupStatus[item.key] ? '✔️' : '⏳'}</span>
-            {setupStatus[item.key] ? (
-              <span>{item.label}</span>
-            ) : (
-              <Link to={item.to}>Action needed: {item.label}</Link>
-            )}
-          </div>
-        ))}
+
+      <div
+        role="progressbar"
+        aria-label="School setup progress"
+        aria-valuenow={setupStatus.percentComplete}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        className="stage-bar"
+        style={{ marginBottom: 4 }}
+      >
+        <span className="stage-bar-fill" style={{ width: `${setupStatus.percentComplete}%` }} />
       </div>
+      <p className="muted" style={{ fontSize: 12.5, marginBottom: 14 }}>{setupStatus.percentComplete}% complete</p>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: nextStep ? 14 : 0 }}>
+        {SETUP_CHECKLIST_ITEMS.map((item) => {
+          const done = Boolean(setupStatus[item.key]);
+          return (
+            <div key={item.key} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span aria-hidden="true" style={{ color: done ? 'var(--success)' : 'var(--text-muted)' }}>{done ? '✓' : '○'}</span>
+              {done ? <span>{item.label}</span> : <Link to={item.to}>{item.label}</Link>}
+            </div>
+          );
+        })}
+      </div>
+
+      {nextStep && (
+        <Link to={nextStep.to} className="btn-primary" style={{ display: 'inline-block' }}>
+          Continue Setup →
+        </Link>
+      )}
     </div>
   );
 }
