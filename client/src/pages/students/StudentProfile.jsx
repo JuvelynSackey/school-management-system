@@ -122,7 +122,7 @@ export function StudentProfileView({
             </span>
           )}
         </h2>
-        <table>
+        <table className="details-table">
           <tbody>
             <tr><th>Admission No.</th><td>{student.admissionNo}</td></tr>
             {student.waecIndexNumber && <tr><th>WAEC/BECE Index No.</th><td>{student.waecIndexNumber}</td></tr>}

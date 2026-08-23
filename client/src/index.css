@@ -506,6 +506,12 @@ th { color: var(--text-muted); font-weight: 500; font-size: 12px; text-transform
 }
 .sticky-first-col th:first-child { z-index: 2; }
 
+/* Student Profile's key-value details table — a long email or admission
+   number has no good reason to force horizontal scrolling for a
+   two-column label/value table; wrapping reads better than either
+   clipping or scrolling here. */
+.details-table td { white-space: normal; word-break: break-word; }
+
 .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
 
 /* Modal */
