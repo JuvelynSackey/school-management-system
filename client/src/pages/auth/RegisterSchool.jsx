@@ -2,6 +2,25 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { registerSchool } from '../../api/schools.api';
 
+// Same icon/behavior as LoginForm.jsx's password toggle — duplicated
+// rather than shared since every auth-page icon in this app is a small
+// local component (SchoolIcon/MailIcon there, this one here), not a
+// shared icon library.
+function EyeIcon({ open }) {
+  return open ? (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  ) : (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3.5 3.5l17 17" />
+      <path d="M10.6 5.7A10.6 10.6 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a15.6 15.6 0 0 1-3.3 4.1M7 6.8C4.3 8.5 2.5 12 2.5 12s3.5 6.5 9.5 6.5c1.3 0 2.5-.3 3.5-.8" />
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+    </svg>
+  );
+}
+
 const slugify = (name) => name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 
 const emptyForm = {
@@ -13,6 +32,7 @@ export default function RegisterSchool() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleNameChange = (schoolName) => setForm((f) => ({ ...f, schoolName, slug: slugify(schoolName) }));
 
@@ -63,7 +83,7 @@ export default function RegisterSchool() {
             </label>
             <label className="field">
               <span>Login Code</span>
-              <input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} placeholder="e.g. kings-prep" required />
+              <input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} placeholder="e.g. kings-prep" required autoComplete="off" />
             </label>
             <label className="field">
               <span>Your Full Name</span>
@@ -79,7 +99,27 @@ export default function RegisterSchool() {
             </label>
             <label className="field">
               <span>Password</span>
-              <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required minLength={8} />
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  required
+                  minLength={8}
+                  style={{ paddingRight: 40 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  style={{
+                    position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                    background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--text-muted)', display: 'flex',
+                  }}
+                >
+                  <EyeIcon open={showPassword} />
+                </button>
+              </div>
             </label>
             <p className="muted" style={{ fontSize: 13 }}>
               A platform administrator reviews every new school before it can log in — this usually

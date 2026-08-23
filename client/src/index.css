@@ -160,9 +160,16 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); opacity: 1
   --cosmic-teal-glow: #1f6f6a;
   min-height: 100svh;
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
+  /* auto, not hidden — a card taller than the viewport (e.g. the longer
+     registration form on a short screen) must be able to scroll, not get
+     silently clipped with its submit button unreachable. */
+  overflow-y: auto;
   display: flex;
-  align-items: center;
+  /* "safe" keeps the top of the content reachable when it overflows —
+     plain `center` can clip the start of an overflowing flex item instead
+     of letting it scroll into view. */
+  align-items: safe center;
   justify-content: center;
   background: #0a2323;
   padding: 24px;
@@ -242,6 +249,15 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); opacity: 1
   color: #fff;
   margin: 0 0 8px;
 }
+/* .cosmic-card always has a dark background regardless of site theme, but
+   RegisterSchool.jsx's <h2> and .field labels use the generic,
+   theme-aware --text-h/--text-muted tokens (built for light-background
+   forms elsewhere in the app) — in light theme those resolve to
+   near-black, unreadable on this card. Force light text for these
+   specific elements only when they're inside a cosmic-card. */
+.cosmic-card h2, .cosmic-card h3 { color: #fff; }
+.cosmic-card .field span { color: rgba(255, 255, 255, 0.85); }
+.cosmic-card .muted { color: rgba(255, 255, 255, 0.6); }
 .cosmic-subtitle {
   display: block;
   color: rgba(255, 255, 255, 0.65);
