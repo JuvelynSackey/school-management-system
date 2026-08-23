@@ -28,9 +28,29 @@ export default function DashboardPage() {
           <div className="stat-card-row">
             <StatTile label="Total Schools" value={data.totalSchools} tone="accent" />
             <StatTile label="Active Schools" value={data.activeSchools} tone="success" />
+            <StatTile label="Pending Approval" value={data.pendingSchools} tone="warning" />
             <StatTile label="Suspended Schools" value={data.suspendedSchools} tone="warning" />
             <StatTile label="Total Platform Users" value={data.totalUsers} tone="rose" />
           </div>
+
+          {data.schoolsPendingApproval.length > 0 && (
+            <div className="panel">
+              <h2>Schools Pending Approval</h2>
+              <p className="muted" style={{ marginBottom: 12 }}>These schools self-registered and can&apos;t log in until you approve or reject them.</p>
+              <table>
+                <thead><tr><th>School</th><th>Login Code</th><th /></tr></thead>
+                <tbody>
+                  {data.schoolsPendingApproval.map((s) => (
+                    <tr key={s.id}>
+                      <td>{s.name}</td>
+                      <td><code>{s.slug}</code></td>
+                      <td><Link className="link-btn" to="/super-admin/schools">Review</Link></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {data.schoolsNeedingAdmin.length > 0 && (
             <div className="panel">

@@ -9,7 +9,15 @@ const schoolSchema = new mongoose.Schema({
   slug: {
     type: String, required: true, unique: true, maxlength: 50, lowercase: true, trim: true,
   },
-  status: { type: String, required: true, enum: ['active', 'suspended'], default: 'active' },
+  // 'pending' only comes from self-registration (schoolRegistration.controller.js)
+  // — every other creation path (super-admin's schools.controller.js) still
+  // defaults straight to 'active', unaffected by this addition. A pending or
+  // rejected school simply can't log in yet: auth.controller.js's login
+  // already filters `School.findOne({ slug, status: 'active' })`, so no
+  // separate gate was needed there.
+  status: {
+    type: String, required: true, enum: ['pending', 'active', 'suspended', 'rejected'], default: 'active',
+  },
 }, { timestamps: true });
 
 schoolSchema.plugin(idTransformPlugin);

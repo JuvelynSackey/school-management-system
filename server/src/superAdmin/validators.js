@@ -14,7 +14,9 @@ const createSchoolValidator = [
 
 const updateSchoolValidator = [
   body('name').optional().trim().notEmpty().withMessage('School name cannot be empty'),
-  body('status').optional().isIn(['active', 'suspended']).withMessage('Status must be active or suspended'),
+  // 'pending' deliberately excluded — that state only comes from
+  // self-registration, never from a super-admin edit.
+  body('status').optional().isIn(['active', 'suspended', 'rejected']).withMessage('Status must be active, suspended, or rejected'),
 ];
 
 const createSchoolAdminValidator = [

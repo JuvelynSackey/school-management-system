@@ -7,10 +7,11 @@ const { getStats } = require('./schools.controller');
 const get = asyncHandler(async (req, res) => {
   const schools = await School.find().sort({ createdAt: -1 });
 
-  const [totalSchools, activeSchools, suspendedSchools, totalUsers] = await Promise.all([
+  const [totalSchools, activeSchools, suspendedSchools, pendingSchools, totalUsers] = await Promise.all([
     School.countDocuments(),
     School.countDocuments({ status: 'active' }),
     School.countDocuments({ status: 'suspended' }),
+    School.countDocuments({ status: 'pending' }),
     User.countDocuments({}).setOptions({ skipTenantScope: true }),
   ]);
 
@@ -18,7 +19,8 @@ const get = asyncHandler(async (req, res) => {
     id: school.id, name: school.name, slug: school.slug, status: school.status, stats: await getStats(school.id),
   })));
 
-  const schoolsNeedingAdmin = withStats.filter((s) => s.stats.adminCount === 0);
+  const schoolsNeedingAdmin = withStats.filter((s) => s.status === 'active' && s.stats.adminCount === 0);
+  const schoolsPendingApproval = withStats.filter((s) => s.status === 'pending');
   const recentSchools = withStats.slice(0, 5);
 
   const backups = await listBackups();
@@ -30,8 +32,10 @@ const get = asyncHandler(async (req, res) => {
       totalSchools,
       activeSchools,
       suspendedSchools,
+      pendingSchools,
       totalUsers,
       schoolsNeedingAdmin: schoolsNeedingAdmin.map((s) => ({ id: s.id, name: s.name, slug: s.slug })),
+      schoolsPendingApproval: schoolsPendingApproval.map((s) => ({ id: s.id, name: s.name, slug: s.slug })),
       recentSchools,
       lastBackup,
     },

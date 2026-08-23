@@ -127,6 +127,10 @@ export default function LoginForm({ onSuccess, defaultSchoolCode = '' }) {
       <button type="submit" className="cosmic-submit" disabled={isSubmitting}>
         {isSubmitting ? 'Logging in...' : 'LOGIN'}
       </button>
+
+      <p style={{ textAlign: 'center', fontSize: 12.5, color: 'rgba(255,255,255,0.65)', marginTop: 14 }}>
+        New school? <Link to="/register-school" style={{ color: 'rgba(255,255,255,0.9)' }}>Register here</Link>
+      </p>
     </form>
   );
 }

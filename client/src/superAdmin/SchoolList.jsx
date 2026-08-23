@@ -36,6 +36,17 @@ export default function SchoolList() {
   const openEditSchool = (school) => { setEditForm({ name: school.name, status: school.status }); setEditFormError(''); setEditModalSchool(school); };
   const closeEditModal = () => setEditModalSchool(null);
 
+  const [decisionError, setDecisionError] = useState('');
+  const decideSchool = async (school, status) => {
+    setDecisionError('');
+    try {
+      await updateSchool(school.id, { status });
+      reload();
+    } catch (err) {
+      setDecisionError(err.response?.data?.message || 'Failed to update school status.');
+    }
+  };
+
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     setIsSavingEdit(true);
@@ -83,6 +94,7 @@ export default function SchoolList() {
       <div className="panel">
         {isLoading && <p className="muted">Loading...</p>}
         {error && <div className="alert-error">{error}</div>}
+        {decisionError && <div className="alert-error">{decisionError}</div>}
         {!isLoading && !error && (
           <table>
             <thead><tr><th>School</th><th>Login Code</th><th>Status</th><th>Students</th><th>Teachers</th><th>Admins</th><th /></tr></thead>
@@ -97,8 +109,17 @@ export default function SchoolList() {
                   <td>{school.stats?.adminCount ?? '—'}</td>
                   <td>
                     <div className="row-actions">
-                      <button type="button" className="link-btn" onClick={() => openEditSchool(school)}>Edit</button>
-                      <button type="button" className="link-btn" onClick={() => openAdminModal(school)}>Add Admin</button>
+                      {school.status === 'pending' ? (
+                        <>
+                          <button type="button" className="link-btn" onClick={() => decideSchool(school, 'active')}>Approve</button>
+                          <button type="button" className="link-btn" onClick={() => decideSchool(school, 'rejected')}>Reject</button>
+                        </>
+                      ) : (
+                        <>
+                          <button type="button" className="link-btn" onClick={() => openEditSchool(school)}>Edit</button>
+                          <button type="button" className="link-btn" onClick={() => openAdminModal(school)}>Add Admin</button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -122,6 +143,7 @@ export default function SchoolList() {
               <select value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}>
                 <option value="active">Active</option>
                 <option value="suspended">Suspended</option>
+                <option value="rejected">Rejected</option>
               </select>
             </label>
             <div className="modal-actions">
