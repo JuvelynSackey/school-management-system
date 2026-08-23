@@ -151,6 +151,17 @@ export default function AnalyticsPage() {
 
       {!isLoading && !error && academicTermId && <AIInsightsBanner academicTermId={academicTermId} />}
 
+      {!isLoading && !error && academic && (
+        <div className="stat-card-row">
+          <StatTile
+            label="Pass Rate"
+            value={academic.passRate !== null ? `${academic.passRate}%` : '—'}
+            tone={academic.passRate !== null && academic.passRate < 50 ? 'warning' : 'success'}
+            index={0}
+          />
+        </div>
+      )}
+
       {!isLoading && !error && financial && (
         <div className="stat-card-row">
           <StatTile label="Total Fees Due" value={formatCurrency(financial.overall.totalDue)} tone="accent" index={0} />

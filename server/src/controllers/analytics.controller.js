@@ -4,6 +4,7 @@ const {
 const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/AppError');
 const { getFeeBalance } = require('../services/fees.service');
+const { getSchemeForSchool } = require('../services/grading.service');
 
 const round1 = (n) => Math.round(n * 10) / 10;
 
@@ -20,6 +21,28 @@ const subjectAverages = (schoolId, academicTermId) => Result.aggregate([
   { $group: { _id: '$subjectId', average: { $avg: '$totalScore' }, count: { $sum: 1 } } },
 ]);
 
+// Same "pass" definition as ai.controller.js's computeSubjectPerformance —
+// at or above the grading scheme's second-lowest band minimum — but across
+// every result this term rather than broken out per subject.
+const overallPassRate = async (schoolId, academicTermId) => {
+  const scheme = await getSchemeForSchool(schoolId);
+  const sortedBands = [...scheme.bands].sort((a, b) => a.min - b.min);
+  const passCutoff = sortedBands[1]?.min ?? 0;
+
+  const [row] = await Result.aggregate([
+    { $match: { schoolId: new mongoose.Types.ObjectId(schoolId), academicTermId: new mongoose.Types.ObjectId(academicTermId) } },
+    {
+      $group: {
+        _id: null,
+        count: { $sum: 1 },
+        passCount: { $sum: { $cond: [{ $gte: ['$totalScore', passCutoff] }, 1, 0] } },
+      },
+    },
+  ]);
+
+  return row && row.count > 0 ? round1((row.passCount / row.count) * 100) : null;
+};
+
 const resolvePreviousTerm = async (schoolId, currentTerm) => {
   const terms = await AcademicTerm.find({ schoolId }).sort({ academicYear: 1, termNumber: 1 });
   const idx = terms.findIndex((t) => t.id === currentTerm.id);
@@ -34,10 +57,11 @@ const getAcademic = asyncHandler(async (req, res, next) => {
   if (!term) return next(new AppError('Academic term not found', 404));
 
   const { schoolId } = req.user;
-  const [classRows, subjectRows, prevTerm] = await Promise.all([
+  const [classRows, subjectRows, prevTerm, passRate] = await Promise.all([
     classAverages(schoolId, academicTermId),
     subjectAverages(schoolId, academicTermId),
     resolvePreviousTerm(schoolId, term),
+    overallPassRate(schoolId, academicTermId),
   ]);
   const prevClassRows = prevTerm ? await classAverages(schoolId, prevTerm.id) : [];
   const prevByClass = new Map(prevClassRows.map((r) => [r._id.toString(), r.average]));
@@ -78,6 +102,7 @@ const getAcademic = asyncHandler(async (req, res, next) => {
       previousTermId: prevTerm?.id || null,
       classAverages: classAveragesOut,
       subjectAverages: subjectAveragesOut,
+      passRate,
     },
   });
 });
