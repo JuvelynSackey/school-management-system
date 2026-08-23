@@ -12,13 +12,15 @@ const validate = require('../middleware/validate');
 const { uploadLogo } = require('../middleware/upload');
 const {
   superAdminLoginValidator, createSchoolValidator, updateSchoolValidator, createSchoolAdminValidator,
-  updateBrandingValidator, setStatusValidator, createSuperAdminValidator, updatePlatformSettingsValidator,
+  updateBrandingValidator, setStatusValidator, createSuperAdminValidator, changeSuperAdminPasswordValidator,
+  updatePlatformSettingsValidator,
 } = require('./validators');
 
 const router = express.Router();
 
 router.post('/auth/login', superAdminLoginValidator, validate, authController.login);
 router.get('/auth/me', authenticateSuperAdmin, authController.me);
+router.put('/auth/password', authenticateSuperAdmin, changeSuperAdminPasswordValidator, validate, authController.changePassword);
 
 router.get('/dashboard', authenticateSuperAdmin, dashboardController.get);
 

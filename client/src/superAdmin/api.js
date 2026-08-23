@@ -2,6 +2,7 @@ import superAdminApiClient from './apiClient';
 
 export const login = (email, password) => superAdminApiClient.post('/auth/login', { email, password }).then((res) => res.data.data);
 export const fetchMe = () => superAdminApiClient.get('/auth/me').then((res) => res.data.data);
+export const changePassword = (payload) => superAdminApiClient.put('/auth/password', payload).then((res) => res.data.data);
 
 export const getDashboard = () => superAdminApiClient.get('/dashboard').then((res) => res.data.data);
 

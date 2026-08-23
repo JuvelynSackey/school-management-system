@@ -56,4 +56,28 @@ const me = asyncHandler(async (req, res, next) => {
   return res.json({ success: true, data: toPublic(superAdmin) });
 });
 
-module.exports = { login, me };
+// PUT /super-admin/auth/password — self-service, requires the current
+// password. The only other way to set a super-admin's password is
+// scripts/create-super-admin.js (create-only) or
+// scripts/reset-super-admin-password.js (server access required) — this
+// is the one path that doesn't need either.
+const changePassword = asyncHandler(async (req, res, next) => {
+  const { currentPassword, newPassword } = req.body;
+  const superAdmin = await SuperAdmin.findById(req.superAdmin.id);
+  if (!superAdmin) return next(new AppError('Super admin not found', 404));
+
+  const matches = await bcrypt.compare(currentPassword, superAdmin.passwordHash);
+  if (!matches) return next(new AppError('Current password is incorrect', 400));
+
+  superAdmin.passwordHash = await bcrypt.hash(newPassword, 10);
+  await superAdmin.save();
+
+  await recordAuthEvent({
+    actorType: 'super-admin', actorName: superAdmin.fullName, actorRole: 'super-admin',
+    action: 'auth.superAdminPasswordChanged', description: `${superAdmin.fullName} changed their own super-admin password`,
+  });
+
+  return res.json({ success: true, data: null });
+});
+
+module.exports = { login, me, changePassword };

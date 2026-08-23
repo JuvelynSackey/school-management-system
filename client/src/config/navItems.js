@@ -37,4 +37,5 @@ export const SUPER_ADMIN_NAV_ITEMS = [
   { to: '/super-admin/security', label: 'Security Center' },
   { to: '/super-admin/settings', label: 'Platform Settings' },
   { to: '/super-admin/backups', label: 'Backup & Recovery' },
+  { to: '/super-admin/account', label: 'My Account' },
 ];

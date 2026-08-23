@@ -38,6 +38,11 @@ const createSuperAdminValidator = [
   passwordLengthValidator('password'),
 ];
 
+const changeSuperAdminPasswordValidator = [
+  body('currentPassword').notEmpty().withMessage('Current password is required'),
+  passwordLengthValidator('newPassword'),
+];
+
 const updatePlatformSettingsValidator = [
   body('maintenanceMode.enabled').optional().isBoolean().withMessage('maintenanceMode.enabled must be a boolean'),
   body('maintenanceMode.message').optional().trim().notEmpty().withMessage('Maintenance message cannot be empty'),
@@ -52,5 +57,6 @@ module.exports = {
   updateBrandingValidator,
   setStatusValidator,
   createSuperAdminValidator,
+  changeSuperAdminPasswordValidator,
   updatePlatformSettingsValidator,
 };

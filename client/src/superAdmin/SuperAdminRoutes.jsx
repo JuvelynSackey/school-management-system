@@ -10,6 +10,7 @@ import PlatformUsersPage from './PlatformUsersPage';
 import AuditLogPage from './AuditLogPage';
 import SecurityCenterPage from './SecurityCenterPage';
 import PlatformSettingsPage from './PlatformSettingsPage';
+import MyAccount from './MyAccount';
 
 export default function SuperAdminRoutes() {
   return (
@@ -26,6 +27,7 @@ export default function SuperAdminRoutes() {
             <Route path="security" element={<SecurityCenterPage />} />
             <Route path="settings" element={<PlatformSettingsPage />} />
             <Route path="backups" element={<BackupsPage />} />
+            <Route path="account" element={<MyAccount />} />
           </Route>
         </Route>
       </Routes>
