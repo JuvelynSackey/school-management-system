@@ -229,6 +229,7 @@ export default function LandingPage() {
           <button type="button" onClick={() => scrollTo('intelligence')}>Intelligence</button>
           <button type="button" onClick={() => scrollTo('roles')}>Roles</button>
           <button type="button" onClick={() => scrollTo('faq')}>FAQ</button>
+          {!isAuthenticated && <button type="button" onClick={() => navigate('/register-school')}>Register Your School</button>}
         </div>
         <button
           type="button"
@@ -248,6 +249,7 @@ export default function LandingPage() {
           </Reveal>
           <Reveal className="landing-hero-ctas" delay={240}>
             <button type="button" className="landing-btn-primary" onClick={() => setLoginOpen(true)}>Login</button>
+            <button type="button" className="landing-btn-secondary" onClick={() => navigate('/register-school')}>Register Your School</button>
             <button type="button" className="landing-btn-secondary" onClick={() => scrollTo('features')}>See Features</button>
           </Reveal>
           <Reveal className="landing-badges" delay={360}>
