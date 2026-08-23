@@ -117,15 +117,6 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); opacity: 1
 
 /* Forms */
 .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; text-align: left; }
-/* Pairs related fields side-by-side on wide screens (RegisterSchool.jsx) to
-   cut the form's vertical footprint without removing any field or copy —
-   collapses back to a single column under 640px, same breakpoint style as
-   the rest of the app's responsive rules. */
-.auth-grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; }
-.auth-grid .field { margin-bottom: 10px; }
-@media (max-width: 640px) {
-  .auth-grid { grid-template-columns: 1fr; }
-}
 .field span { font-size: 13px; font-weight: 500; color: var(--text-h); }
 .field input, .field select, .field textarea {
   border: 1px solid var(--border);
