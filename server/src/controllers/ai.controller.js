@@ -61,7 +61,7 @@ const suggestRemark = asyncHandler(async (req, res, next) => {
   };
 
   // "Suggest Remark" should never just dead-end the teacher — if AI isn't
-  // configured, or the live Gemini request itself fails (rate limit,
+  // configured, or the live AI request itself fails (rate limit,
   // timeout, bad response), fall back to the deterministic score-banded
   // templates instead of surfacing an error.
   let suggestions;

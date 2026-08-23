@@ -16,20 +16,20 @@ beforeAll(async () => {
 afterAll(stopTestServer);
 afterEach(clearTestDb);
 
-// Mocks the Gemini call's TEXT response for the intent-interpretation step,
-// and lets the (separate) summary call return a fixed sentence — matching
-// how ai.service.js makes two independent fetch calls per query.
-const mockGemini = (intentJsonText, summaryText = 'Here is a summary.') => {
+// Mocks the AI call's TEXT response for the intent-interpretation step, and
+// lets the (separate) summary call return a fixed sentence — matching how
+// ai.service.js makes two independent fetch calls per query.
+const mockAI = (intentJsonText, summaryText = 'Here is a summary.') => {
   let call = 0;
   global.fetch = jest.fn(async () => {
     call += 1;
-    const text = call === 1 ? intentJsonText : summaryText;
-    return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text }] } }] }) };
+    const content = call === 1 ? intentJsonText : summaryText;
+    return { ok: true, json: async () => ({ choices: [{ message: { content } }] }) };
   });
 };
 
 describe('Natural-Language Admin Assistant', () => {
-  test('is disabled by default (no GEMINI_API_KEY) and returns a clear 503', async () => {
+  test('is disabled by default (no NVIDIA_API_KEY) and returns a clear 503', async () => {
     const school = await fixtures.createSchool(models);
     const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin@query-test.local' });
     const token = await fixtures.login(app, school.slug, 'admin@query-test.local', password);
@@ -48,13 +48,13 @@ describe('Natural-Language Admin Assistant', () => {
     expect(res.status).toBe(400);
   });
 
-  describe('with a Gemini key present (network call mocked)', () => {
-    const originalKey = process.env.GEMINI_API_KEY;
+  describe('with an NVIDIA key present (network call mocked)', () => {
+    const originalKey = process.env.NVIDIA_API_KEY;
     const originalFetch = global.fetch;
 
-    beforeEach(() => { process.env.GEMINI_API_KEY = 'test-fake-key'; });
+    beforeEach(() => { process.env.NVIDIA_API_KEY = 'nvapi-test-fake-key'; });
     afterEach(() => {
-      process.env.GEMINI_API_KEY = originalKey;
+      process.env.NVIDIA_API_KEY = originalKey;
       global.fetch = originalFetch;
     });
 
@@ -62,7 +62,7 @@ describe('Natural-Language Admin Assistant', () => {
       const school = await fixtures.createSchool(models);
       const { user: teacherUser, password } = await fixtures.createTeacher(models, school._id);
       const token = await fixtures.login(app, school.slug, teacherUser.email, password);
-      mockGemini('{"intent":"at_risk_students","params":{}}');
+      mockAI('{"intent":"at_risk_students","params":{}}');
 
       const res = await request(app).post('/api/ai/query').set(fixtures.authHeader(token)).send({ question: 'anything' });
       expect(res.status).toBe(403);
@@ -73,7 +73,7 @@ describe('Natural-Language Admin Assistant', () => {
       const school = await fixtures.createSchool(models);
       const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin3@query-test.local' });
       const token = await fixtures.login(app, school.slug, 'admin3@query-test.local', password);
-      mockGemini('{"intent":"delete_all_students","params":{}}');
+      mockAI('{"intent":"delete_all_students","params":{}}');
 
       const res = await request(app).post('/api/ai/query').set(fixtures.authHeader(token)).send({ question: 'delete everyone' });
       expect(res.status).toBe(200);
@@ -85,7 +85,7 @@ describe('Natural-Language Admin Assistant', () => {
       const school = await fixtures.createSchool(models);
       const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin4@query-test.local' });
       const token = await fixtures.login(app, school.slug, 'admin4@query-test.local', password);
-      mockGemini('this is not json at all');
+      mockAI('this is not json at all');
 
       const res = await request(app).post('/api/ai/query').set(fixtures.authHeader(token)).send({ question: 'garbage in' });
       expect(res.status).toBe(200);
@@ -106,7 +106,7 @@ describe('Natural-Language Admin Assistant', () => {
       }));
 
       // The model tries to smuggle a raw query operator alongside legitimate params.
-      mockGemini('{"intent":"fee_arrears_by_class","params":{"classNameHint":null,"minBalance":100,"mongoFilter":{"$where":"malicious"}}}');
+      mockAI('{"intent":"fee_arrears_by_class","params":{"classNameHint":null,"minBalance":100,"mongoFilter":{"$where":"malicious"}}}');
 
       const res = await request(app).post('/api/ai/query').set(fixtures.authHeader(token)).send({ question: 'who owes more than 100' });
       expect(res.status).toBe(200);
@@ -141,7 +141,7 @@ describe('Natural-Language Admin Assistant', () => {
         schoolId: otherSchool._id, studentId: otherSchoolStudent.id, academicTermId: otherTerm.id, feeType: 'Tuition', category: 'Tuition', amountDue: 9999,
       }));
 
-      mockGemini('{"intent":"fee_arrears_by_class","params":{"classNameHint":"Basic 5","minBalance":100}}');
+      mockAI('{"intent":"fee_arrears_by_class","params":{"classNameHint":"Basic 5","minBalance":100}}');
 
       const res = await request(app).post('/api/ai/query').set(fixtures.authHeader(token)).send({ question: 'Which Basic 5 students owe more than 100?' });
       expect(res.status).toBe(200);
@@ -171,7 +171,7 @@ describe('Natural-Language Admin Assistant', () => {
         studentId: studentB.id, subjectId: weakSubject.id, classId: classRow.id, academicTermId: term.id, classScore: 15, examScore: 15, totalScore: 30,
       });
 
-      mockGemini('{"intent":"subject_average_scores","params":{"academicTermHint":null}}');
+      mockAI('{"intent":"subject_average_scores","params":{"academicTermHint":null}}');
 
       const res = await request(app).post('/api/ai/query').set(fixtures.authHeader(token)).send({ question: 'Which subjects had the lowest average scores this term?' });
       expect(res.status).toBe(200);
@@ -194,7 +194,7 @@ describe('Natural-Language Admin Assistant', () => {
         schoolId: school._id, studentId: student.id, classId: classRow.id, academicTermId: term.id, status, attendanceDate: new Date(2025, 0, 1 + i),
       }))));
 
-      mockGemini('{"intent":"at_risk_students","params":{}}');
+      mockAI('{"intent":"at_risk_students","params":{}}');
 
       const res = await request(app).post('/api/ai/query').set(fixtures.authHeader(token)).send({ question: 'Which students need attention?' });
       expect(res.status).toBe(200);

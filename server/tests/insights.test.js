@@ -128,20 +128,20 @@ describe('Student Performance Insights', () => {
     });
   });
 
-  describe('with a Gemini key present (network call mocked)', () => {
-    const originalKey = process.env.GEMINI_API_KEY;
+  describe('with an NVIDIA key present (network call mocked)', () => {
+    const originalKey = process.env.NVIDIA_API_KEY;
     const originalFetch = global.fetch;
 
     beforeEach(() => {
-      process.env.GEMINI_API_KEY = 'test-fake-key';
+      process.env.NVIDIA_API_KEY = 'nvapi-test-fake-key';
       global.fetch = jest.fn(async () => ({
         ok: true,
-        json: async () => ({ candidates: [{ content: { parts: [{ text: 'Ama has shown strong, consistent improvement this term.' }] } }] }),
+        json: async () => ({ choices: [{ message: { content: 'Ama has shown strong, consistent improvement this term.' } }] }),
       }));
     });
 
     afterEach(() => {
-      process.env.GEMINI_API_KEY = originalKey;
+      process.env.NVIDIA_API_KEY = originalKey;
       global.fetch = originalFetch;
     });
 
@@ -164,7 +164,7 @@ describe('Student Performance Insights', () => {
       expect(res.status).toBe(200);
       expect(res.body.data.aiNarrative).toBe('Ama has shown strong, consistent improvement this term.');
 
-      const promptSent = JSON.parse(global.fetch.mock.calls[0][1].body).contents[0].parts[0].text;
+      const promptSent = JSON.parse(global.fetch.mock.calls[0][1].body).messages[0].content;
       expect(promptSent).toContain('Ama');
       expect(promptSent).not.toContain('DoNotLeakThisSurname');
     });

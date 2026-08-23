@@ -334,8 +334,8 @@ npm install          # installs client + server via npm workspaces
 | `JWT_SECRET` | long random string — required |
 | `JWT_EXPIRES_IN` | token lifetime (default `8h`) |
 | `CLIENT_ORIGIN` | allowed CORS origin, e.g. `http://localhost:5173` |
-| `GEMINI_API_KEY` | optional — activates the AI Remark Assistant (§21); left blank, it stays gated off |
-| `GEMINI_MODEL` | optional, defaults to `gemini-2.0-flash` |
+| `NVIDIA_API_KEY` | optional — activates the AI Remark Assistant (§21) and friends; must start with `nvapi-` or it's treated as unset. Left blank, everything stays gated to its deterministic fallback |
+| `NVIDIA_MODEL` | optional, defaults to `meta/llama-3.1-8b-instruct` |
 
 `client/.env` (copy from `client/.env.example`):
 
@@ -385,15 +385,19 @@ set (e.g. MongoDB Atlas, which is a replica set by default); and set
 - SMS and WhatsApp notification channels exist in the data model
   (`Announcement.channels`) but are **not wired to a real provider** —
   only email actually sends.
-- All five planned **JesManage Intelligence** features are built: the
-  **AI Teacher Remark Assistant**, **Academic Anomaly Detection**,
+- All seven **JesManage Intelligence** features are built: the
+  **AI Teacher Remark Assistant**, **Smart Announcement Composer**,
+  **AI Performance Summary**, **Academic Anomaly Detection**,
   **Student Performance Insights**, **Early-Warning Intelligence**, and
-  the **Natural-Language Admin Assistant** — all gated behind
-  `GEMINI_API_KEY` (the middle three have a deterministic core that
-  works with no key at all; only their AI-written enrichment needs one —
-  the Remark Assistant and Admin Assistant require it for their core
-  function). Add the key to `server/.env` to activate the gated parts,
-  no code changes required (see §17).
+  the **Natural-Language Admin Assistant** — powered by NVIDIA Build
+  (an OpenAI-compatible endpoint in front of hosted open models,
+  default `meta/llama-3.1-8b-instruct`) behind `NVIDIA_API_KEY`. Only
+  the Admin Assistant hard-requires the key (503 with no fallback if
+  it's missing); every other feature has a deterministic template/rules
+  fallback and returns `fallbackMode: true` instead of erroring when
+  the key is absent or a live request fails. Add the key to
+  `server/.env` to activate live generation everywhere, no code changes
+  required (see §17).
 - Early-Warning Intelligence deliberately does **not** treat an
   outstanding fee balance as a risk signal in its own right — a family
   owing fees says nothing about a specific child's academic risk, and

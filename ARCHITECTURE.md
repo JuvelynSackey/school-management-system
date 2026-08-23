@@ -595,18 +595,18 @@ sequenceDiagram
     actor T as Teacher/Admin
     participant API as POST /api/ai/remarks/suggest
     participant DB as MongoDB
-    participant Gemini as Gemini API
+    participant AI as NVIDIA API
 
     T->>API: { reportId }  (never scores/attendance — those aren't trusted from the client)
     API->>API: authenticate -> authorize(admin,teacher) -> assertClassAccess(report.classId)
-    alt not configured (no GEMINI_API_KEY)
+    alt not configured (no NVIDIA_API_KEY)
         API-->>T: 503 { code: 'AI_NOT_CONFIGURED' }
     else report not Draft/Rejected
         API-->>T: 400 (editing is closed — no point suggesting a remark)
     else authorized and editable
         API->>DB: re-read the student, averageScore, classPosition, attendance<br/>for THIS report only, under the caller's own tenant context
-        API->>Gemini: prompt built only from those fields + student's first name<br/>(never last name, admission number, or any other student's data)
-        Gemini-->>API: 3 remark options
+        API->>AI: prompt built only from those fields + student's first name<br/>(never last name, admission number, or any other student's data)
+        AI-->>API: 3 remark options
         API->>DB: AuditLog.create('ai.remarkSuggested')
         API-->>T: 200 { suggestions: [...] }
         Note over T: Teacher picks "Use" (fills the editable textarea,<br/>can still be edited) or writes their own — nothing is<br/>saved to the report until the teacher explicitly submits it
@@ -628,7 +628,7 @@ sequenceDiagram
     participant API as GET /api/results/anomalies
     participant Det as anomalyDetection.service<br/>(pure calculation, no AI)
     participant DB as MongoDB
-    participant Gemini as Gemini API
+    participant AI as NVIDIA API
 
     A->>API: opens Review on a Submitted sheet
     API->>API: authenticate -> authorize(admin,teacher) -> assertClassAccess
@@ -639,8 +639,8 @@ sequenceDiagram
     end
     Det-->>API: flags (advisory only — never gates approve/recordBulk)
     alt flags exist AND AI configured
-        API->>Gemini: flag TYPES only (no studentId, no name)
-        Gemini-->>API: one-sentence "what to expect" summary
+        API->>AI: flag TYPES only (no studentId, no name)
+        AI-->>API: one-sentence "what to expect" summary
     else no flags, or AI not configured
         Note over API: aiSummary stays null — the deterministic<br/>flags already stand on their own
     end
@@ -662,7 +662,7 @@ sequenceDiagram
     participant API as GET /api/results/insights/:studentId
     participant Calc as performanceInsights.service<br/>(pure calculation, no AI)
     participant DB as MongoDB
-    participant Gemini as Gemini API
+    participant AI as NVIDIA API
 
     U->>API: opens Student Profile / My Results
     API->>API: authenticate -> assertStudentAccess<br/>(self / linked parent / assigned teacher / admin)
@@ -670,8 +670,8 @@ sequenceDiagram
     API->>Calc: group by term (needs academicTerm.startDate to order) -><br/>trend vs. previous term; rank latest term's subjects
     Calc-->>API: trend + strongest/needs-attention subjects
     alt any data AND AI configured
-        API->>Gemini: first name + trend direction/magnitude +<br/>subject NAMES only (never a score history)
-        Gemini-->>API: 2-3 sentence narrative
+        API->>AI: first name + trend direction/magnitude +<br/>subject NAMES only (never a score history)
+        AI-->>API: 2-3 sentence narrative
     else no data yet, or AI not configured
         Note over API: aiNarrative stays null — panel simply<br/>doesn't render if there's nothing to show
     end
@@ -699,7 +699,7 @@ sequenceDiagram
     participant PI as performanceInsights.service<br/>(reused trend engine)
     participant Fees as fees.service<br/>(existing balance calculator)
     participant DB as MongoDB
-    participant Gemini as Gemini API
+    participant AI as NVIDIA API
 
     U->>API: opens Admin or Teacher Dashboard
     API->>API: authenticate -> authorize(admin,teacher)
@@ -716,8 +716,8 @@ sequenceDiagram
         Fees-->>API: balance (context only, never a flag source)
     end
     alt any students flagged AND AI configured
-        API->>Gemini: first names + flag TYPES + fee PRESENCE (never an<br/>amount) + hard rules: never diagnose, never suggest<br/>discipline, never blame fees for academic flags
-        Gemini-->>API: one supportive paragraph
+        API->>AI: first names + flag TYPES + fee PRESENCE (never an<br/>amount) + hard rules: never diagnose, never suggest<br/>discipline, never blame fees for academic flags
+        AI-->>API: one supportive paragraph
     else nothing flagged, or AI not configured
         Note over API: aiSynthesis stays null
     end
@@ -744,15 +744,15 @@ teacher or Super-Admin path for this endpoint in this pass.
 sequenceDiagram
     actor A as Admin
     participant API as POST /api/ai/query
-    participant Gemini as Gemini API (call 1: classify)
+    participant AI as NVIDIA API (call 1: classify)
     participant AQ as aiQuery.service<br/>(pure, tenant-scoped queries)
     participant DB as MongoDB
-    participant Gemini2 as Gemini API (call 2: phrase the answer)
+    participant AI2 as NVIDIA API (call 2: phrase the answer)
 
     A->>API: { question: "free text" }
     API->>API: authenticate -> authorize(admin only)
-    API->>Gemini: classify into ONE of a fixed intent enum +<br/>typed params (never a query)
-    Gemini-->>API: { intent, params } — raw response
+    API->>AI: classify into ONE of a fixed intent enum +<br/>typed params (never a query)
+    AI-->>API: { intent, params } — raw response
     API->>API: validate intent against the enum, allowlist<br/>every param field individually -> unknown/malformed<br/>input silently degrades to "unsupported", never passed through
     alt intent = unsupported
         API-->>A: a plain "I can only answer X/Y/Z" message
@@ -760,8 +760,8 @@ sequenceDiagram
         API->>AQ: resolve any class/term HINT to a real id<br/>(ordinary tenant-scoped lookup — never trusts the hint as an id)
         AQ->>DB: run the matching pre-built query template<br/>(fee arrears / subject averages / at-risk students)
         DB-->>API: rows — this school's data only, by construction
-        API->>Gemini2: question + the ALREADY-COMPUTED rows only<br/>(paraphrase, never re-derive or add facts)
-        Gemini2-->>API: one short plain-English answer
+        API->>AI2: question + the ALREADY-COMPUTED rows only<br/>(paraphrase, never re-derive or add facts)
+        AI2-->>API: one short plain-English answer
         API->>DB: AuditLog.create('ai.adminQuery')
         API-->>A: { answer, rows, intent } — rows are always the<br/>real, untruncated data regardless of what the summary says
     end
@@ -919,6 +919,6 @@ covered by the automated test suite — `server/tests/` (101/101 passing):
 `waecExport.test.js`.
 
 This closes Stage 6 (JesManage Intelligence) — all five planned features
-(§6.9-§6.13) are built, gated behind an optional `GEMINI_API_KEY`, and
+(§6.9-§6.13) are built, gated behind an optional `NVIDIA_API_KEY`, and
 tested. §6.14-§6.16 close out Stage 7's original three-item list — plain
 reporting/printing/export features, no AI involved.

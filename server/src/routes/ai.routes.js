@@ -23,7 +23,7 @@ const suggestLimiter = rateLimit({
   message: { success: false, message: 'Too many AI requests. Please try again later.' },
 });
 
-// Two Gemini calls per request (intent interpretation + result summary),
+// Two AI calls per request (intent interpretation + result summary),
 // admin-only — a tighter budget than the remark suggester's.
 const queryLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,

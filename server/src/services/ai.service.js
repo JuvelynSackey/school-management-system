@@ -1,11 +1,66 @@
-// Gemini-backed remark suggestions. Follows the same isConfigured() gate as
-// email.service.js: if GEMINI_API_KEY isn't set, every call fails fast with
-// a clear, expected error rather than throwing deep inside a fetch. Node 18+
-// ships a global fetch, so no new HTTP dependency is needed for this.
-const isAIConfigured = () => Boolean(process.env.GEMINI_API_KEY);
+// NVIDIA Build (integrate.api.nvidia.com) — an OpenAI-compatible chat
+// endpoint in front of hosted open models. Follows the same isConfigured()
+// gate as email.service.js: if the key isn't set (or isn't shaped like a
+// real one), every call fails fast and predictably rather than wasting a
+// network round-trip only to fail deep inside a fetch. A malformed key was
+// the actual root cause the last time this app used a different provider
+// (Gemini) — checking the prefix here catches that class of mistake
+// immediately instead of it silently degrading to fallback mode with no
+// clue why. Node 18+ ships a global fetch, so no new HTTP dependency is
+// needed for this.
+const isAIConfigured = () => {
+  const key = process.env.NVIDIA_API_KEY;
+  if (!key) return false;
+  if (!key.startsWith('nvapi-')) {
+    console.error('[ai.service] NVIDIA_API_KEY is set but does not start with "nvapi-" — treating AI as unconfigured. Get a real key from build.nvidia.com.');
+    return false;
+  }
+  return true;
+};
 
-const GEMINI_MODEL = () => process.env.GEMINI_MODEL || 'gemini-2.0-flash';
-const GEMINI_URL = () => `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL()}:generateContent`;
+const NVIDIA_MODEL = () => process.env.NVIDIA_MODEL || 'meta/llama-3.1-8b-instruct';
+const NVIDIA_URL = 'https://integrate.api.nvidia.com/v1/chat/completions';
+
+// Shared by every AI-backed generator below — one fetch/error-handling path
+// instead of eight near-identical copies. Every caller here already has its
+// own deterministic fallback for when this throws (see each
+// generateFallback* function), so failing loudly to the SERVER LOG here —
+// not just a generic "AI_REQUEST_FAILED" code to the client — is what makes
+// a real production failure (bad key, wrong model name, quota) actually
+// diagnosable instead of indistinguishable from "not configured".
+const callAI = async (prompt) => {
+  let res;
+  try {
+    res = await fetch(NVIDIA_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.NVIDIA_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: NVIDIA_MODEL(),
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.2,
+        max_tokens: 1024,
+      }),
+    });
+  } catch (fetchErr) {
+    console.error('[ai.service] NVIDIA request never reached a response (network/URL error):', fetchErr.message);
+    const err = new Error('AI request failed before a response was received');
+    err.code = 'AI_REQUEST_FAILED';
+    throw err;
+  }
+
+  if (!res.ok) {
+    const bodyText = await res.text().catch(() => '');
+    console.error(`[ai.service] NVIDIA request failed with status ${res.status}:`, bodyText.slice(0, 500));
+    const err = new Error(`AI request failed with status ${res.status}`);
+    err.code = 'AI_REQUEST_FAILED';
+    throw err;
+  }
+
+  return res.json();
+};
 
 // Deliberately built from only what's actually known and already
 // tenant/role-authorized by the caller (see ai.controller.js) — never the
@@ -34,7 +89,7 @@ const buildRemarkPrompt = ({
   return lines.join('\n');
 };
 
-// Gemini often wraps JSON in ```json fences despite being told not to, and
+// The model often wraps JSON in ```json fences despite being told not to, and
 // occasionally adds a leading/trailing sentence — this recovers the actual
 // array either way rather than failing the whole request over formatting.
 const parseSuggestions = (text) => {
@@ -65,20 +120,8 @@ const generateRemarkSuggestions = async (context) => {
   }
 
   const prompt = buildRemarkPrompt(context);
-  const res = await fetch(`${GEMINI_URL()}?key=${process.env.GEMINI_API_KEY}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-  });
-
-  if (!res.ok) {
-    const err = new Error(`Gemini request failed with status ${res.status}`);
-    err.code = 'AI_REQUEST_FAILED';
-    throw err;
-  }
-
-  const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const data = await callAI(prompt);
+  const text = data?.choices?.[0]?.message?.content || '';
   const suggestions = parseSuggestions(text);
   if (suggestions.length === 0) {
     const err = new Error('AI returned no usable suggestions');
@@ -96,7 +139,7 @@ const attendancePhrase = ({ attendancePercent }) => (
 );
 
 // Same facts as buildRemarkPrompt, no external call — used whenever a live
-// AI suggestion isn't available (unconfigured, or the Gemini request itself
+// AI suggestion isn't available (unconfigured, or the AI request itself
 // failed/timed out) so "Suggest Remark" always returns something usable
 // instead of dead-ending the teacher. Banded on the term average: A (80+),
 // B (60-79), C (below 60).
@@ -157,20 +200,8 @@ const generateAnnouncementSuggestions = async ({ objective, tone, targetLabel })
   }
 
   const prompt = buildAnnouncementPrompt({ objective, tone, targetLabel });
-  const res = await fetch(`${GEMINI_URL()}?key=${process.env.GEMINI_API_KEY}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-  });
-
-  if (!res.ok) {
-    const err = new Error(`Gemini request failed with status ${res.status}`);
-    err.code = 'AI_REQUEST_FAILED';
-    throw err;
-  }
-
-  const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const data = await callAI(prompt);
+  const text = data?.choices?.[0]?.message?.content || '';
   const suggestions = parseSuggestions(text);
   if (suggestions.length === 0) {
     const err = new Error('AI returned no usable suggestions');
@@ -228,7 +259,7 @@ const buildPerformanceSummaryPrompt = (subjectPerf) => {
   return lines.join('\n');
 };
 
-// Same recovery reasoning as parseSuggestions — Gemini sometimes wraps
+// Same recovery reasoning as parseSuggestions — the model sometimes wraps
 // JSON in fences or adds stray commentary despite being told not to.
 const parseSummaryResponse = (text) => {
   const stripped = text.replace(/```json|```/g, '').trim();
@@ -255,20 +286,8 @@ const generatePerformanceSummary = async (subjectPerf) => {
   }
 
   const prompt = buildPerformanceSummaryPrompt(subjectPerf);
-  const res = await fetch(`${GEMINI_URL()}?key=${process.env.GEMINI_API_KEY}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-  });
-
-  if (!res.ok) {
-    const err = new Error(`Gemini request failed with status ${res.status}`);
-    err.code = 'AI_REQUEST_FAILED';
-    throw err;
-  }
-
-  const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const data = await callAI(prompt);
+  const text = data?.choices?.[0]?.message?.content || '';
   const parsed = parseSummaryResponse(text);
   const isEmpty = !parsed || (parsed.keyStrengths.length === 0 && parsed.areasForAttention.length === 0 && parsed.recommendations.length === 0);
   if (isEmpty) {
@@ -330,20 +349,8 @@ const generateAnomalySummary = async (flags) => {
   }
 
   const prompt = buildAnomalySummaryPrompt(flags);
-  const res = await fetch(`${GEMINI_URL()}?key=${process.env.GEMINI_API_KEY}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-  });
-
-  if (!res.ok) {
-    const err = new Error(`Gemini request failed with status ${res.status}`);
-    err.code = 'AI_REQUEST_FAILED';
-    throw err;
-  }
-
-  const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const data = await callAI(prompt);
+  const text = data?.choices?.[0]?.message?.content || '';
   const summary = text.replace(/```/g, '').trim();
   if (!summary) {
     const err = new Error('AI returned no usable summary');
@@ -391,20 +398,8 @@ const generatePerformanceNarrative = async (context) => {
   }
 
   const prompt = buildPerformanceNarrativePrompt(context);
-  const res = await fetch(`${GEMINI_URL()}?key=${process.env.GEMINI_API_KEY}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-  });
-
-  if (!res.ok) {
-    const err = new Error(`Gemini request failed with status ${res.status}`);
-    err.code = 'AI_REQUEST_FAILED';
-    throw err;
-  }
-
-  const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const data = await callAI(prompt);
+  const text = data?.choices?.[0]?.message?.content || '';
   const narrative = text.replace(/```/g, '').trim();
   if (!narrative) {
     const err = new Error('AI returned no usable narrative');
@@ -459,20 +454,8 @@ const generateInterventionSynthesis = async (flaggedStudents) => {
   }
 
   const prompt = buildInterventionSynthesisPrompt(flaggedStudents);
-  const res = await fetch(`${GEMINI_URL()}?key=${process.env.GEMINI_API_KEY}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-  });
-
-  if (!res.ok) {
-    const err = new Error(`Gemini request failed with status ${res.status}`);
-    err.code = 'AI_REQUEST_FAILED';
-    throw err;
-  }
-
-  const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const data = await callAI(prompt);
+  const text = data?.choices?.[0]?.message?.content || '';
   const synthesis = text.replace(/```/g, '').trim();
   if (!synthesis) {
     const err = new Error('AI returned no usable synthesis');
@@ -552,20 +535,8 @@ const interpretAdminQuery = async (question) => {
   }
 
   const prompt = buildQueryInterpretationPrompt(question);
-  const res = await fetch(`${GEMINI_URL()}?key=${process.env.GEMINI_API_KEY}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-  });
-
-  if (!res.ok) {
-    const err = new Error(`Gemini request failed with status ${res.status}`);
-    err.code = 'AI_REQUEST_FAILED';
-    throw err;
-  }
-
-  const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const data = await callAI(prompt);
+  const text = data?.choices?.[0]?.message?.content || '';
   return parseIntentResponse(text);
 };
 
@@ -601,20 +572,8 @@ const summarizeQueryResult = async (question, rows) => {
   }
 
   const prompt = buildQuerySummaryPrompt(question, rows);
-  const res = await fetch(`${GEMINI_URL()}?key=${process.env.GEMINI_API_KEY}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-  });
-
-  if (!res.ok) {
-    const err = new Error(`Gemini request failed with status ${res.status}`);
-    err.code = 'AI_REQUEST_FAILED';
-    throw err;
-  }
-
-  const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const data = await callAI(prompt);
+  const text = data?.choices?.[0]?.message?.content || '';
   return text.replace(/```/g, '').trim() || null;
 };
 
