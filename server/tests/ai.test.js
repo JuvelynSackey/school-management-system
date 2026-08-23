@@ -21,6 +21,11 @@ const createDraftReport = async (schoolId, overrides = {}) => {
   return runWithSchool(schoolId, async () => TerminalReport.create({ status: 'Draft', ...overrides }));
 };
 
+const createResult = async (schoolId, fields) => {
+  const { Result } = models;
+  return runWithSchool(schoolId, async () => Result.create({ schoolId, ...fields }));
+};
+
 describe('AI Remark Assistant', () => {
   test('with no GEMINI_API_KEY configured, falls back to the deterministic templates instead of erroring', async () => {
     const school = await fixtures.createSchool(models);
@@ -188,5 +193,134 @@ describe('AI Remark Assistant', () => {
       const logs = await runWithSchool(school._id, async () => AuditLog.find({ action: 'ai.remarkSuggested' }));
       expect(logs.length).toBe(1);
     });
+  });
+});
+
+describe('Announcement Composer', () => {
+  test('with no GEMINI_API_KEY, falls back to tone templates that carry the exact objective text', async () => {
+    const school = await fixtures.createSchool(models);
+    const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin@announce-test.local' });
+    const token = await fixtures.login(app, school.slug, 'admin@announce-test.local', password);
+
+    const res = await request(app).post('/api/ai/compose-announcement').set(fixtures.authHeader(token)).send({
+      objective: 'PTA meeting this Friday at 3pm', tone: 'friendly', targetType: 'school',
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.fallbackMode).toBe(true);
+    expect(res.body.data.suggestions).toHaveLength(3);
+    res.body.data.suggestions.forEach((s) => expect(s).toContain('PTA meeting this Friday at 3pm'));
+  });
+
+  test('a teacher cannot compose an announcement — only admins can create one', async () => {
+    const school = await fixtures.createSchool(models);
+    const { user, password } = await fixtures.createTeacher(models, school._id);
+    const token = await fixtures.login(app, school.slug, user.email, password);
+
+    const res = await request(app).post('/api/ai/compose-announcement').set(fixtures.authHeader(token)).send({
+      objective: 'Test', tone: 'formal', targetType: 'school',
+    });
+    expect(res.status).toBe(403);
+  });
+
+  test('rejects an unknown tone as a validation error', async () => {
+    const school = await fixtures.createSchool(models);
+    const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin2@announce-test.local' });
+    const token = await fixtures.login(app, school.slug, 'admin2@announce-test.local', password);
+
+    const res = await request(app).post('/api/ai/compose-announcement').set(fixtures.authHeader(token)).send({
+      objective: 'Test', tone: 'sarcastic', targetType: 'school',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test('resolves targetType=class into the actual class name for phrasing context', async () => {
+    const school = await fixtures.createSchool(models);
+    const classRow = await fixtures.createClass(models, school._id, { name: 'JHS 2' });
+    const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin3@announce-test.local' });
+    const token = await fixtures.login(app, school.slug, 'admin3@announce-test.local', password);
+
+    process.env.GEMINI_API_KEY = 'test-fake-key';
+    global.fetch = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(['a', 'b', 'c']) }] } }] }),
+    }));
+    try {
+      const res = await request(app).post('/api/ai/compose-announcement').set(fixtures.authHeader(token)).send({
+        objective: 'Sports day', tone: 'formal', targetType: 'class', targetClassId: classRow.id,
+      });
+      expect(res.status).toBe(200);
+      const promptSent = JSON.parse(global.fetch.mock.calls[0][1].body).contents[0].parts[0].text;
+      expect(promptSent).toContain('JHS 2');
+    } finally {
+      delete process.env.GEMINI_API_KEY;
+      delete global.fetch;
+    }
+  });
+});
+
+describe('AI Performance Summary', () => {
+  test('with no GEMINI_API_KEY, derives key strengths and areas for attention from computed averages', async () => {
+    const school = await fixtures.createSchool(models);
+    const classRow = await fixtures.createClass(models, school._id);
+    const strongSubject = await fixtures.createSubject(models, school._id, { name: 'Mathematics' });
+    const weakSubject = await fixtures.createSubject(models, school._id, { name: 'Science' });
+    const term = await fixtures.createTerm(models, school._id, { isCurrent: true });
+    const { student: studentA } = await fixtures.createStudent(models, school._id, { classId: classRow.id });
+    const { student: studentB } = await fixtures.createStudent(models, school._id, { classId: classRow.id });
+    const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin@perf-test.local' });
+    const token = await fixtures.login(app, school.slug, 'admin@perf-test.local', password);
+
+    await createResult(school._id, {
+      studentId: studentA.id, subjectId: strongSubject.id, classId: classRow.id, academicTermId: term.id, classScore: 45, examScore: 45, totalScore: 90,
+    });
+    await createResult(school._id, {
+      studentId: studentB.id, subjectId: strongSubject.id, classId: classRow.id, academicTermId: term.id, classScore: 42, examScore: 42, totalScore: 84,
+    });
+    await createResult(school._id, {
+      studentId: studentA.id, subjectId: weakSubject.id, classId: classRow.id, academicTermId: term.id, classScore: 15, examScore: 15, totalScore: 30,
+    });
+    await createResult(school._id, {
+      studentId: studentB.id, subjectId: weakSubject.id, classId: classRow.id, academicTermId: term.id, classScore: 18, examScore: 18, totalScore: 36,
+    });
+
+    const res = await request(app).get(`/api/ai/performance-summary?academicTermId=${term.id}`).set(fixtures.authHeader(token));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.fallbackMode).toBe(true);
+    expect(res.body.data.keyStrengths.join(' ')).toContain('Mathematics');
+    expect(res.body.data.areasForAttention.join(' ')).toContain('Science');
+    expect(res.body.data.recommendations.length).toBeGreaterThan(0);
+  });
+
+  test('a term with no results at all gets an empty, harmless response', async () => {
+    const school = await fixtures.createSchool(models);
+    const term = await fixtures.createTerm(models, school._id);
+    const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin2@perf-test.local' });
+    const token = await fixtures.login(app, school.slug, 'admin2@perf-test.local', password);
+
+    const res = await request(app).get(`/api/ai/performance-summary?academicTermId=${term.id}`).set(fixtures.authHeader(token));
+    expect(res.status).toBe(200);
+    expect(res.body.data.keyStrengths).toEqual([]);
+    expect(res.body.data.areasForAttention).toEqual([]);
+  });
+
+  test('an unknown academicTermId is rejected with 404', async () => {
+    const school = await fixtures.createSchool(models);
+    const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin3@perf-test.local' });
+    const token = await fixtures.login(app, school.slug, 'admin3@perf-test.local', password);
+
+    const res = await request(app).get(`/api/ai/performance-summary?academicTermId=${new models.mongoose.Types.ObjectId()}`).set(fixtures.authHeader(token));
+    expect(res.status).toBe(404);
+  });
+
+  test('a teacher cannot request the school-wide performance summary', async () => {
+    const school = await fixtures.createSchool(models);
+    const term = await fixtures.createTerm(models, school._id);
+    const { user, password } = await fixtures.createTeacher(models, school._id);
+    const token = await fixtures.login(app, school.slug, user.email, password);
+
+    const res = await request(app).get(`/api/ai/performance-summary?academicTermId=${term.id}`).set(fixtures.authHeader(token));
+    expect(res.status).toBe(403);
   });
 });

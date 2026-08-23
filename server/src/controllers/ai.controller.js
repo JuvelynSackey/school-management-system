@@ -1,7 +1,10 @@
-const { TerminalReport, Student } = require('../models');
+const {
+  mongoose, TerminalReport, Student, Class, Subject, Result, AcademicTerm,
+} = require('../models');
 const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/AppError');
 const { getTeacherClassIds } = require('../services/teacherScope.service');
+const { getSchemeForSchool } = require('../services/grading.service');
 const aiService = require('../services/ai.service');
 const auditLog = require('../services/auditLog.service');
 
@@ -86,4 +89,111 @@ const suggestRemark = asyncHandler(async (req, res, next) => {
   res.json({ success: true, data: { suggestions, fallbackMode } });
 });
 
-module.exports = { suggestRemark };
+// POST /ai/compose-announcement { objective, tone, targetType, targetClassId }  (admin only)
+// targetLabel is resolved server-side from targetType/targetClassId (never
+// trusted free text from the client) purely for phrasing context — the AI
+// never sees a specific student's name, only "Whole School" / a class name
+// / a generic "A Specific Student".
+const composeAnnouncement = asyncHandler(async (req, res, next) => {
+  const {
+    objective, tone, targetType, targetClassId,
+  } = req.body;
+
+  let targetLabel = 'Whole School';
+  if (targetType === 'class' && targetClassId) {
+    const classRow = await Class.findById(targetClassId);
+    if (!classRow) return next(new AppError('Class not found', 404));
+    targetLabel = `${classRow.name} ${classRow.section || ''}`.trim();
+  } else if (targetType === 'student') {
+    targetLabel = 'A Specific Student';
+  }
+
+  let suggestions;
+  let fallbackMode = false;
+  if (aiService.isAIConfigured()) {
+    try {
+      suggestions = await aiService.generateAnnouncementSuggestions({ objective, tone, targetLabel });
+    } catch {
+      suggestions = aiService.generateFallbackAnnouncementSuggestions({ objective, tone });
+      fallbackMode = true;
+    }
+  } else {
+    suggestions = aiService.generateFallbackAnnouncementSuggestions({ objective, tone });
+    fallbackMode = true;
+  }
+
+  await auditLog.record({
+    req, action: 'ai.announcementComposed', entityType: 'Announcement', description: `${fallbackMode ? 'Fallback' : 'AI'} announcement draft generated`,
+  });
+
+  res.json({ success: true, data: { suggestions, fallbackMode } });
+});
+
+// Result.aggregate() bypasses tenantScopePlugin — schoolId must be matched
+// explicitly here, same reasoning as analytics.controller.js's own
+// aggregates. "Pass" is defined as scoring at or above the second-lowest
+// grade band's minimum — the lowest band is the scheme's fail grade by
+// definition (e.g. F9 in the NaCCA default).
+const computeSubjectPerformance = async (schoolId, academicTermId) => {
+  const scheme = await getSchemeForSchool(schoolId);
+  const sortedBands = [...scheme.bands].sort((a, b) => a.min - b.min);
+  const passCutoff = sortedBands[1]?.min ?? 0;
+
+  const rows = await Result.aggregate([
+    { $match: { schoolId: new mongoose.Types.ObjectId(schoolId), academicTermId: new mongoose.Types.ObjectId(academicTermId) } },
+    {
+      $group: {
+        _id: '$subjectId',
+        average: { $avg: '$totalScore' },
+        count: { $sum: 1 },
+        passCount: { $sum: { $cond: [{ $gte: ['$totalScore', passCutoff] }, 1, 0] } },
+      },
+    },
+  ]);
+
+  const subjects = await Subject.find({ _id: { $in: rows.map((r) => r._id) } }, { name: 1 });
+  const nameById = new Map(subjects.map((s) => [s.id, s.name]));
+
+  return rows.map((r) => ({
+    subjectName: nameById.get(r._id.toString()) || 'Unknown subject',
+    average: Math.round(r.average * 10) / 10,
+    passRate: Math.round((r.passCount / r.count) * 100),
+    resultCount: r.count,
+  }));
+};
+
+// GET /ai/performance-summary?academicTermId=  (admin only)
+const performanceSummary = asyncHandler(async (req, res, next) => {
+  const { academicTermId } = req.query;
+  if (!academicTermId) return next(new AppError('academicTermId is required', 400));
+  if (!(await AcademicTerm.findById(academicTermId))) return next(new AppError('Academic term not found', 404));
+
+  const subjectPerf = await computeSubjectPerformance(req.user.schoolId, academicTermId);
+  if (subjectPerf.length === 0) {
+    return res.json({
+      success: true, data: {
+        keyStrengths: [], areasForAttention: [], recommendations: [], fallbackMode: false,
+      },
+    });
+  }
+
+  let summary;
+  let fallbackMode = false;
+  if (aiService.isAIConfigured()) {
+    try {
+      summary = await aiService.generatePerformanceSummary(subjectPerf);
+    } catch {
+      summary = aiService.generateFallbackPerformanceSummary(subjectPerf);
+      fallbackMode = true;
+    }
+  } else {
+    summary = aiService.generateFallbackPerformanceSummary(subjectPerf);
+    fallbackMode = true;
+  }
+
+  res.json({ success: true, data: { ...summary, fallbackMode } });
+});
+
+module.exports = {
+  suggestRemark, composeAnnouncement, performanceSummary,
+};

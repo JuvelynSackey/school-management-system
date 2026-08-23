@@ -2,7 +2,9 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const controller = require('../controllers/ai.controller');
 const queryController = require('../controllers/aiQuery.controller');
-const { suggestRemarkValidator, adminQueryValidator } = require('../validators/ai.validators');
+const {
+  suggestRemarkValidator, adminQueryValidator, composeAnnouncementValidator, performanceSummaryValidator,
+} = require('../validators/ai.validators');
 const validate = require('../middleware/validate');
 const authenticate = require('../middleware/authenticate');
 const authorize = require('../middleware/authorize');
@@ -37,5 +39,8 @@ router.post('/remarks/suggest', suggestLimiter, suggestRemarkValidator, validate
 // Admin-only, narrower than this router's own admin+teacher default above —
 // authorize() checks stack, so this further restricts just this one route.
 router.post('/query', authorize('admin'), queryLimiter, adminQueryValidator, validate, queryController.runQuery);
+// Admin-only, matching who can actually create an announcement (announcements.routes.js).
+router.post('/compose-announcement', authorize('admin'), suggestLimiter, composeAnnouncementValidator, validate, controller.composeAnnouncement);
+router.get('/performance-summary', authorize('admin'), performanceSummaryValidator, validate, controller.performanceSummary);
 
 module.exports = router;

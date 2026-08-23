@@ -126,6 +126,180 @@ const scoreBand = (averageScore) => {
 
 const generateFallbackRemarkSuggestions = (context) => FALLBACK_TEMPLATES[scoreBand(Number(context.averageScore) || 0)](context);
 
+// Announcements are a single message string in this app (no separate
+// headline/body field — see Announcement.model.js), so this drafts one
+// cohesive message per option, not a title+body pair. targetLabel is
+// context only ("Whole School" / a class name) — never a specific
+// student's name or any other identifying detail.
+const buildAnnouncementPrompt = ({ objective, tone, targetLabel }) => {
+  const lines = [
+    'You are helping a Ghanaian basic school admin draft a short announcement',
+    'for the school\'s notice board. Use only the facts given below — never',
+    'invent details (dates, times, places) that were not provided.',
+    '',
+    `What it's about: ${objective}`,
+    `Audience: ${targetLabel}`,
+    `Tone: ${tone}`,
+    '',
+    'Write exactly 3 different ready-to-post message options (no headline —',
+    'just the message body itself), each 1-3 sentences.',
+    'Return ONLY a JSON array of exactly 3 strings — no markdown, no code',
+    'fences, no extra commentary before or after the array.',
+  ];
+  return lines.join('\n');
+};
+
+const generateAnnouncementSuggestions = async ({ objective, tone, targetLabel }) => {
+  if (!isAIConfigured()) {
+    const err = new Error('AI is not configured');
+    err.code = 'AI_NOT_CONFIGURED';
+    throw err;
+  }
+
+  const prompt = buildAnnouncementPrompt({ objective, tone, targetLabel });
+  const res = await fetch(`${GEMINI_URL()}?key=${process.env.GEMINI_API_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+  });
+
+  if (!res.ok) {
+    const err = new Error(`Gemini request failed with status ${res.status}`);
+    err.code = 'AI_REQUEST_FAILED';
+    throw err;
+  }
+
+  const data = await res.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const suggestions = parseSuggestions(text);
+  if (suggestions.length === 0) {
+    const err = new Error('AI returned no usable suggestions');
+    err.code = 'AI_EMPTY_RESPONSE';
+    throw err;
+  }
+  return suggestions;
+};
+
+// Same reasoning as the remark assistant's fallback — the tone the admin
+// picked still gets 3 distinct phrasings, just template-based instead of
+// generated, so the objective's actual details (dates/times/places) show
+// up verbatim rather than being paraphrased.
+const ANNOUNCEMENT_FALLBACK_TEMPLATES = {
+  friendly: (objective) => [
+    `Hi everyone! Just a quick note: ${objective}. Thanks so much!`,
+    `Hello! We wanted to let you know: ${objective}. We appreciate you taking a moment to read this.`,
+    `Quick heads-up: ${objective}. Thank you for staying in the loop!`,
+  ],
+  formal: (objective) => [
+    `Dear Parents and Guardians, we would like to inform you that ${objective}. Kindly take note. Regards, School Administration.`,
+    `This is to formally notify all concerned that ${objective}. Your attention to this matter is appreciated.`,
+    `Please be advised that ${objective}. We thank you for your continued cooperation.`,
+  ],
+  urgent: (objective) => [
+    `IMPORTANT NOTICE: ${objective}. Please take immediate note of this update.`,
+    `URGENT: ${objective}. This requires your prompt attention.`,
+    `Please read carefully: ${objective}. Immediate action or awareness is required.`,
+  ],
+};
+
+const generateFallbackAnnouncementSuggestions = ({ objective, tone }) => (
+  (ANNOUNCEMENT_FALLBACK_TEMPLATES[tone] || ANNOUNCEMENT_FALLBACK_TEMPLATES.formal)(objective)
+);
+
+// subjectPerf: [{ subjectName, average, passRate, resultCount }] — already
+// computed, tenant-scoped, school-wide aggregates (see
+// ai.controller.js's computeSubjectPerformance). No student-level data
+// ever reaches this prompt, only per-subject numbers.
+const buildPerformanceSummaryPrompt = (subjectPerf) => {
+  const lines = [
+    'You are helping a school admin understand overall academic performance',
+    'this term across all subjects. Use only the data given below — never',
+    'invent numbers or subjects not listed.',
+    '',
+    'Subject performance this term:',
+    ...subjectPerf.map((s) => `- ${s.subjectName}: ${s.average}% average, ${s.passRate}% pass rate (${s.resultCount} results)`),
+    '',
+    'Return a JSON object with exactly these three keys, each an array of',
+    '1-3 short, plain-sentence bullet points (no markdown):',
+    '{"keyStrengths": [...], "areasForAttention": [...], "recommendations": [...]}',
+    'Return ONLY that JSON object — no markdown, no code fences, no',
+    'commentary before or after it.',
+  ];
+  return lines.join('\n');
+};
+
+// Same recovery reasoning as parseSuggestions — Gemini sometimes wraps
+// JSON in fences or adds stray commentary despite being told not to.
+const parseSummaryResponse = (text) => {
+  const stripped = text.replace(/```json|```/g, '').trim();
+  const match = stripped.match(/\{[\s\S]*\}/);
+  if (!match) return null;
+  try {
+    const parsed = JSON.parse(match[0]);
+    const toStringArray = (v) => (Array.isArray(v) ? v.filter((s) => typeof s === 'string' && s.trim()).slice(0, 3) : []);
+    return {
+      keyStrengths: toStringArray(parsed.keyStrengths),
+      areasForAttention: toStringArray(parsed.areasForAttention),
+      recommendations: toStringArray(parsed.recommendations),
+    };
+  } catch {
+    return null;
+  }
+};
+
+const generatePerformanceSummary = async (subjectPerf) => {
+  if (!isAIConfigured()) {
+    const err = new Error('AI is not configured');
+    err.code = 'AI_NOT_CONFIGURED';
+    throw err;
+  }
+
+  const prompt = buildPerformanceSummaryPrompt(subjectPerf);
+  const res = await fetch(`${GEMINI_URL()}?key=${process.env.GEMINI_API_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+  });
+
+  if (!res.ok) {
+    const err = new Error(`Gemini request failed with status ${res.status}`);
+    err.code = 'AI_REQUEST_FAILED';
+    throw err;
+  }
+
+  const data = await res.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const parsed = parseSummaryResponse(text);
+  const isEmpty = !parsed || (parsed.keyStrengths.length === 0 && parsed.areasForAttention.length === 0 && parsed.recommendations.length === 0);
+  if (isEmpty) {
+    const err = new Error('AI returned no usable summary');
+    err.code = 'AI_EMPTY_RESPONSE';
+    throw err;
+  }
+  return parsed;
+};
+
+// Same "always return something usable" reasoning as the other fallbacks —
+// derived directly from the same computed averages/pass-rates, just phrased
+// with fixed sentence templates instead of a generated narrative.
+const generateFallbackPerformanceSummary = (subjectPerf) => {
+  const sorted = [...subjectPerf].sort((a, b) => b.average - a.average); // best first
+  const n = sorted.length;
+  // Index-based split (not "top 2 / bottom 2" independently) so the two
+  // lists never overlap even when there are only 1-3 subjects total.
+  const weakCount = Math.min(2, Math.floor(n / 2));
+  const strongCount = Math.min(2, n - weakCount);
+  const strong = sorted.slice(0, strongCount);
+  const weak = sorted.slice(n - weakCount, n).reverse(); // weakest first
+  return {
+    keyStrengths: strong.map((s) => `${s.subjectName} is performing well — ${s.average}% average, ${s.passRate}% pass rate.`),
+    areasForAttention: weak.map((s) => `${s.subjectName} needs attention — ${s.average}% average, ${s.passRate}% pass rate.`),
+    recommendations: weak.length > 0
+      ? weak.map((s) => `Consider extra support or a review session for ${s.subjectName}.`)
+      : ['Performance is consistent across subjects this term — no single subject stands out as needing extra attention.'],
+  };
+};
+
 // Deliberately given only flag TYPES (e.g. 'performance_drop'), never a
 // studentId or name — this summary is a general "what to expect" note for
 // the whole review screen, not a per-student narrative, so there's no
@@ -450,6 +624,13 @@ module.exports = {
   generateFallbackRemarkSuggestions,
   buildRemarkPrompt,
   parseSuggestions,
+  generateAnnouncementSuggestions,
+  generateFallbackAnnouncementSuggestions,
+  buildAnnouncementPrompt,
+  generatePerformanceSummary,
+  generateFallbackPerformanceSummary,
+  buildPerformanceSummaryPrompt,
+  parseSummaryResponse,
   generateAnomalySummary,
   buildAnomalySummaryPrompt,
   generatePerformanceNarrative,

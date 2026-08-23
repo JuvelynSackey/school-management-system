@@ -4,6 +4,7 @@ import {
 } from 'recharts';
 import { listTerms } from '../../api/terms.api';
 import { getAcademicAnalytics, getFinancialAnalytics } from '../../api/analytics.api';
+import { getPerformanceSummary } from '../../api/ai.api';
 import { formatCurrency } from '../../utils/currency';
 import { useTheme } from '../../context/ThemeContext';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
@@ -33,6 +34,52 @@ function StatTile({ label, value, tone, index = 0 }) {
       <div>
         <div className="stat-card-label">{label}</div>
         <div className="stat-card-value">{value}</div>
+      </div>
+    </div>
+  );
+}
+
+// Pure enrichment on top of the charts below, not load-bearing — a failed
+// or empty summary just renders nothing rather than blocking the page,
+// same "quiet when there's nothing to say" pattern as PerformanceInsightsPanel.
+function AIInsightsBanner({ academicTermId }) {
+  const [summary, setSummary] = useState(null);
+
+  useEffect(() => {
+    if (!academicTermId) return;
+    setSummary(null);
+    getPerformanceSummary(academicTermId).then(setSummary).catch(() => setSummary(null));
+  }, [academicTermId]);
+
+  if (!summary) return null;
+  const { keyStrengths, areasForAttention, recommendations, fallbackMode } = summary;
+  const hasAnything = keyStrengths.length > 0 || areasForAttention.length > 0 || recommendations.length > 0;
+  if (!hasAnything) return null;
+
+  const column = (title, items) => items.length > 0 && (
+    <div style={{ flex: '1 1 220px' }}>
+      <p style={{ fontSize: 12.5, fontWeight: 600, margin: '0 0 6px', color: 'var(--text-h)' }}>{title}</p>
+      <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
+        {items.map((item, i) => (
+          // eslint-disable-next-line react/no-array-index-key
+          <li key={i} style={{ marginBottom: 4 }}>{item}</li>
+        ))}
+      </ul>
+    </div>
+  );
+
+  return (
+    <div className="panel dash-reveal">
+      <div className="toolbar" style={{ marginBottom: 12 }}>
+        <h2 style={{ margin: 0 }}>✨ JesManage AI Insights</h2>
+        {fallbackMode && (
+          <span className="badge badge-neutral" style={{ fontSize: 11 }}>⚡ Rule-Based Fallback Mode</span>
+        )}
+      </div>
+      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+        {column('Key Strengths', keyStrengths)}
+        {column('Areas Requiring Attention', areasForAttention)}
+        {column('Recommendations', recommendations)}
       </div>
     </div>
   );
@@ -101,6 +148,8 @@ export default function AnalyticsPage() {
 
       {error && <div className="alert-error">{error}</div>}
       {isLoading && <LoadingSpinner label="Loading analytics…" />}
+
+      {!isLoading && !error && academicTermId && <AIInsightsBanner academicTermId={academicTermId} />}
 
       {!isLoading && !error && financial && (
         <div className="stat-card-row">

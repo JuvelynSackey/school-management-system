@@ -12,6 +12,13 @@ const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 
+// Render (and any other reverse-proxy host) terminates TLS and forwards
+// plain HTTP internally — without this, req.protocol always reads 'http'
+// (wrong scheme baked into generated URLs like uploaded logos) and
+// req.ip reads the proxy's own address instead of the real client's,
+// which silently pools every user's login-rate-limit bucket together.
+app.set('trust proxy', 1);
+
 app.use(helmet());
 app.use(cors({ origin: config.clientOrigin }));
 app.use(express.json());

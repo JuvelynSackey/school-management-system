@@ -4,10 +4,17 @@ import { listAnnouncements, createAnnouncement, deleteAnnouncement } from '../..
 import { listClasses } from '../../api/classes.api';
 import { listStudents } from '../../api/students.api';
 import { getChannelStatus } from '../../api/notifications.api';
+import { composeAnnouncement } from '../../api/ai.api';
 
 const emptyForm = {
   message: '', targetType: 'school', targetClassId: '', targetStudentId: '', channels: ['in_app'],
 };
+
+const TONE_OPTIONS = [
+  { value: 'friendly', label: 'Friendly' },
+  { value: 'formal', label: 'Formal' },
+  { value: 'urgent', label: 'Urgent' },
+];
 
 const CHANNEL_LABELS = { email: 'Email', sms: 'SMS', whatsapp: 'WhatsApp' };
 
@@ -32,11 +39,41 @@ export default function AnnouncementComposer() {
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState('');
 
+  const [aiObjective, setAiObjective] = useState('');
+  const [aiTone, setAiTone] = useState('friendly');
+  const [aiSuggestions, setAiSuggestions] = useState(null);
+  const [aiFallbackMode, setAiFallbackMode] = useState(false);
+  const [isDrafting, setIsDrafting] = useState(false);
+  const [draftError, setDraftError] = useState('');
+
   useEffect(() => {
     listClasses().then(setClasses).catch(() => setClasses([]));
     listStudents().then(setStudents).catch(() => setStudents([]));
     getChannelStatus().then(setChannelStatus).catch(() => setChannelStatus(null));
   }, []);
+
+  // Only ever fills the Message textarea below — never posts anything on
+  // its own. The admin still reviews, can edit, and explicitly clicks Send.
+  const handleDraftWithAI = async () => {
+    if (!aiObjective.trim()) { setDraftError('Describe what the announcement is about first.'); return; }
+    setIsDrafting(true);
+    setDraftError('');
+    setAiSuggestions(null);
+    try {
+      const { suggestions, fallbackMode } = await composeAnnouncement({
+        objective: aiObjective,
+        tone: aiTone,
+        targetType: form.targetType,
+        targetClassId: form.targetType === 'class' ? form.targetClassId : undefined,
+      });
+      setAiSuggestions(suggestions);
+      setAiFallbackMode(Boolean(fallbackMode));
+    } catch (err) {
+      setDraftError(err.response?.data?.message || 'Could not draft a suggestion right now.');
+    } finally {
+      setIsDrafting(false);
+    }
+  };
 
   const toggleChannel = (channel) => {
     setForm((f) => ({
@@ -86,6 +123,50 @@ export default function AnnouncementComposer() {
         <form onSubmit={handleSubmit}>
           {formError && <div className="alert-error">{formError}</div>}
           {message && <div className="alert-error" style={{ background: 'var(--accent-bg)', color: 'var(--accent)' }}>{message}</div>}
+
+          <div className="panel" style={{ background: 'var(--bg)', marginBottom: 16 }}>
+            <p className="muted" style={{ fontSize: 12.5, marginBottom: 10 }}>✨ Draft with AI — describe what it&apos;s about, pick a tone, and get 3 ready-to-edit options below.</p>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <label className="field" style={{ flex: '1 1 240px', marginBottom: 0 }}>
+                <span>What&apos;s this about?</span>
+                <input
+                  value={aiObjective}
+                  onChange={(e) => setAiObjective(e.target.value)}
+                  placeholder="e.g. PTA meeting this Friday at 3pm in the assembly hall"
+                  maxLength={300}
+                />
+              </label>
+              <label className="field" style={{ flex: '0 1 140px', marginBottom: 0 }}>
+                <span>Tone</span>
+                <select value={aiTone} onChange={(e) => setAiTone(e.target.value)}>
+                  {TONE_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </label>
+              <button type="button" className="btn-secondary" onClick={handleDraftWithAI} disabled={isDrafting}>
+                {isDrafting ? 'Drafting…' : '✨ Draft with AI'}
+              </button>
+            </div>
+            {draftError && <p className="muted" style={{ fontSize: 12.5, marginTop: 8 }}>{draftError}</p>}
+            {aiSuggestions && (
+              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {aiFallbackMode && (
+                  <span className="badge badge-neutral" style={{ alignSelf: 'flex-start', fontSize: 11 }}>
+                    ⚡ JesManage Intelligence (Rule-Based Fallback Mode)
+                  </span>
+                )}
+                {aiSuggestions.map((s, i) => (
+                  // eslint-disable-next-line react/no-array-index-key
+                  <div key={i} className="panel" style={{ padding: 10, display: 'flex', gap: 10, alignItems: 'center' }}>
+                    <p style={{ fontSize: 13, margin: 0, flex: 1 }}>{s}</p>
+                    <button type="button" className="btn-secondary" style={{ flexShrink: 0 }} onClick={() => { setForm((f) => ({ ...f, message: s })); setAiSuggestions(null); }}>
+                      Use
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <label className="field">
             <span>Message</span>
             <textarea
