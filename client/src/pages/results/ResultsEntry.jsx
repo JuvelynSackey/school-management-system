@@ -273,10 +273,10 @@ export default function ResultsEntry({ initialClassId = '', initialSubjectId = '
 
         {!isLoading && (
           <>
-            <table>
+            <table className="sticky-first-col">
               <thead>
                 <tr>
-                  <th>Admission No.</th><th>Name</th>
+                  <th>Name</th><th>Admission No.</th>
                   <th>Class Score ({scheme?.classScoreMax ?? 50})</th>
                   <th>Exam Score ({scheme?.examScoreMax ?? 50})</th>
                   <th>Total</th><th>Grade</th><th>Position</th>
@@ -289,8 +289,8 @@ export default function ResultsEntry({ initialClassId = '', initialSubjectId = '
                   const previewTotal = (r.classScore !== '' && r.examScore !== '') ? Number(r.classScore) + Number(r.examScore) : r.totalScore;
                   return (
                     <tr key={r.studentId}>
-                      <td>{r.admissionNo}</td>
                       <td>{r.firstName} {r.lastName}</td>
+                      <td>{r.admissionNo}</td>
                       <td>
                         <input
                           type="number"
