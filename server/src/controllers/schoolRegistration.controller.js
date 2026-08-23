@@ -21,14 +21,16 @@ const { recordAuthEvent } = require('../services/auditLog.service');
 // school exists and is pending" would be exactly that kind of leak.
 const register = asyncHandler(async (req, res, next) => {
   const {
-    schoolName, slug, adminFullName, adminEmail, adminPhone, password,
+    schoolName, slug, adminFullName, adminEmail, adminPhone, password, schoolType,
   } = req.body;
 
   const normalizedSlug = slug.toLowerCase().trim();
   const existingSchool = await School.findOne({ slug: normalizedSlug });
   if (existingSchool) return next(new AppError('A school with this login code already exists', 400));
 
-  const school = await School.create({ name: schoolName, slug: normalizedSlug, status: 'pending' });
+  const school = await School.create({
+    name: schoolName, slug: normalizedSlug, status: 'pending', schoolType: schoolType || null,
+  });
 
   await runWithSchool(school._id, () => findOrCreate(SchoolSettings, {
     where: { schoolId: school._id },

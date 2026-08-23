@@ -18,6 +18,13 @@ const schoolSchema = new mongoose.Schema({
   status: {
     type: String, required: true, enum: ['pending', 'active', 'suspended', 'rejected'], default: 'active',
   },
+  // Optional context captured at self-registration — no feature reads this
+  // yet (no regional/type analytics or filtering exists), so it's `null`able
+  // rather than defaulted to a guessed value for schools that never set it
+  // (including every school created via the super-admin's own create flow).
+  schoolType: {
+    type: String, enum: ['private_basic', 'public_basic', 'tvet', 'other'], default: null,
+  },
 }, { timestamps: true });
 
 schoolSchema.plugin(idTransformPlugin);

@@ -64,6 +64,25 @@ describe('Self-service school registration', () => {
     expect(res.status).toBe(400);
   });
 
+  test('persists an optional schoolType when provided, and leaves it null when omitted', async () => {
+    const token = await loginSuperAdmin();
+    await request(app).post('/api/schools/register').send(validPayload({ schoolType: 'public_basic' }));
+    await request(app).post('/api/schools/register').send(validPayload({
+      slug: 'no-type-school', adminEmail: 'other2@kings-prep.local', schoolType: undefined,
+    }));
+
+    const listRes = await request(app).get('/api/super-admin/schools').set('Authorization', `Bearer ${token}`);
+    const withType = listRes.body.data.find((s) => s.slug === 'kings-prep');
+    const withoutType = listRes.body.data.find((s) => s.slug === 'no-type-school');
+    expect(withType.schoolType).toBe('public_basic');
+    expect(withoutType.schoolType).toBeNull();
+  });
+
+  test('rejects an invalid schoolType value', async () => {
+    const res = await request(app).post('/api/schools/register').send(validPayload({ schoolType: 'boarding_house' }));
+    expect(res.status).toBe(400);
+  });
+
   test('a super admin approving the school unlocks login; rejecting keeps it locked', async () => {
     const token = await loginSuperAdmin();
     const registerRes = await request(app).post('/api/schools/register').send(validPayload());
