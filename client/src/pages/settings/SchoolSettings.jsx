@@ -6,6 +6,7 @@ import { getChannelStatus } from '../../api/notifications.api';
 import {
   listPersonalAttributes, createPersonalAttribute, updatePersonalAttribute, deletePersonalAttribute,
 } from '../../api/personalAttributes.api';
+import { getGradingScheme, updateGradingScheme } from '../../api/gradingScheme.api';
 
 function SchoolEmblemIcon() {
   return (
@@ -261,6 +262,169 @@ export default function SchoolSettings() {
       </div>
 
       <PersonalAttributesPanel />
+      <GradingSchemePanel />
+    </div>
+  );
+}
+
+// Mirrors grading.service.js's hardcoded NaCCA SCALE constant — kept as a
+// client-side copy purely for the "reset to defaults" button, since this
+// national scale is stable reference data, not something worth a dedicated
+// endpoint just to fetch it.
+const NACCA_DEFAULT_BANDS = [
+  { min: 80, grade: 'A1', label: 'Excellent' },
+  { min: 70, grade: 'B2', label: 'Very Good' },
+  { min: 65, grade: 'B3', label: 'Good' },
+  { min: 60, grade: 'C4', label: 'Credit' },
+  { min: 55, grade: 'C5', label: 'Credit' },
+  { min: 50, grade: 'C6', label: 'Credit' },
+  { min: 45, grade: 'D7', label: 'Pass' },
+  { min: 40, grade: 'E8', label: 'Pass' },
+  { min: 0, grade: 'F9', label: 'Fail' },
+];
+
+// GradingScheme is its own model/endpoint (GET/PUT /grading-scheme), not a
+// field on SchoolSettings — this panel just lives on the same page for
+// admin convenience. Bands only store `min`; the "Upper Bound" column below
+// is derived for display (one less than the band above, or the score
+// ceiling for the top band) and is never sent back to the server.
+function GradingSchemePanel() {
+  const [classScoreMax, setClassScoreMax] = useState(50);
+  const [examScoreMax, setExamScoreMax] = useState(50);
+  const [bands, setBands] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+
+  const load = () => {
+    setIsLoading(true);
+    getGradingScheme()
+      .then((data) => {
+        setClassScoreMax(data.classScoreMax);
+        setExamScoreMax(data.examScoreMax);
+        setBands(data.bands);
+      })
+      .catch((err) => setError(err.response?.data?.message || 'Failed to load grading scheme.'))
+      .finally(() => setIsLoading(false));
+  };
+  useEffect(load, []);
+
+  const sortedBands = [...bands].sort((a, b) => b.min - a.min);
+
+  const updateBand = (index, field, value) => {
+    const next = [...bands];
+    next[index] = { ...next[index], [field]: value };
+    setBands(next);
+  };
+
+  const addBand = () => setBands([...bands, { min: 0, grade: '', label: '' }]);
+  const removeBand = (index) => setBands(bands.filter((_, i) => i !== index));
+
+  const resetToDefaults = () => {
+    setClassScoreMax(50);
+    setExamScoreMax(50);
+    setBands(NACCA_DEFAULT_BANDS);
+    setMessage('Restored NaCCA defaults below — click Save to apply.');
+    setError('');
+  };
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setError('');
+    setMessage('');
+
+    // Mirrors the server's own checks (gradingScheme.controller.js) so a
+    // mistake surfaces immediately instead of a round trip.
+    const cleanBands = bands.map((b) => ({ ...b, min: Number(b.min) }));
+    const lowestBand = [...cleanBands].sort((a, b) => a.min - b.min)[0];
+    if (!lowestBand || lowestBand.min !== 0) {
+      setError('The lowest grade band must start at 0.');
+      return;
+    }
+    const grades = cleanBands.map((b) => b.grade);
+    if (new Set(grades).size !== grades.length) {
+      setError('Grade codes must be unique.');
+      return;
+    }
+    const mins = cleanBands.map((b) => b.min);
+    if (new Set(mins).size !== mins.length) {
+      setError('Band minimum scores must be unique.');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await updateGradingScheme({
+        classScoreMax: Number(classScoreMax), examScoreMax: Number(examScoreMax), bands: cleanBands,
+      });
+      setMessage('Grading scheme saved.');
+      load();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to save grading scheme.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="panel" style={{ maxWidth: 640, marginTop: 20 }}>
+      <div className="toolbar" style={{ marginBottom: 8 }}>
+        <h3 style={{ fontSize: 14, margin: 0 }}>Grading Scheme</h3>
+        <button type="button" className="link-btn" onClick={resetToDefaults}>Reset to NaCCA Standard Defaults</button>
+      </div>
+      <p className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
+        Turns a class score + exam score total into a letter grade everywhere in the app — results entry, report cards, and analytics.
+      </p>
+      {isLoading && <p className="muted">Loading...</p>}
+      {!isLoading && (
+        <form onSubmit={handleSave}>
+          {error && <div className="alert-error">{error}</div>}
+          {message && <div className="alert-error" style={{ background: 'var(--accent-bg)', color: 'var(--accent)' }}>{message}</div>}
+
+          <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+            <label className="field" style={{ flex: 1 }}>
+              <span>Class Score Max</span>
+              <input type="number" min="1" value={classScoreMax} onChange={(e) => setClassScoreMax(e.target.value)} />
+            </label>
+            <label className="field" style={{ flex: 1 }}>
+              <span>Exam Score Max</span>
+              <input type="number" min="1" value={examScoreMax} onChange={(e) => setExamScoreMax(e.target.value)} />
+            </label>
+          </div>
+
+          <table style={{ marginBottom: 12 }}>
+            <thead>
+              <tr><th>Min Score</th><th>Upper Bound</th><th>Grade</th><th>Label</th><th /></tr>
+            </thead>
+            <tbody>
+              {sortedBands.map((band) => {
+                const index = bands.indexOf(band);
+                const rank = sortedBands.indexOf(band);
+                const upperBound = rank === 0
+                  ? (Number(classScoreMax) + Number(examScoreMax)) || 100
+                  : sortedBands[rank - 1].min - 1;
+                return (
+                  // eslint-disable-next-line react/no-array-index-key
+                  <tr key={index}>
+                    <td><input type="number" min="0" value={band.min} onChange={(e) => updateBand(index, 'min', e.target.value)} style={{ width: 70 }} /></td>
+                    <td className="muted">{upperBound}</td>
+                    <td><input value={band.grade} onChange={(e) => updateBand(index, 'grade', e.target.value)} style={{ width: 60 }} /></td>
+                    <td><input value={band.label} onChange={(e) => updateBand(index, 'label', e.target.value)} style={{ width: 140 }} /></td>
+                    <td><button type="button" className="link-btn" onClick={() => removeBand(index)}>Remove</button></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          <div className="toolbar" style={{ marginBottom: 12 }}>
+            <button type="button" className="btn-secondary" onClick={addBand}>+ Add Band</button>
+          </div>
+
+          <button type="submit" className="btn-primary" disabled={isSaving}>{isSaving ? 'Saving...' : 'Save Grading Scheme'}</button>
+        </form>
+      )}
     </div>
   );
 }
