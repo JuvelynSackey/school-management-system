@@ -75,7 +75,6 @@ export default function RegisterSchool() {
           </div>
         ) : (
           <form onSubmit={handleSubmit}>
-            <img src="/logo.png" alt="JesManage" style={{ width: 48, height: 48, borderRadius: 12, marginBottom: 10 }} />
             <h2 style={{ marginTop: 0, marginBottom: 4 }}>Register Your School</h2>
             <p className="muted" style={{ fontSize: 12.5, marginTop: 0, marginBottom: 16 }}>
               For Ghanaian basic schools
