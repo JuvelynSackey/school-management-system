@@ -435,7 +435,14 @@ function AcademicOverview({ currentTermId, atRiskData, index }) {
       {academic === null && <p className="muted">Loading…</p>}
 
       {academic !== null && topSubjects.length === 0 && (
-        <p className="muted">No results recorded yet this term.</p>
+        <div className="empty-state">
+          <div style={{ fontSize: 32, marginBottom: 8 }} aria-hidden="true">📊</div>
+          <h3 style={{ margin: '0 0 4px' }}>No academic data yet</h3>
+          <p className="muted" style={{ margin: '0 0 16px' }}>
+            Results will appear here once teachers begin entering and submitting marks.
+          </p>
+          <Link to="/results" className="btn-primary" style={{ display: 'inline-block' }}>Go to Results</Link>
+        </div>
       )}
 
       {topSubjects.length > 0 && (
