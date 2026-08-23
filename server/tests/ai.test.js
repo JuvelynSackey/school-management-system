@@ -22,11 +22,11 @@ const createDraftReport = async (schoolId, overrides = {}) => {
 };
 
 describe('AI Remark Assistant', () => {
-  test('is disabled by default (no GEMINI_API_KEY) and returns a clear 503, not a crash', async () => {
+  test('with no GEMINI_API_KEY configured, falls back to the deterministic templates instead of erroring', async () => {
     const school = await fixtures.createSchool(models);
     const classRow = await fixtures.createClass(models, school._id);
     const term = await fixtures.createTerm(models, school._id);
-    const { student } = await fixtures.createStudent(models, school._id, { classId: classRow.id });
+    const { student } = await fixtures.createStudent(models, school._id, { classId: classRow.id, overrides: { firstName: 'Ama' } });
     const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin@ai-test.local' });
     const token = await fixtures.login(app, school.slug, 'admin@ai-test.local', password);
 
@@ -35,8 +35,56 @@ describe('AI Remark Assistant', () => {
     });
 
     const res = await request(app).post('/api/ai/remarks/suggest').set(fixtures.authHeader(token)).send({ reportId: report.id });
-    expect(res.status).toBe(503);
-    expect(res.body.code).toBe('AI_NOT_CONFIGURED');
+    expect(res.status).toBe(200);
+    expect(res.body.data.fallbackMode).toBe(true);
+    expect(res.body.data.suggestions).toHaveLength(3);
+    res.body.data.suggestions.forEach((s) => expect(s).toContain('Ama'));
+  });
+
+  test('fallback templates are banded by score — a low average gets a supportive, not congratulatory, remark', async () => {
+    const school = await fixtures.createSchool(models);
+    const classRow = await fixtures.createClass(models, school._id);
+    const term = await fixtures.createTerm(models, school._id);
+    const { student } = await fixtures.createStudent(models, school._id, { classId: classRow.id, overrides: { firstName: 'Kofi' } });
+    const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin5@ai-test.local' });
+    const token = await fixtures.login(app, school.slug, 'admin5@ai-test.local', password);
+
+    const report = await createDraftReport(school._id, {
+      schoolId: school._id, studentId: student.id, classId: classRow.id, academicTermId: term.id, averageScore: 42,
+    });
+
+    const res = await request(app).post('/api/ai/remarks/suggest').set(fixtures.authHeader(token)).send({ reportId: report.id });
+    expect(res.status).toBe(200);
+    expect(res.body.data.fallbackMode).toBe(true);
+    expect(res.body.data.suggestions.join(' ')).toMatch(/support|foundation|room to grow/i);
+  });
+
+  test('a failed live Gemini request falls back to templates rather than surfacing an error', async () => {
+    const originalKey = process.env.GEMINI_API_KEY;
+    const originalFetch = global.fetch;
+    process.env.GEMINI_API_KEY = 'test-fake-key';
+    global.fetch = jest.fn(async () => ({ ok: false, status: 500 }));
+
+    try {
+      const school = await fixtures.createSchool(models);
+      const classRow = await fixtures.createClass(models, school._id);
+      const term = await fixtures.createTerm(models, school._id);
+      const { student } = await fixtures.createStudent(models, school._id, { classId: classRow.id });
+      const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin6@ai-test.local' });
+      const token = await fixtures.login(app, school.slug, 'admin6@ai-test.local', password);
+
+      const report = await createDraftReport(school._id, {
+        schoolId: school._id, studentId: student.id, classId: classRow.id, academicTermId: term.id, averageScore: 75,
+      });
+
+      const res = await request(app).post('/api/ai/remarks/suggest').set(fixtures.authHeader(token)).send({ reportId: report.id });
+      expect(res.status).toBe(200);
+      expect(res.body.data.fallbackMode).toBe(true);
+      expect(res.body.data.suggestions).toHaveLength(3);
+    } finally {
+      process.env.GEMINI_API_KEY = originalKey;
+      global.fetch = originalFetch;
+    }
   });
 
   test('rejects a malformed reportId as a validation error', async () => {
@@ -130,6 +178,7 @@ describe('AI Remark Assistant', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.data.suggestions).toHaveLength(3);
+      expect(res.body.data.fallbackMode).toBe(false);
 
       const promptSent = JSON.parse(global.fetch.mock.calls[0][1].body).contents[0].parts[0].text;
       expect(promptSent).toContain('Ama');

@@ -31,10 +31,6 @@ const assertClassAccess = async (req, classId) => {
 // the exact same authorization check as editing the report itself, and never
 // gets broader data access than the teacher making the request already has.
 const suggestRemark = asyncHandler(async (req, res, next) => {
-  if (!aiService.isAIConfigured()) {
-    return next(new AppError('AI features are not yet configured for this deployment.', 503, undefined, 'AI_NOT_CONFIGURED'));
-  }
-
   const { reportId } = req.body;
   const report = await TerminalReport.findById(reportId);
   if (!report) return next(new AppError('Terminal report not found', 404));
@@ -53,27 +49,41 @@ const suggestRemark = asyncHandler(async (req, res, next) => {
     ? Math.round((report.totalAttendance / report.outOfAttendance) * 100)
     : null;
 
-  try {
-    const suggestions = await aiService.generateRemarkSuggestions({
-      studentFirstName: student.firstName,
-      averageScore: report.averageScore,
-      classPosition: report.classPosition,
-      classSize,
-      attendancePercent,
-    });
+  const context = {
+    studentFirstName: student.firstName,
+    averageScore: report.averageScore,
+    classPosition: report.classPosition,
+    classSize,
+    attendancePercent,
+  };
 
-    await auditLog.record({
-      req,
-      action: 'ai.remarkSuggested',
-      entityType: 'TerminalReport',
-      entityId: report.id,
-      description: `AI remark suggestions generated for ${student.firstName} ${student.lastName}`,
-    });
-
-    res.json({ success: true, data: { suggestions } });
-  } catch (err) {
-    return next(new AppError('Could not generate a remark suggestion right now. You can still write one directly.', 502, undefined, err.code || 'AI_REQUEST_FAILED'));
+  // "Suggest Remark" should never just dead-end the teacher — if AI isn't
+  // configured, or the live Gemini request itself fails (rate limit,
+  // timeout, bad response), fall back to the deterministic score-banded
+  // templates instead of surfacing an error.
+  let suggestions;
+  let fallbackMode = false;
+  if (aiService.isAIConfigured()) {
+    try {
+      suggestions = await aiService.generateRemarkSuggestions(context);
+    } catch {
+      suggestions = aiService.generateFallbackRemarkSuggestions(context);
+      fallbackMode = true;
+    }
+  } else {
+    suggestions = aiService.generateFallbackRemarkSuggestions(context);
+    fallbackMode = true;
   }
+
+  await auditLog.record({
+    req,
+    action: 'ai.remarkSuggested',
+    entityType: 'TerminalReport',
+    entityId: report.id,
+    description: `${fallbackMode ? 'Fallback' : 'AI'} remark suggestions generated for ${student.firstName} ${student.lastName}`,
+  });
+
+  res.json({ success: true, data: { suggestions, fallbackMode } });
 });
 
 module.exports = { suggestRemark };

@@ -88,6 +88,44 @@ const generateRemarkSuggestions = async (context) => {
   return suggestions;
 };
 
+const positionPhrase = ({ classPosition, classSize }) => (
+  classPosition && classSize ? ` (ranked ${classPosition} of ${classSize})` : ''
+);
+const attendancePhrase = ({ attendancePercent }) => (
+  attendancePercent != null ? ` Attendance stood at ${attendancePercent}%.` : ''
+);
+
+// Same facts as buildRemarkPrompt, no external call — used whenever a live
+// AI suggestion isn't available (unconfigured, or the Gemini request itself
+// failed/timed out) so "Suggest Remark" always returns something usable
+// instead of dead-ending the teacher. Banded on the term average: A (80+),
+// B (60-79), C (below 60).
+const FALLBACK_TEMPLATES = {
+  A: (ctx) => [
+    `${ctx.studentFirstName} has had an excellent term, consistently demonstrating mastery of the material${positionPhrase(ctx)}. Keep up this outstanding standard of work.`,
+    `An outstanding academic performance from ${ctx.studentFirstName} this term, with a strong average of ${ctx.averageScore}%. This is a great foundation to keep building on.`,
+    `${ctx.studentFirstName} continues to lead by example, combining strong results with consistent effort.${attendancePhrase(ctx)} Well done this term.`,
+  ],
+  B: (ctx) => [
+    `${ctx.studentFirstName} put in solid, consistent work this term, averaging ${ctx.averageScore}%. With a bit more focus on the weaker areas, even better results are within reach.`,
+    `A steady term for ${ctx.studentFirstName}${positionPhrase(ctx)}. Reviewing class notes more regularly would help push this average even higher.`,
+    `${ctx.studentFirstName} is making reasonable progress and shows real potential.${attendancePhrase(ctx)} More consistent revision would help turn that potential into stronger scores.`,
+  ],
+  C: (ctx) => [
+    `${ctx.studentFirstName} needs additional support to strengthen the basics this term. Regular practice and extra attention in class would help build a firmer foundation.`,
+    `This term's results suggest ${ctx.studentFirstName} would benefit from closer attention to foundational topics and more consistent class participation.${attendancePhrase(ctx)}`,
+    `${ctx.studentFirstName} has room to grow this term. Focused revision, regular attendance, and extra practice at home would go a long way toward improvement.`,
+  ],
+};
+
+const scoreBand = (averageScore) => {
+  if (averageScore >= 80) return 'A';
+  if (averageScore >= 60) return 'B';
+  return 'C';
+};
+
+const generateFallbackRemarkSuggestions = (context) => FALLBACK_TEMPLATES[scoreBand(Number(context.averageScore) || 0)](context);
+
 // Deliberately given only flag TYPES (e.g. 'performance_drop'), never a
 // studentId or name — this summary is a general "what to expect" note for
 // the whole review screen, not a per-student narrative, so there's no
@@ -409,6 +447,7 @@ const summarizeQueryResult = async (question, rows) => {
 module.exports = {
   isAIConfigured,
   generateRemarkSuggestions,
+  generateFallbackRemarkSuggestions,
   buildRemarkPrompt,
   parseSuggestions,
   generateAnomalySummary,

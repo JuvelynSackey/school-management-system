@@ -486,6 +486,7 @@ function ManageReportModal({
   const [error, setError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [remarkSuggestions, setRemarkSuggestions] = useState(null);
+  const [suggestionsAreFallback, setSuggestionsAreFallback] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [suggestError, setSuggestError] = useState('');
 
@@ -494,17 +495,20 @@ function ManageReportModal({
   // AI only ever suggests text into this same editable textarea — a teacher
   // still has to review it, optionally edit it, and explicitly Submit for
   // the remark to go anywhere. Nothing here writes to the report on its own.
+  // The endpoint itself never fails just because AI isn't configured or a
+  // live request errors — it degrades to deterministic templates and flags
+  // that via fallbackMode, so this only ever hits the catch block for a
+  // real error (not assigned to the class, report no longer editable, etc).
   const handleSuggestRemark = async () => {
     setIsSuggesting(true);
     setSuggestError('');
     setRemarkSuggestions(null);
     try {
-      const { suggestions } = await suggestRemark(report.id);
+      const { suggestions, fallbackMode } = await suggestRemark(report.id);
       setRemarkSuggestions(suggestions);
+      setSuggestionsAreFallback(Boolean(fallbackMode));
     } catch (err) {
-      setSuggestError(err.response?.data?.code === 'AI_NOT_CONFIGURED'
-        ? 'AI remark suggestions aren\'t set up for this school yet.'
-        : (err.response?.data?.message || 'Could not generate a suggestion right now.'));
+      setSuggestError(err.response?.data?.message || 'Could not generate a suggestion right now.');
     } finally {
       setIsSuggesting(false);
     }
@@ -617,6 +621,11 @@ function ManageReportModal({
           {suggestError && <p className="muted" style={{ fontSize: 12.5, marginTop: 6 }}>{suggestError}</p>}
           {remarkSuggestions && (
             <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {suggestionsAreFallback && (
+                <span className="badge badge-neutral" style={{ alignSelf: 'flex-start', fontSize: 11 }}>
+                  ⚡ JesManage Intelligence (Rule-Based Fallback Mode)
+                </span>
+              )}
               {remarkSuggestions.map((s, i) => (
                 // eslint-disable-next-line react/no-array-index-key
                 <div key={i} className="panel" style={{ padding: 10, display: 'flex', gap: 10, alignItems: 'center' }}>
@@ -627,7 +636,9 @@ function ManageReportModal({
                 </div>
               ))}
               <p className="muted" style={{ fontSize: 11.5 }}>
-                AI-generated — review before using. Using a suggestion fills the textarea above; you can still edit it before submitting.
+                {suggestionsAreFallback
+                  ? 'Rule-based templates — review before using. Using a suggestion fills the textarea above; you can still edit it before submitting.'
+                  : 'AI-generated — review before using. Using a suggestion fills the textarea above; you can still edit it before submitting.'}
               </p>
             </div>
           )}
