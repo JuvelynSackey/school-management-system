@@ -27,7 +27,7 @@ const createResult = async (schoolId, fields) => {
 };
 
 describe('AI Remark Assistant', () => {
-  test('with no NVIDIA_API_KEY configured, falls back to the deterministic templates instead of erroring', async () => {
+  test('with no DEEPSEEK_API_KEY configured, falls back to the deterministic templates instead of erroring', async () => {
     const school = await fixtures.createSchool(models);
     const classRow = await fixtures.createClass(models, school._id);
     const term = await fixtures.createTerm(models, school._id);
@@ -65,9 +65,9 @@ describe('AI Remark Assistant', () => {
   });
 
   test('a failed live AI request falls back to templates rather than surfacing an error', async () => {
-    const originalKey = process.env.NVIDIA_API_KEY;
+    const originalKey = process.env.DEEPSEEK_API_KEY;
     const originalFetch = global.fetch;
-    process.env.NVIDIA_API_KEY = 'nvapi-test-fake-key';
+    process.env.DEEPSEEK_API_KEY = 'test-fake-deepseek-key';
     global.fetch = jest.fn(async () => ({ ok: false, status: 500 }));
 
     try {
@@ -87,7 +87,7 @@ describe('AI Remark Assistant', () => {
       expect(res.body.data.fallbackMode).toBe(true);
       expect(res.body.data.suggestions).toHaveLength(3);
     } finally {
-      process.env.NVIDIA_API_KEY = originalKey;
+      process.env.DEEPSEEK_API_KEY = originalKey;
       global.fetch = originalFetch;
     }
   });
@@ -101,12 +101,12 @@ describe('AI Remark Assistant', () => {
     expect(res.status).toBe(400);
   });
 
-  describe('with an NVIDIA key present (the network call itself is mocked)', () => {
-    const originalKey = process.env.NVIDIA_API_KEY;
+  describe('with a DeepSeek key present (the network call itself is mocked)', () => {
+    const originalKey = process.env.DEEPSEEK_API_KEY;
     const originalFetch = global.fetch;
 
     beforeEach(() => {
-      process.env.NVIDIA_API_KEY = 'nvapi-test-fake-key';
+      process.env.DEEPSEEK_API_KEY = 'test-fake-deepseek-key';
       global.fetch = jest.fn(async () => ({
         ok: true,
         json: async () => ({
@@ -124,7 +124,7 @@ describe('AI Remark Assistant', () => {
     });
 
     afterEach(() => {
-      process.env.NVIDIA_API_KEY = originalKey;
+      process.env.DEEPSEEK_API_KEY = originalKey;
       global.fetch = originalFetch;
     });
 
@@ -195,7 +195,7 @@ describe('AI Remark Assistant', () => {
 });
 
 describe('Announcement Composer', () => {
-  test('with no NVIDIA_API_KEY, falls back to tone templates that carry the exact objective text', async () => {
+  test('with no DEEPSEEK_API_KEY, falls back to tone templates that carry the exact objective text', async () => {
     const school = await fixtures.createSchool(models);
     const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin@announce-test.local' });
     const token = await fixtures.login(app, school.slug, 'admin@announce-test.local', password);
@@ -238,7 +238,7 @@ describe('Announcement Composer', () => {
     const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin3@announce-test.local' });
     const token = await fixtures.login(app, school.slug, 'admin3@announce-test.local', password);
 
-    process.env.NVIDIA_API_KEY = 'nvapi-test-fake-key';
+    process.env.DEEPSEEK_API_KEY = 'test-fake-deepseek-key';
     global.fetch = jest.fn(async () => ({
       ok: true,
       json: async () => ({ choices: [{ message: { content: JSON.stringify(['a', 'b', 'c']) } }] }),
@@ -251,14 +251,14 @@ describe('Announcement Composer', () => {
       const promptSent = JSON.parse(global.fetch.mock.calls[0][1].body).messages[0].content;
       expect(promptSent).toContain('JHS 2');
     } finally {
-      delete process.env.NVIDIA_API_KEY;
+      delete process.env.DEEPSEEK_API_KEY;
       delete global.fetch;
     }
   });
 });
 
 describe('AI Performance Summary', () => {
-  test('with no NVIDIA_API_KEY, derives key strengths and areas for attention from computed averages', async () => {
+  test('with no DEEPSEEK_API_KEY, derives key strengths and areas for attention from computed averages', async () => {
     const school = await fixtures.createSchool(models);
     const classRow = await fixtures.createClass(models, school._id);
     const strongSubject = await fixtures.createSubject(models, school._id, { name: 'Mathematics' });

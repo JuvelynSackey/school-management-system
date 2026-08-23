@@ -50,12 +50,11 @@ services:
       # Composer / Performance Summary / Anomaly Detection / Early-Warning /
       # Ask JesManage gated off (deterministic fallback templates instead),
       # exactly like in local dev with no key set. Get a key from
-      # build.nvidia.com — it must start with "nvapi-", or the app treats it
-      # as unconfigured rather than attempting a request with a bad key.
-      - key: NVIDIA_API_KEY
+      # platform.deepseek.com.
+      - key: DEEPSEEK_API_KEY
         sync: false
-      - key: NVIDIA_MODEL
-        value: meta/llama-3.1-8b-instruct
+      - key: DEEPSEEK_MODEL
+        value: deepseek-v4-flash
       # Optional — leave blank to keep email notifications silently
       # skipped, same as local dev.
       - key: SMTP_HOST

@@ -1,25 +1,22 @@
-// NVIDIA Build (integrate.api.nvidia.com) — an OpenAI-compatible chat
-// endpoint in front of hosted open models. Follows the same isConfigured()
-// gate as email.service.js: if the key isn't set (or isn't shaped like a
-// real one), every call fails fast and predictably rather than wasting a
-// network round-trip only to fail deep inside a fetch. A malformed key was
-// the actual root cause the last time this app used a different provider
-// (Gemini) — checking the prefix here catches that class of mistake
-// immediately instead of it silently degrading to fallback mode with no
-// clue why. Node 18+ ships a global fetch, so no new HTTP dependency is
+// DeepSeek's own API (api.deepseek.com) — an OpenAI-compatible chat
+// endpoint, independent of NVIDIA Build (whose deprecation timeline we
+// couldn't fully confirm for a provider swap this close to a defense).
+// Follows the same isConfigured() gate as email.service.js: if the key
+// isn't set, every call fails fast and predictably rather than wasting a
+// network round-trip only to fail deep inside a fetch. No documented key
+// prefix to validate here (unlike NVIDIA's "nvapi-"), so this only checks
+// presence. Node 18+ ships a global fetch, so no new HTTP dependency is
 // needed for this.
-const isAIConfigured = () => {
-  const key = process.env.NVIDIA_API_KEY;
-  if (!key) return false;
-  if (!key.startsWith('nvapi-')) {
-    console.error('[ai.service] NVIDIA_API_KEY is set but does not start with "nvapi-" — treating AI as unconfigured. Get a real key from build.nvidia.com.');
-    return false;
-  }
-  return true;
-};
+const isAIConfigured = () => Boolean(process.env.DEEPSEEK_API_KEY);
 
-const NVIDIA_MODEL = () => process.env.NVIDIA_MODEL || 'meta/llama-3.1-8b-instruct';
-const NVIDIA_URL = 'https://integrate.api.nvidia.com/v1/chat/completions';
+// deepseek-v4-flash is the current fast/general-purpose tier (verified
+// directly against DeepSeek's live docs) — the legacy "deepseek-chat" /
+// "deepseek-reasoner" model IDs are no longer listed there. "flash" over
+// "pro" for the same reason llama-3.2-3b was picked over 70b: everything
+// this app generates is short and structured (a few sentences or bullet
+// points), not deep multi-step reasoning.
+const DEEPSEEK_MODEL = () => process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash';
+const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions';
 
 // Shared by every AI-backed generator below — one fetch/error-handling path
 // instead of eight near-identical copies. Every caller here already has its
@@ -31,21 +28,21 @@ const NVIDIA_URL = 'https://integrate.api.nvidia.com/v1/chat/completions';
 const callAI = async (prompt) => {
   let res;
   try {
-    res = await fetch(NVIDIA_URL, {
+    res = await fetch(DEEPSEEK_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.NVIDIA_API_KEY}`,
+        Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
       },
       body: JSON.stringify({
-        model: NVIDIA_MODEL(),
+        model: DEEPSEEK_MODEL(),
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.2,
         max_tokens: 1024,
       }),
     });
   } catch (fetchErr) {
-    console.error('[ai.service] NVIDIA request never reached a response (network/URL error):', fetchErr.message);
+    console.error('[ai.service] DeepSeek request never reached a response (network/URL error):', fetchErr.message);
     const err = new Error('AI request failed before a response was received');
     err.code = 'AI_REQUEST_FAILED';
     throw err;
@@ -53,7 +50,7 @@ const callAI = async (prompt) => {
 
   if (!res.ok) {
     const bodyText = await res.text().catch(() => '');
-    console.error(`[ai.service] NVIDIA request failed with status ${res.status}:`, bodyText.slice(0, 500));
+    console.error(`[ai.service] DeepSeek request failed with status ${res.status}:`, bodyText.slice(0, 500));
     const err = new Error(`AI request failed with status ${res.status}`);
     err.code = 'AI_REQUEST_FAILED';
     throw err;

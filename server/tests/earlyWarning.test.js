@@ -172,12 +172,12 @@ describe('Early-Warning Intelligence', () => {
     expect(ids).not.toContain(otherStudent.id);
   });
 
-  describe('with an NVIDIA key present (network call mocked)', () => {
-    const originalKey = process.env.NVIDIA_API_KEY;
+  describe('with a DeepSeek key present (network call mocked)', () => {
+    const originalKey = process.env.DEEPSEEK_API_KEY;
     const originalFetch = global.fetch;
 
     beforeEach(() => {
-      process.env.NVIDIA_API_KEY = 'nvapi-test-fake-key';
+      process.env.DEEPSEEK_API_KEY = 'test-fake-deepseek-key';
       global.fetch = jest.fn(async () => ({
         ok: true,
         json: async () => ({ choices: [{ message: { content: 'A few students may benefit from a quiet check-in this term.' } }] }),
@@ -185,7 +185,7 @@ describe('Early-Warning Intelligence', () => {
     });
 
     afterEach(() => {
-      process.env.NVIDIA_API_KEY = originalKey;
+      process.env.DEEPSEEK_API_KEY = originalKey;
       global.fetch = originalFetch;
     });
 

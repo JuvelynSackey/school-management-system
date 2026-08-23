@@ -29,7 +29,7 @@ const mockAI = (intentJsonText, summaryText = 'Here is a summary.') => {
 };
 
 describe('Natural-Language Admin Assistant', () => {
-  test('is disabled by default (no NVIDIA_API_KEY) and returns a clear 503', async () => {
+  test('is disabled by default (no DEEPSEEK_API_KEY) and returns a clear 503', async () => {
     const school = await fixtures.createSchool(models);
     const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin@query-test.local' });
     const token = await fixtures.login(app, school.slug, 'admin@query-test.local', password);
@@ -48,13 +48,13 @@ describe('Natural-Language Admin Assistant', () => {
     expect(res.status).toBe(400);
   });
 
-  describe('with an NVIDIA key present (network call mocked)', () => {
-    const originalKey = process.env.NVIDIA_API_KEY;
+  describe('with a DeepSeek key present (network call mocked)', () => {
+    const originalKey = process.env.DEEPSEEK_API_KEY;
     const originalFetch = global.fetch;
 
-    beforeEach(() => { process.env.NVIDIA_API_KEY = 'nvapi-test-fake-key'; });
+    beforeEach(() => { process.env.DEEPSEEK_API_KEY = 'test-fake-deepseek-key'; });
     afterEach(() => {
-      process.env.NVIDIA_API_KEY = originalKey;
+      process.env.DEEPSEEK_API_KEY = originalKey;
       global.fetch = originalFetch;
     });
 

@@ -595,11 +595,11 @@ sequenceDiagram
     actor T as Teacher/Admin
     participant API as POST /api/ai/remarks/suggest
     participant DB as MongoDB
-    participant AI as NVIDIA API
+    participant AI as DeepSeek API
 
     T->>API: { reportId }  (never scores/attendance — those aren't trusted from the client)
     API->>API: authenticate -> authorize(admin,teacher) -> assertClassAccess(report.classId)
-    alt not configured (no NVIDIA_API_KEY)
+    alt not configured (no DEEPSEEK_API_KEY)
         API-->>T: 503 { code: 'AI_NOT_CONFIGURED' }
     else report not Draft/Rejected
         API-->>T: 400 (editing is closed — no point suggesting a remark)
@@ -628,7 +628,7 @@ sequenceDiagram
     participant API as GET /api/results/anomalies
     participant Det as anomalyDetection.service<br/>(pure calculation, no AI)
     participant DB as MongoDB
-    participant AI as NVIDIA API
+    participant AI as DeepSeek API
 
     A->>API: opens Review on a Submitted sheet
     API->>API: authenticate -> authorize(admin,teacher) -> assertClassAccess
@@ -662,7 +662,7 @@ sequenceDiagram
     participant API as GET /api/results/insights/:studentId
     participant Calc as performanceInsights.service<br/>(pure calculation, no AI)
     participant DB as MongoDB
-    participant AI as NVIDIA API
+    participant AI as DeepSeek API
 
     U->>API: opens Student Profile / My Results
     API->>API: authenticate -> assertStudentAccess<br/>(self / linked parent / assigned teacher / admin)
@@ -699,7 +699,7 @@ sequenceDiagram
     participant PI as performanceInsights.service<br/>(reused trend engine)
     participant Fees as fees.service<br/>(existing balance calculator)
     participant DB as MongoDB
-    participant AI as NVIDIA API
+    participant AI as DeepSeek API
 
     U->>API: opens Admin or Teacher Dashboard
     API->>API: authenticate -> authorize(admin,teacher)
@@ -744,10 +744,10 @@ teacher or Super-Admin path for this endpoint in this pass.
 sequenceDiagram
     actor A as Admin
     participant API as POST /api/ai/query
-    participant AI as NVIDIA API (call 1: classify)
+    participant AI as DeepSeek API (call 1: classify)
     participant AQ as aiQuery.service<br/>(pure, tenant-scoped queries)
     participant DB as MongoDB
-    participant AI2 as NVIDIA API (call 2: phrase the answer)
+    participant AI2 as DeepSeek API (call 2: phrase the answer)
 
     A->>API: { question: "free text" }
     API->>API: authenticate -> authorize(admin only)
@@ -919,6 +919,6 @@ covered by the automated test suite — `server/tests/` (101/101 passing):
 `waecExport.test.js`.
 
 This closes Stage 6 (JesManage Intelligence) — all five planned features
-(§6.9-§6.13) are built, gated behind an optional `NVIDIA_API_KEY`, and
+(§6.9-§6.13) are built, gated behind an optional `DEEPSEEK_API_KEY`, and
 tested. §6.14-§6.16 close out Stage 7's original three-item list — plain
 reporting/printing/export features, no AI involved.
