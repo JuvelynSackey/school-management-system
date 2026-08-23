@@ -35,12 +35,19 @@ function EyeIcon({ open }) {
   );
 }
 
+// Purely a same-device convenience (prefilling a field, nothing
+// security-relevant) — not gated behind "Remember Me", which governs
+// session persistence, a different concern.
+const LAST_SCHOOL_KEY = 'jesmanage-last-school';
+
 // Shared by the dedicated /login page and LoginModal (opened from the
 // landing page) — same fields/behavior, the host decides what happens
 // after a successful login via onSuccess.
 export default function LoginForm({ onSuccess, defaultSchoolCode = '' }) {
   const { login } = useAuth();
-  const [schoolCode, setSchoolCode] = useState(defaultSchoolCode);
+  const [schoolCode, setSchoolCode] = useState(
+    () => defaultSchoolCode || localStorage.getItem(LAST_SCHOOL_KEY) || '',
+  );
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -54,6 +61,7 @@ export default function LoginForm({ onSuccess, defaultSchoolCode = '' }) {
     setIsSubmitting(true);
     try {
       await login(schoolCode, identifier, password, remember);
+      localStorage.setItem(LAST_SCHOOL_KEY, schoolCode);
       onSuccess?.();
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed. Please try again.');
