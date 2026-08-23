@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { listClasses } from '../../api/classes.api';
 import { listSubjectsForClass } from '../../api/subjects.api';
 import { listTerms } from '../../api/terms.api';
@@ -22,7 +22,11 @@ const sheetStatusBadge = (status) => {
   return <span className="badge badge-neutral">Draft</span>;
 };
 
-export default function ResultsEntry() {
+// initialClassId/initialSubjectId: set when the teacher dashboard's "Enter
+// Scores" card hands off a deep link — pre-selects that class/subject
+// instead of Score Entry's own default (first class/subject alphabetically)
+// once, on first load. A later manual class switch behaves normally.
+export default function ResultsEntry({ initialClassId = '', initialSubjectId = '' }) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const { isOnline, registerFlushHandler, refreshPendingCount } = useOffline();
@@ -42,6 +46,12 @@ export default function ResultsEntry() {
   const [message, setMessage] = useState('');
   const [amending, setAmending] = useState(null);
   const [showingCached, setShowingCached] = useState(false);
+  const appliedInitialSubjectRef = useRef(false);
+
+  const pickClassId = (rows) => {
+    const preselected = initialClassId && rows.some((c) => String(c.id) === initialClassId);
+    return preselected ? initialClassId : String(rows[0].id);
+  };
 
   useEffect(() => {
     getGradingScheme().then((s) => { setScheme(s); setCache('scheme', s); }).catch((err) => {
@@ -50,11 +60,11 @@ export default function ResultsEntry() {
     listClasses().then((rows) => {
       setClasses(rows);
       setCache('classes', rows);
-      if (rows.length) setClassId(String(rows[0].id));
+      if (rows.length) setClassId(pickClassId(rows));
     }).catch((err) => {
       if (!isNetworkError(err)) return;
       const cached = getCache('classes');
-      if (cached) { setClasses(cached); if (cached.length) setClassId(String(cached[0].id)); }
+      if (cached) { setClasses(cached); if (cached.length) setClassId(pickClassId(cached)); }
     });
     listTerms().then((rows) => {
       setTerms(rows);
@@ -72,20 +82,32 @@ export default function ResultsEntry() {
         else if (cached.length) setAcademicTermId(String(cached[0].id));
       }
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (!classId) return;
+    // Captured synchronously so this only ever applies once, on the very
+    // first subjects-load after mount — a later class switch (by the
+    // teacher, not the deep link) always defaults to that class's first
+    // subject like before.
+    const isFirstLoad = !appliedInitialSubjectRef.current;
+    appliedInitialSubjectRef.current = true;
+    const pickSubjectId = (subs) => {
+      const preselected = isFirstLoad && initialSubjectId && subs.some((s) => String(s.id) === initialSubjectId);
+      return preselected ? initialSubjectId : (subs.length ? String(subs[0].id) : '');
+    };
     listSubjectsForClass(classId).then((links) => {
       const subs = links.map((l) => l.subject);
       setSubjects(subs);
       setCache(`subjects:${classId}`, subs);
-      setSubjectId(subs.length ? String(subs[0].id) : '');
+      setSubjectId(pickSubjectId(subs));
     }).catch((err) => {
       if (!isNetworkError(err)) { setSubjects([]); return; }
       const cached = getCache(`subjects:${classId}`);
-      if (cached) { setSubjects(cached); setSubjectId(cached.length ? String(cached[0].id) : ''); } else setSubjects([]);
+      if (cached) { setSubjects(cached); setSubjectId(pickSubjectId(cached)); } else setSubjects([]);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classId]);
 
   const loadRoster = async () => {

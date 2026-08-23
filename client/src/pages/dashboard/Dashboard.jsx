@@ -36,7 +36,7 @@ export default function Dashboard() {
 
   return (
     <div>
-      {data?.role !== 'admin' && (
+      {data?.role !== 'admin' && data?.role !== 'teacher' && (
         <>
           <h1>Welcome, {user?.fullName}</h1>
           <p className="muted" style={{ marginBottom: 24 }}>Role: {user?.role}</p>
@@ -49,7 +49,7 @@ export default function Dashboard() {
       {!isLoading && !error && data && (
         <>
           {data.role === 'admin' && <AdminDashboard data={data} user={user} />}
-          {data.role === 'teacher' && <TeacherDashboard data={data} />}
+          {data.role === 'teacher' && <TeacherDashboard data={data} user={user} />}
           {data.role === 'student' && <StudentDashboard data={data} />}
           {data.role === 'parent' && <ParentDashboard data={data} />}
         </>
@@ -568,18 +568,52 @@ function AdminDashboard({ data, user }) {
   );
 }
 
-function TeacherDashboard({ data }) {
-  const { counts, attendanceStats } = data;
+const timeOfDayGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+};
+
+function TeacherDashboard({ data, user }) {
+  const { counts, attendanceStats, myClasses } = data;
   const navigate = useNavigate();
   return (
     <>
+      <h1 style={{ marginBottom: 4 }}>{timeOfDayGreeting()}, {user?.fullName?.split(' ')[0]} 👋</h1>
+      <p className="muted" style={{ marginBottom: 20 }}>Here&apos;s what&apos;s on today.</p>
+
       <div className="cards">
         <div className="card"><div>My Classes</div><div className="num">{counts.classes}</div></div>
         <div className="card"><div>My Students</div><div className="num">{counts.students}</div></div>
       </div>
+
+      <div className="panel">
+        <h2>My Classes</h2>
+        {myClasses.length === 0 && <p className="muted">No class/subject assignments yet — ask an admin to assign you one.</p>}
+        {myClasses.length > 0 && (
+          <div className="quick-actions-grid">
+            {myClasses.map((c) => (
+              <div key={`${c.classId}:${c.subjectId}`} className="quick-action-item" style={{ cursor: 'default' }}>
+                <span style={{ fontWeight: 600, color: 'var(--text-h)' }}>{c.className}</span>
+                <span className="muted" style={{ fontSize: 12.5 }}>{c.subjectName}</span>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  style={{ marginTop: 4, fontSize: 12.5, padding: '6px 12px' }}
+                  onClick={() => navigate(`/results?classId=${c.classId}&subjectId=${c.subjectId}`)}
+                >
+                  Enter Scores
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="toolbar" style={{ marginBottom: 16 }}>
         <button type="button" className="btn-secondary" onClick={() => navigate('/attendance')}>Record Attendance</button>
-        <button type="button" className="btn-secondary" onClick={() => navigate('/results')}>Enter Results</button>
+        <button type="button" className="btn-secondary" onClick={() => navigate('/results')}>Score Entry (all classes)</button>
       </div>
       <div className="panel">
         <h2>Today&apos;s Attendance (My Classes)</h2>

@@ -81,3 +81,48 @@ describe('Admin dashboard — Action Center data', () => {
     expect(res.body.data.alerts.teachersUnsubmittedCount).toBe(0);
   });
 });
+
+describe('Teacher dashboard — My Classes', () => {
+  test('lists each class/subject assignment for the logged-in teacher', async () => {
+    const school = await fixtures.createSchool(models);
+    const classRow = await fixtures.createClass(models, school._id, { name: 'Basic 4', section: 'A' });
+    const subject = await fixtures.createSubject(models, school._id, { name: 'Mathematics' });
+    const { teacher, user, password } = await fixtures.createTeacher(models, school._id);
+    await fixtures.assignTeacherToClass(models, school._id, { teacherId: teacher.id, subjectId: subject.id, classId: classRow.id });
+    const token = await fixtures.login(app, school.slug, user.email, password);
+
+    const res = await request(app).get('/api/dashboard').set(fixtures.authHeader(token));
+    expect(res.status).toBe(200);
+    expect(res.body.data.myClasses).toEqual([
+      {
+        classId: classRow.id, className: 'Basic 4 A', subjectId: subject.id, subjectName: 'Mathematics',
+      },
+    ]);
+  });
+
+  test('dedupes an assignment that exists once per-term and once for all terms', async () => {
+    const school = await fixtures.createSchool(models);
+    const classRow = await fixtures.createClass(models, school._id);
+    const subject = await fixtures.createSubject(models, school._id);
+    const term = await fixtures.createTerm(models, school._id, { isCurrent: true });
+    const { teacher, user, password } = await fixtures.createTeacher(models, school._id);
+    await fixtures.assignTeacherToClass(models, school._id, { teacherId: teacher.id, subjectId: subject.id, classId: classRow.id });
+    await fixtures.assignTeacherToClass(models, school._id, {
+      teacherId: teacher.id, subjectId: subject.id, classId: classRow.id, academicTermId: term.id,
+    });
+    const token = await fixtures.login(app, school.slug, user.email, password);
+
+    const res = await request(app).get('/api/dashboard').set(fixtures.authHeader(token));
+    expect(res.body.data.myClasses).toHaveLength(1);
+  });
+
+  test('returns an empty list for a teacher with no assignments, rather than throwing', async () => {
+    const school = await fixtures.createSchool(models);
+    const { user, password } = await fixtures.createTeacher(models, school._id);
+    const token = await fixtures.login(app, school.slug, user.email, password);
+
+    const res = await request(app).get('/api/dashboard').set(fixtures.authHeader(token));
+    expect(res.status).toBe(200);
+    expect(res.body.data.myClasses).toEqual([]);
+  });
+});

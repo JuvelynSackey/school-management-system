@@ -170,7 +170,7 @@ const getAdminDashboard = async () => {
 };
 
 const getTeacherDashboard = async (userId) => {
-  const { classIds } = await getTeacherClassIds(userId);
+  const { teacherId, classIds } = await getTeacherClassIds(userId);
   const studentCount = await Student.countDocuments({ classId: { $in: classIds }, status: 'active' });
 
   const today = new Date().toISOString().slice(0, 10);
@@ -181,10 +181,37 @@ const getTeacherDashboard = async (userId) => {
     return acc;
   }, { total: 0, Present: 0, Absent: 0, Late: 0, Excused: 0 });
 
+  // The class/subject pairs this teacher is assigned to, for the dashboard's
+  // "My Classes" cards. There's no timetable/period model in this app, so
+  // this is every assignment the teacher has — not literally filtered to
+  // "today" — deduped since an assignment can exist once per term plus once
+  // with a null (all-terms) academicTermId.
+  const assignments = teacherId
+    ? await TeacherSubjectAssignment.find({ teacherId })
+      .populate('class', 'name section')
+      .populate('subject', 'name')
+    : [];
+  const seenPairs = new Set();
+  const myClasses = assignments
+    .filter((a) => a.class && a.subject)
+    .filter((a) => {
+      const key = `${a.classId}:${a.subjectId}`;
+      if (seenPairs.has(key)) return false;
+      seenPairs.add(key);
+      return true;
+    })
+    .map((a) => ({
+      classId: a.classId.toString(),
+      className: `${a.class.name} ${a.class.section || ''}`.trim(),
+      subjectId: a.subjectId.toString(),
+      subjectName: a.subject.name,
+    }));
+
   return {
     role: 'teacher',
     counts: { classes: classIds.length, students: studentCount },
     attendanceStats,
+    myClasses,
   };
 };
 
