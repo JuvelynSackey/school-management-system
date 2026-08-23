@@ -21,7 +21,15 @@ const isAIConfigured = () => {
   return true;
 };
 
-const GEMINI_MODEL = () => process.env.GEMINI_MODEL || 'gemini-3.6-flash';
+// gemini-flash-lite-latest — not the flagship gemini-3.6-flash — deliberately.
+// The flagship "thinking" model kept 429/503-ing under free-tier demand
+// (RESOURCE_EXHAUSTED / "currently experiencing high demand") even on a
+// single isolated request; this lite alias is stable, has no thinking-token
+// overhead (see the maxOutputTokens comment below), and is plenty for
+// short, templated generations like these. gemini-2.0-flash and
+// gemini-2.5-flash are both fully retired as of testing (confirmed via
+// live 404s from the API itself).
+const GEMINI_MODEL = () => process.env.GEMINI_MODEL || 'gemini-flash-lite-latest';
 const GEMINI_URL = () => `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL()}:generateContent`;
 
 // Shared by every AI-backed generator below — one fetch/error-handling path
@@ -46,13 +54,14 @@ const callAI = async (prompt) => {
       },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        // gemini-3.6-flash is a "thinking" model — maxOutputTokens covers
-        // its internal reasoning tokens AND the visible answer combined
-        // (a plain 3-sentence remark alone used ~840 thinking + ~180
-        // answer tokens in testing), so 1024 was cutting real answers off
-        // mid-sentence. thinkingConfig: { thinkingBudget: 0 } to disable
-        // reasoning outright was tried first but this model rejects it
-        // with 400 INVALID_ARGUMENT — bumping the budget is what actually works.
+        // 3072 rather than the old 1024: some Gemini models (the flagship
+        // "thinking" ones, e.g. gemini-3.6-flash) spend part of
+        // maxOutputTokens on internal reasoning before the visible answer
+        // (~840 thinking tokens alone for a 3-sentence remark, in testing —
+        // 1024 was cutting real answers off mid-sentence). The default
+        // model above doesn't do this, but the extra headroom costs
+        // nothing and keeps GEMINI_MODEL safely overridable to a thinking
+        // model without silently truncating output again.
         generationConfig: { temperature: 0.2, maxOutputTokens: 3072 },
       }),
     });
