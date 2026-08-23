@@ -11,6 +11,7 @@ import { getAtRiskStudents } from '../../api/earlyWarning.api';
 import { getAcademicAnalytics } from '../../api/analytics.api';
 import { formatCurrency } from '../../utils/currency';
 import QuickActionsGrid from '../../components/common/QuickActionsGrid';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 // Same validated single-hue used for the "subject average" bar in
 // AnalyticsPage.jsx — kept identical here so the two "average by subject"
@@ -43,7 +44,7 @@ export default function Dashboard() {
         </>
       )}
 
-      {isLoading && <p className="muted">Loading...</p>}
+      {isLoading && <LoadingSpinner label="Loading dashboard…" />}
       {error && <div className="alert-error">{error}</div>}
 
       {!isLoading && !error && data && (
@@ -224,7 +225,7 @@ function AnnouncementsFeed() {
         <h2 style={{ margin: 0 }}>Recent Announcements</h2>
         <Link to="/announcements" className="link-btn">View all</Link>
       </div>
-      {items === null && <p className="muted">Loading...</p>}
+      {items === null && <LoadingSpinner label="" size={20} />}
       {items && items.length === 0 && <p className="muted">No announcements yet.</p>}
       {items && items.map((a) => (
         <div key={a.id} className="announcement-feed-item">

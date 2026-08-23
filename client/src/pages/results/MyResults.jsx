@@ -5,6 +5,7 @@ import { gradeBadgeClass } from '../../utils/grading';
 import ReportCardsPanel from '../../components/results/ReportCardsPanel';
 import PerformanceInsightsPanel from '../../components/results/PerformanceInsightsPanel';
 import AcademicHistoryPanel from '../../components/results/AcademicHistoryPanel';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 export default function MyResults() {
   const [results, setResults] = useState([]);
@@ -23,7 +24,7 @@ export default function MyResults() {
   return (
     <div>
       <h1>My Results</h1>
-      {isLoading && <p className="muted">Loading...</p>}
+      {isLoading && <LoadingSpinner label="Loading your results…" />}
       {error && <div className="alert-error">{error}</div>}
       {!isLoading && !error && studentId && <PerformanceInsightsPanel studentId={studentId} />}
       {!isLoading && !error && studentId && <AcademicHistoryPanel studentId={studentId} />}

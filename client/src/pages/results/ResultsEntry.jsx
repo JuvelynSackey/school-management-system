@@ -12,6 +12,7 @@ import {
   getCache, setCache, queueWrite, removeFromQueue, markConflict, markFailed, getPending, isNetworkError,
 } from '../../utils/offlineStore';
 import Modal from '../../components/common/Modal';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 const rosterCacheKey = (classId, subjectId, academicTermId) => `roster:${classId}:${subjectId}:${academicTermId}`;
 
@@ -269,7 +270,7 @@ export default function ResultsEntry({ initialClassId = '', initialSubjectId = '
         )}
         {error && <div className="alert-error">{error}</div>}
         {message && <div className="alert-error" style={{ background: 'var(--accent-bg)', color: 'var(--accent)' }}>{message}</div>}
-        {isLoading && <p className="muted">Loading...</p>}
+        {isLoading && <LoadingSpinner label="Loading roster…" />}
 
         {!isLoading && (
           <>

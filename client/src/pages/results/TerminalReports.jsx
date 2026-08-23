@@ -14,6 +14,7 @@ import { getSchoolSettings } from '../../api/schoolSettings.api';
 import { suggestRemark } from '../../api/ai.api';
 import { useAuth } from '../../context/AuthContext';
 import Modal from '../../components/common/Modal';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 const RATING_SCALE = ['Excellent', 'Very Good', 'Good', 'Fair', 'Needs Improvement'];
 
@@ -173,7 +174,7 @@ export default function TerminalReports() {
       <SubjectCompletionStrip classId={classId} academicTermId={academicTermId} isAdmin={isAdmin} />
 
       <div className="panel">
-        {isLoading && <p className="muted">Loading...</p>}
+        {isLoading && <LoadingSpinner label="Loading terminal reports…" />}
         {!isLoading && (
           <table>
             <thead>

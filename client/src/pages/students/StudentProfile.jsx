@@ -9,6 +9,7 @@ import { gradeBadgeClass } from '../../utils/grading';
 import { formatCurrency } from '../../utils/currency';
 import { useAuth } from '../../context/AuthContext';
 import Modal from '../../components/common/Modal';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
 import ReportCardsPanel from '../../components/results/ReportCardsPanel';
 import PerformanceInsightsPanel from '../../components/results/PerformanceInsightsPanel';
 import AcademicHistoryPanel from '../../components/results/AcademicHistoryPanel';
@@ -279,7 +280,7 @@ export default function StudentProfile() {
         <h1>Student Profile</h1>
         <Link to={backLink} className="btn-secondary">Back</Link>
       </div>
-      {isLoading && <p className="muted">Loading...</p>}
+      {isLoading && <LoadingSpinner label="Loading student profile…" />}
       {error && <div className="alert-error">{error}</div>}
       {!isLoading && !error && (
         <>

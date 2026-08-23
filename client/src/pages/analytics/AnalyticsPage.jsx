@@ -6,6 +6,7 @@ import { listTerms } from '../../api/terms.api';
 import { getAcademicAnalytics, getFinancialAnalytics } from '../../api/analytics.api';
 import { formatCurrency } from '../../utils/currency';
 import { useTheme } from '../../context/ThemeContext';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 // Validated against the app's white panel surface with the dataviz skill's
 // validator (scripts/validate_palette.js) — blue/violet clears every
@@ -99,7 +100,7 @@ export default function AnalyticsPage() {
       </div>
 
       {error && <div className="alert-error">{error}</div>}
-      {isLoading && <p className="muted">Loading...</p>}
+      {isLoading && <LoadingSpinner label="Loading analytics…" />}
 
       {!isLoading && !error && financial && (
         <div className="stat-card-row">
