@@ -10,6 +10,7 @@ import {
 import { listResultSheets, approveResultSheet, rejectResultSheet, submitAllResultSheets } from '../../api/resultSheets.api';
 import { getResultsRoster, getResultAnomalies } from '../../api/results.api';
 import { listPersonalAttributes } from '../../api/personalAttributes.api';
+import { getSchoolSettings } from '../../api/schoolSettings.api';
 import { suggestRemark } from '../../api/ai.api';
 import { useAuth } from '../../context/AuthContext';
 import Modal from '../../components/common/Modal';
@@ -46,6 +47,7 @@ export default function TerminalReports() {
   const [managing, setManaging] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
   const [lockingAll, setLockingAll] = useState(false);
+  const [headteacherDefaultName, setHeadteacherDefaultName] = useState('');
 
   useEffect(() => {
     listClasses().then((rows) => { setClasses(rows); if (rows.length) setClassId(String(rows[0].id)); }).catch(() => {});
@@ -56,6 +58,14 @@ export default function TerminalReports() {
       else if (rows.length) setAcademicTermId(String(rows[0].id));
     }).catch(() => {});
   }, []);
+
+  // The school's configured headteacher name (School Settings) outranks the
+  // logged-in admin's own name as the lock-form default — whoever is doing
+  // the data entry isn't necessarily the headteacher.
+  useEffect(() => {
+    if (!isAdmin) return;
+    getSchoolSettings().then((s) => setHeadteacherDefaultName(s.headteacherName || '')).catch(() => {});
+  }, [isAdmin]);
 
   const load = async () => {
     if (!classId || !academicTermId) return;
@@ -196,6 +206,7 @@ export default function TerminalReports() {
           report={managing}
           isAdmin={isAdmin}
           userFullName={user?.fullName}
+          headteacherDefaultName={headteacherDefaultName}
           onClose={() => setManaging(null)}
           onChanged={() => { setManaging(null); load(); }}
         />
@@ -206,6 +217,7 @@ export default function TerminalReports() {
           classId={classId}
           academicTermId={academicTermId}
           userFullName={user?.fullName}
+          headteacherDefaultName={headteacherDefaultName}
           onClose={() => setLockingAll(false)}
           onChanged={(msg) => { setLockingAll(false); setMessage(msg); load(); }}
         />
@@ -214,8 +226,10 @@ export default function TerminalReports() {
   );
 }
 
-function LockAllModal({ classId, academicTermId, userFullName, onClose, onChanged }) {
-  const [headteacherSignatureName, setHeadteacherSignatureName] = useState(userFullName || '');
+function LockAllModal({
+  classId, academicTermId, userFullName, headteacherDefaultName, onClose, onChanged,
+}) {
+  const [headteacherSignatureName, setHeadteacherSignatureName] = useState(headteacherDefaultName || userFullName || '');
   const [headteacherRemark, setHeadteacherRemark] = useState('');
   const [error, setError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -456,11 +470,15 @@ function ReviewSheetModal({ sheet, onClose, onChanged }) {
   );
 }
 
-function ManageReportModal({ report, isAdmin, userFullName, onClose, onChanged }) {
+function ManageReportModal({
+  report, isAdmin, userFullName, headteacherDefaultName, onClose, onChanged,
+}) {
   const [teacherRemark, setTeacherRemark] = useState(report.teacherRemark || '');
   const [teacherSignatureName, setTeacherSignatureName] = useState(report.teacherSignatureName || userFullName || '');
   const [headteacherRemark, setHeadteacherRemark] = useState(report.headteacherRemark || '');
-  const [headteacherSignatureName, setHeadteacherSignatureName] = useState(report.headteacherSignatureName || userFullName || '');
+  const [headteacherSignatureName, setHeadteacherSignatureName] = useState(
+    report.headteacherSignatureName || headteacherDefaultName || userFullName || '',
+  );
   const [rejectionReason, setRejectionReason] = useState('');
   const [showReject, setShowReject] = useState(false);
   const [attributes, setAttributes] = useState([]);

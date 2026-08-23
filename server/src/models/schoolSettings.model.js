@@ -13,6 +13,8 @@ const schoolSettingsSchema = new mongoose.Schema({
   phone: { type: String, default: '' },
   email: { type: String, default: '' },
   logoUrl: { type: String, default: null },
+  headteacherName: { type: String, default: '' },
+  headteacherSignatureUrl: { type: String, default: null },
   primaryColor: { type: String, default: null },
   secondaryColor: { type: String, default: null },
   reportCardFeeGateEnabled: { type: Boolean, default: false },

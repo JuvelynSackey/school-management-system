@@ -42,6 +42,15 @@ const describeReport = async (report) => {
   return student ? `${student.firstName} ${student.lastName}` : 'Unknown student';
 };
 
+// A headteacher signature name typed manually into a lock request always
+// wins; only when the caller leaves it blank do we fall back to the
+// school's configured default (SchoolSettings.headteacherName) instead of
+// silently locking with nothing.
+const getDefaultHeadteacherName = async (schoolId) => {
+  const settings = await SchoolSettings.findOne({ schoolId });
+  return settings?.headteacherName || '';
+};
+
 const assertClassAccess = async (req, classId) => {
   if (req.user.role === 'admin') return;
   if (req.user.role === 'teacher') {
@@ -168,7 +177,13 @@ const lock = asyncHandler(async (req, res, next) => {
   if (!report) return;
   if (!(await assertAllSubjectsApproved(report.classId, report.academicTermId, next))) return;
 
-  await lockReport(req, report, req.body);
+  const headteacherSignatureName = req.body.headteacherSignatureName?.trim()
+    || (await getDefaultHeadteacherName(req.user.schoolId));
+  if (!headteacherSignatureName) {
+    return next(new AppError('Headteacher signature name is required to lock a report', 400));
+  }
+
+  await lockReport(req, report, { ...req.body, headteacherSignatureName });
   await recalculateClassPositions(report.classId, report.academicTermId);
 
   res.json({ success: true, data: report });
@@ -179,9 +194,12 @@ const lock = asyncHandler(async (req, res, next) => {
 // headteacher remark/signature, skipping (not failing the batch on) any
 // report that isn't Submitted.
 const lockAll = asyncHandler(async (req, res, next) => {
-  const { classId, academicTermId, headteacherRemark, headteacherSignatureName } = req.body;
+  const { classId, academicTermId, headteacherRemark } = req.body;
   if (!classId || !academicTermId) return next(new AppError('classId and academicTermId are required', 400));
-  if (!headteacherSignatureName?.trim()) return next(new AppError('Headteacher signature name is required to lock reports', 400));
+
+  const headteacherSignatureName = req.body.headteacherSignatureName?.trim()
+    || (await getDefaultHeadteacherName(req.user.schoolId));
+  if (!headteacherSignatureName) return next(new AppError('Headteacher signature name is required to lock reports', 400));
   if (!(await assertAllSubjectsApproved(classId, academicTermId, next))) return;
 
   const reports = await TerminalReport.find({ classId, academicTermId, status: 'Submitted' })

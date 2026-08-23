@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { getSchoolSettings, updateSchoolSettings, uploadSchoolLogo } from '../../api/schoolSettings.api';
+import {
+  getSchoolSettings, updateSchoolSettings, uploadSchoolLogo, uploadHeadteacherSignature,
+} from '../../api/schoolSettings.api';
 import { getChannelStatus } from '../../api/notifications.api';
 import {
   listPersonalAttributes, createPersonalAttribute, updatePersonalAttribute, deletePersonalAttribute,
@@ -14,7 +16,22 @@ function SchoolEmblemIcon() {
   );
 }
 
-function SchoolLogoUpload({ logoUrl, onUploaded }) {
+function SignatureIcon() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 17.5c2-.5 3-2 4-3.5 1.5-2.3 2.7-6.5 4.3-6.5 1.3 0 1 3 2.2 3 1.5 0 2.7-2.5 4-2.5.9 0 1 1.3 2 1.3.7 0 1-.6 1.5-1.3" />
+      <path d="M4 20.5h16" />
+    </svg>
+  );
+}
+
+// Shared by the logo and headteacher-signature fields below — same
+// immediate-upload-on-select behavior (mirrors StudentPhoto's pattern in
+// StudentProfile.jsx), just a different upload function, alt text, and
+// fallback icon.
+function ImageUploadField({
+  imageUrl, alt, onUploaded, uploadFn, resultKey, label, fallbackIcon,
+}) {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState('');
 
@@ -25,10 +42,10 @@ function SchoolLogoUpload({ logoUrl, onUploaded }) {
     setIsUploading(true);
     setError('');
     try {
-      const { logoUrl: newLogoUrl } = await uploadSchoolLogo(file);
-      onUploaded(newLogoUrl);
+      const result = await uploadFn(file);
+      onUploaded(result[resultKey]);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to upload logo.');
+      setError(err.response?.data?.message || `Failed to upload ${label.toLowerCase()}.`);
     } finally {
       setIsUploading(false);
     }
@@ -36,16 +53,16 @@ function SchoolLogoUpload({ logoUrl, onUploaded }) {
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18 }}>
-      {logoUrl ? (
-        <img src={logoUrl} alt="School logo" style={{ width: 64, height: 64, borderRadius: 12, objectFit: 'cover', border: '1px solid var(--border)' }} />
+      {imageUrl ? (
+        <img src={imageUrl} alt={alt} style={{ width: 64, height: 64, borderRadius: 12, objectFit: 'cover', border: '1px solid var(--border)' }} />
       ) : (
         <div className="profile-avatar" style={{ width: 64, height: 64, marginBottom: 0, borderRadius: 12 }}>
-          <SchoolEmblemIcon />
+          {fallbackIcon}
         </div>
       )}
       <div>
         <label className="btn-secondary" style={{ cursor: 'pointer', fontSize: 13, display: 'inline-block' }}>
-          {isUploading ? 'Uploading…' : logoUrl ? 'Replace Logo' : 'Upload Logo'}
+          {isUploading ? 'Uploading…' : imageUrl ? `Replace ${label}` : `Upload ${label}`}
           <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFile} disabled={isUploading} style={{ display: 'none' }} />
         </label>
         <p className="muted" style={{ fontSize: 11.5, margin: '6px 0 0' }}>JPEG, PNG, or WebP — up to 2MB.</p>
@@ -56,7 +73,8 @@ function SchoolLogoUpload({ logoUrl, onUploaded }) {
 }
 
 const emptyForm = {
-  name: '', motto: '', address: '', phone: '', email: '', reportCardFeeGateEnabled: false, performanceChartEnabled: false,
+  name: '', motto: '', address: '', phone: '', email: '', headteacherName: '',
+  reportCardFeeGateEnabled: false, performanceChartEnabled: false,
   communicationChannelsEnabled: { email: false, sms: false, whatsapp: false },
   feedingFeeEnabled: false, feedingRatePerDay: 0,
 };
@@ -66,6 +84,7 @@ const CHANNEL_LABELS = { email: 'Email', sms: 'SMS', whatsapp: 'WhatsApp' };
 export default function SchoolSettings() {
   const [form, setForm] = useState(emptyForm);
   const [logoUrl, setLogoUrl] = useState(null);
+  const [signatureUrl, setSignatureUrl] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
@@ -76,9 +95,10 @@ export default function SchoolSettings() {
     getSchoolSettings()
       .then((data) => {
         setLogoUrl(data.logoUrl || null);
+        setSignatureUrl(data.headteacherSignatureUrl || null);
         setForm({
           name: data.name || '', motto: data.motto || '', address: data.address || '',
-          phone: data.phone || '', email: data.email || '',
+          phone: data.phone || '', email: data.email || '', headteacherName: data.headteacherName || '',
           reportCardFeeGateEnabled: Boolean(data.reportCardFeeGateEnabled),
           performanceChartEnabled: Boolean(data.performanceChartEnabled),
           communicationChannelsEnabled: {
@@ -124,7 +144,15 @@ export default function SchoolSettings() {
             {error && <div className="alert-error">{error}</div>}
             {message && <div className="alert-error" style={{ background: 'var(--accent-bg)', color: 'var(--accent)' }}>{message}</div>}
 
-            <SchoolLogoUpload logoUrl={logoUrl} onUploaded={setLogoUrl} />
+            <ImageUploadField
+              imageUrl={logoUrl}
+              alt="School logo"
+              onUploaded={setLogoUrl}
+              uploadFn={uploadSchoolLogo}
+              resultKey="logoUrl"
+              label="Logo"
+              fallbackIcon={<SchoolEmblemIcon />}
+            />
 
             <label className="field">
               <span>School Name</span>
@@ -163,6 +191,28 @@ export default function SchoolSettings() {
               />
               <span>Show a per-subject performance bar chart on report cards</span>
             </label>
+
+            <h3 style={{ fontSize: 14, margin: '20px 0 8px' }}>Administrative Sign-Off</h3>
+            <p className="muted" style={{ fontSize: 13, marginBottom: 10 }}>
+              Pre-fills the headteacher signature name when locking terminal reports — an admin can still override it per batch.
+            </p>
+            <label className="field">
+              <span>Headteacher Name</span>
+              <input
+                value={form.headteacherName}
+                onChange={(e) => setForm({ ...form, headteacherName: e.target.value })}
+                placeholder="e.g. Mrs. Abena Owusu"
+              />
+            </label>
+            <ImageUploadField
+              imageUrl={signatureUrl}
+              alt="Headteacher signature"
+              onUploaded={setSignatureUrl}
+              uploadFn={uploadHeadteacherSignature}
+              resultKey="headteacherSignatureUrl"
+              label="Signature"
+              fallbackIcon={<SignatureIcon />}
+            />
 
             <h3 style={{ fontSize: 14, margin: '20px 0 8px' }}>Communication Channels</h3>
             <p className="muted" style={{ fontSize: 13, marginBottom: 10 }}>

@@ -8,3 +8,9 @@ export const uploadSchoolLogo = (file) => {
   formData.append('logo', file);
   return apiClient.post('/school-settings/logo', formData).then((res) => res.data.data);
 };
+
+export const uploadHeadteacherSignature = (file) => {
+  const formData = new FormData();
+  formData.append('signature', file);
+  return apiClient.post('/school-settings/signature', formData).then((res) => res.data.data);
+};

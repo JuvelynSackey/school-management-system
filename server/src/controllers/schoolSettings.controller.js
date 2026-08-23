@@ -12,7 +12,7 @@ const get = asyncHandler(async (req, res) => {
 
 const update = asyncHandler(async (req, res) => {
   const {
-    name, motto, address, phone, email, reportCardFeeGateEnabled, performanceChartEnabled, communicationChannelsEnabled,
+    name, motto, address, phone, email, headteacherName, reportCardFeeGateEnabled, performanceChartEnabled, communicationChannelsEnabled,
     feedingFeeEnabled, feedingRatePerDay,
   } = req.body;
   const settings = await SchoolSettings.findOneAndUpdate(
@@ -23,6 +23,7 @@ const update = asyncHandler(async (req, res) => {
       address: address ?? '',
       phone: phone ?? '',
       email: email ?? '',
+      headteacherName: headteacherName ?? '',
       reportCardFeeGateEnabled: Boolean(reportCardFeeGateEnabled),
       performanceChartEnabled: Boolean(performanceChartEnabled),
       communicationChannelsEnabled: {
@@ -61,6 +62,28 @@ const uploadLogo = asyncHandler(async (req, res, next) => {
   res.json({ success: true, data: { logoUrl } });
 });
 
+// POST /school-settings/signature — multipart, req.file populated by the
+// uploadSignature multer middleware before this handler runs. Stored for
+// display/reference only — the report-card PDF still uses a typed name on
+// a signature line, it does not embed this image.
+const uploadSignature = asyncHandler(async (req, res, next) => {
+  if (!req.file) return next(new AppError('A signature image is required', 400));
+
+  const headteacherSignatureUrl = `${req.protocol}://${req.get('host')}/uploads/signatures/${req.file.filename}`;
+
+  const settings = await SchoolSettings.findOneAndUpdate(
+    { schoolId: req.user.schoolId },
+    { $set: { headteacherSignatureUrl } },
+    { upsert: true, new: true },
+  );
+
+  await auditLog.record({
+    req, action: 'schoolSettings.signatureUpload', entityType: 'SchoolSettings', entityId: settings.id, description: 'Uploaded the headteacher signature',
+  });
+
+  res.json({ success: true, data: { headteacherSignatureUrl } });
+});
+
 module.exports = {
-  get, update, uploadLogo,
+  get, update, uploadLogo, uploadSignature,
 };

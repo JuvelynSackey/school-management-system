@@ -17,7 +17,10 @@ const submitValidator = [
 
 const lockValidator = [
   body('headteacherRemark').optional({ nullable: true }).trim(),
-  body('headteacherSignatureName').trim().notEmpty().withMessage('Headteacher signature name is required to lock a report'),
+  // Not required here: an omitted/blank value falls back to the school's
+  // configured default headteacher name in the controller, which itself
+  // errors if there's no default either.
+  body('headteacherSignatureName').optional({ nullable: true, checkFalsy: true }).trim(),
 ];
 
 const pdfValidator = [
@@ -33,7 +36,7 @@ const lockAllValidator = [
   body('classId').isMongoId(),
   body('academicTermId').isMongoId(),
   body('headteacherRemark').optional({ nullable: true }).trim(),
-  body('headteacherSignatureName').trim().notEmpty().withMessage('Headteacher signature name is required to lock reports'),
+  body('headteacherSignatureName').optional({ nullable: true, checkFalsy: true }).trim(),
 ];
 
 const pdfSelectedValidator = [
