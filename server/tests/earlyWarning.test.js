@@ -172,20 +172,20 @@ describe('Early-Warning Intelligence', () => {
     expect(ids).not.toContain(otherStudent.id);
   });
 
-  describe('with a DeepSeek key present (network call mocked)', () => {
-    const originalKey = process.env.DEEPSEEK_API_KEY;
+  describe('with a Gemini key present (network call mocked)', () => {
+    const originalKey = process.env.GEMINI_API_KEY;
     const originalFetch = global.fetch;
 
     beforeEach(() => {
-      process.env.DEEPSEEK_API_KEY = 'test-fake-deepseek-key';
+      process.env.GEMINI_API_KEY = 'AIzaSy-test-fake-key';
       global.fetch = jest.fn(async () => ({
         ok: true,
-        json: async () => ({ choices: [{ message: { content: 'A few students may benefit from a quiet check-in this term.' } }] }),
+        json: async () => ({ candidates: [{ content: { parts: [{ text: 'A few students may benefit from a quiet check-in this term.' }] } }] }),
       }));
     });
 
     afterEach(() => {
-      process.env.DEEPSEEK_API_KEY = originalKey;
+      process.env.GEMINI_API_KEY = originalKey;
       global.fetch = originalFetch;
     });
 
@@ -208,7 +208,7 @@ describe('Early-Warning Intelligence', () => {
       const res = await request(app).get('/api/early-warning/at-risk-students').query({ academicTermId: term.id }).set(fixtures.authHeader(token));
       expect(res.body.data.aiSynthesis).toBe('A few students may benefit from a quiet check-in this term.');
 
-      const promptSent = JSON.parse(global.fetch.mock.calls[0][1].body).messages[0].content;
+      const promptSent = JSON.parse(global.fetch.mock.calls[0][1].body).contents[0].parts[0].text;
       expect(promptSent).toContain('Kojo');
       expect(promptSent).not.toContain('DoNotLeakThisSurname');
       expect(promptSent).not.toContain('1234');

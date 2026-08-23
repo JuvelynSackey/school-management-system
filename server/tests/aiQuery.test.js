@@ -24,12 +24,12 @@ const mockAI = (intentJsonText, summaryText = 'Here is a summary.') => {
   global.fetch = jest.fn(async () => {
     call += 1;
     const content = call === 1 ? intentJsonText : summaryText;
-    return { ok: true, json: async () => ({ choices: [{ message: { content } }] }) };
+    return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: content }] } }] }) };
   });
 };
 
 describe('Natural-Language Admin Assistant', () => {
-  test('is disabled by default (no DEEPSEEK_API_KEY) and returns a clear 503', async () => {
+  test('is disabled by default (no GEMINI_API_KEY) and returns a clear 503', async () => {
     const school = await fixtures.createSchool(models);
     const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin@query-test.local' });
     const token = await fixtures.login(app, school.slug, 'admin@query-test.local', password);
@@ -48,13 +48,13 @@ describe('Natural-Language Admin Assistant', () => {
     expect(res.status).toBe(400);
   });
 
-  describe('with a DeepSeek key present (network call mocked)', () => {
-    const originalKey = process.env.DEEPSEEK_API_KEY;
+  describe('with a Gemini key present (network call mocked)', () => {
+    const originalKey = process.env.GEMINI_API_KEY;
     const originalFetch = global.fetch;
 
-    beforeEach(() => { process.env.DEEPSEEK_API_KEY = 'test-fake-deepseek-key'; });
+    beforeEach(() => { process.env.GEMINI_API_KEY = 'AIzaSy-test-fake-key'; });
     afterEach(() => {
-      process.env.DEEPSEEK_API_KEY = originalKey;
+      process.env.GEMINI_API_KEY = originalKey;
       global.fetch = originalFetch;
     });
 

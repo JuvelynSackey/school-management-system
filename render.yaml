@@ -50,11 +50,13 @@ services:
       # Composer / Performance Summary / Anomaly Detection / Early-Warning /
       # Ask JesManage gated off (deterministic fallback templates instead),
       # exactly like in local dev with no key set. Get a key from
-      # platform.deepseek.com.
-      - key: DEEPSEEK_API_KEY
+      # aistudio.google.com/app/apikey — must start with "AIzaSy" (legacy
+      # Standard key) or "AQ." (the newer Auth key AI Studio now issues by
+      # default; AIzaSy keys are being phased out through September 2026).
+      - key: GEMINI_API_KEY
         sync: false
-      - key: DEEPSEEK_MODEL
-        value: deepseek-v4-flash
+      - key: GEMINI_MODEL
+        value: gemini-2.0-flash
       # Optional — leave blank to keep email notifications silently
       # skipped, same as local dev.
       - key: SMTP_HOST

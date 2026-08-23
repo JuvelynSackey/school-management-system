@@ -99,20 +99,20 @@ describe('Academic Anomaly Detection', () => {
     expect(approveRes.status).toBe(200);
   });
 
-  describe('with a DeepSeek key present (network call mocked)', () => {
-    const originalKey = process.env.DEEPSEEK_API_KEY;
+  describe('with a Gemini key present (network call mocked)', () => {
+    const originalKey = process.env.GEMINI_API_KEY;
     const originalFetch = global.fetch;
 
     beforeEach(() => {
-      process.env.DEEPSEEK_API_KEY = 'test-fake-deepseek-key';
+      process.env.GEMINI_API_KEY = 'AIzaSy-test-fake-key';
       global.fetch = jest.fn(async () => ({
         ok: true,
-        json: async () => ({ choices: [{ message: { content: 'These look like genuine performance changes worth a closer look.' } }] }),
+        json: async () => ({ candidates: [{ content: { parts: [{ text: 'These look like genuine performance changes worth a closer look.' }] } }] }),
       }));
     });
 
     afterEach(() => {
-      process.env.DEEPSEEK_API_KEY = originalKey;
+      process.env.GEMINI_API_KEY = originalKey;
       global.fetch = originalFetch;
     });
 
@@ -138,7 +138,7 @@ describe('Academic Anomaly Detection', () => {
       expect(res.status).toBe(200);
       expect(res.body.data.aiSummary).toBe('These look like genuine performance changes worth a closer look.');
 
-      const promptSent = JSON.parse(global.fetch.mock.calls[0][1].body).messages[0].content;
+      const promptSent = JSON.parse(global.fetch.mock.calls[0][1].body).contents[0].parts[0].text;
       expect(promptSent).not.toContain('Kojo');
       expect(promptSent).not.toContain('ShouldNeverBeSent');
       expect(promptSent).not.toContain(String(student.id));

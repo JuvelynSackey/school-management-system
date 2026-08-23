@@ -1,22 +1,28 @@
-// DeepSeek's own API (api.deepseek.com) — an OpenAI-compatible chat
-// endpoint, independent of NVIDIA Build (whose deprecation timeline we
-// couldn't fully confirm for a provider swap this close to a defense).
-// Follows the same isConfigured() gate as email.service.js: if the key
-// isn't set, every call fails fast and predictably rather than wasting a
-// network round-trip only to fail deep inside a fetch. No documented key
-// prefix to validate here (unlike NVIDIA's "nvapi-"), so this only checks
-// presence. Node 18+ ships a global fetch, so no new HTTP dependency is
-// needed for this.
-const isAIConfigured = () => Boolean(process.env.DEEPSEEK_API_KEY);
+// Google AI Studio's Gemini API — back to this after NVIDIA Build's
+// ambiguous deprecation notice and DeepSeek's own API requiring a prepaid
+// balance; Gemini has a genuine free tier, which matters most right before
+// a defense. Follows the same isConfigured() gate as email.service.js: if
+// the key isn't set (or isn't shaped like a real one), every call fails
+// fast and predictably rather than wasting a network round-trip only to
+// fail deep inside a fetch. Google is mid-migration (as of mid/late 2026)
+// from "Standard" keys (AIzaSy...) to "Auth" keys (AQ.Ab...) — AI Studio
+// now issues AQ. keys by default, unrestricted AIzaSy keys already stopped
+// working, and ALL AIzaSy keys are slated for rejection in September 2026 —
+// so both prefixes are accepted here rather than just the old one. Node 18+
+// ships a global fetch, so no new HTTP dependency (nor the Google GenAI SDK)
+// is needed for this.
+const isAIConfigured = () => {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return false;
+  if (!key.startsWith('AIzaSy') && !key.startsWith('AQ.')) {
+    console.error('[ai.service] GEMINI_API_KEY is set but doesn\'t look like a real Gemini key (expected it to start with "AIzaSy" or the newer "AQ.") — treating AI as unconfigured. Get a real key from aistudio.google.com/app/apikey.');
+    return false;
+  }
+  return true;
+};
 
-// deepseek-v4-flash is the current fast/general-purpose tier (verified
-// directly against DeepSeek's live docs) — the legacy "deepseek-chat" /
-// "deepseek-reasoner" model IDs are no longer listed there. "flash" over
-// "pro" for the same reason llama-3.2-3b was picked over 70b: everything
-// this app generates is short and structured (a few sentences or bullet
-// points), not deep multi-step reasoning.
-const DEEPSEEK_MODEL = () => process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash';
-const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions';
+const GEMINI_MODEL = () => process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+const GEMINI_URL = () => `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL()}:generateContent`;
 
 // Shared by every AI-backed generator below — one fetch/error-handling path
 // instead of eight near-identical copies. Every caller here already has its
@@ -24,25 +30,27 @@ const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions';
 // generateFallback* function), so failing loudly to the SERVER LOG here —
 // not just a generic "AI_REQUEST_FAILED" code to the client — is what makes
 // a real production failure (bad key, wrong model name, quota) actually
-// diagnosable instead of indistinguishable from "not configured".
+// diagnosable instead of indistinguishable from "not configured". The key
+// goes in the x-goog-api-key header rather than a ?key= query param —
+// Google's own docs point there as the current standard, and it's the more
+// reliable path for the newer AQ. auth keys (some REST/query-param reports
+// of "API key not valid" for AQ. keys are still open on Google's forum).
 const callAI = async (prompt) => {
   let res;
   try {
-    res = await fetch(DEEPSEEK_URL, {
+    res = await fetch(GEMINI_URL(), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+        'x-goog-api-key': process.env.GEMINI_API_KEY,
       },
       body: JSON.stringify({
-        model: DEEPSEEK_MODEL(),
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.2,
-        max_tokens: 1024,
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
       }),
     });
   } catch (fetchErr) {
-    console.error('[ai.service] DeepSeek request never reached a response (network/URL error):', fetchErr.message);
+    console.error('[ai.service] Gemini request never reached a response (network/URL error):', fetchErr.message);
     const err = new Error('AI request failed before a response was received');
     err.code = 'AI_REQUEST_FAILED';
     throw err;
@@ -50,7 +58,7 @@ const callAI = async (prompt) => {
 
   if (!res.ok) {
     const bodyText = await res.text().catch(() => '');
-    console.error(`[ai.service] DeepSeek request failed with status ${res.status}:`, bodyText.slice(0, 500));
+    console.error(`[ai.service] Gemini request failed with status ${res.status}:`, bodyText.slice(0, 500));
     const err = new Error(`AI request failed with status ${res.status}`);
     err.code = 'AI_REQUEST_FAILED';
     throw err;
@@ -118,7 +126,7 @@ const generateRemarkSuggestions = async (context) => {
 
   const prompt = buildRemarkPrompt(context);
   const data = await callAI(prompt);
-  const text = data?.choices?.[0]?.message?.content || '';
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
   const suggestions = parseSuggestions(text);
   if (suggestions.length === 0) {
     const err = new Error('AI returned no usable suggestions');
@@ -198,7 +206,7 @@ const generateAnnouncementSuggestions = async ({ objective, tone, targetLabel })
 
   const prompt = buildAnnouncementPrompt({ objective, tone, targetLabel });
   const data = await callAI(prompt);
-  const text = data?.choices?.[0]?.message?.content || '';
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
   const suggestions = parseSuggestions(text);
   if (suggestions.length === 0) {
     const err = new Error('AI returned no usable suggestions');
@@ -284,7 +292,7 @@ const generatePerformanceSummary = async (subjectPerf) => {
 
   const prompt = buildPerformanceSummaryPrompt(subjectPerf);
   const data = await callAI(prompt);
-  const text = data?.choices?.[0]?.message?.content || '';
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
   const parsed = parseSummaryResponse(text);
   const isEmpty = !parsed || (parsed.keyStrengths.length === 0 && parsed.areasForAttention.length === 0 && parsed.recommendations.length === 0);
   if (isEmpty) {
@@ -347,7 +355,7 @@ const generateAnomalySummary = async (flags) => {
 
   const prompt = buildAnomalySummaryPrompt(flags);
   const data = await callAI(prompt);
-  const text = data?.choices?.[0]?.message?.content || '';
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
   const summary = text.replace(/```/g, '').trim();
   if (!summary) {
     const err = new Error('AI returned no usable summary');
@@ -396,7 +404,7 @@ const generatePerformanceNarrative = async (context) => {
 
   const prompt = buildPerformanceNarrativePrompt(context);
   const data = await callAI(prompt);
-  const text = data?.choices?.[0]?.message?.content || '';
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
   const narrative = text.replace(/```/g, '').trim();
   if (!narrative) {
     const err = new Error('AI returned no usable narrative');
@@ -452,7 +460,7 @@ const generateInterventionSynthesis = async (flaggedStudents) => {
 
   const prompt = buildInterventionSynthesisPrompt(flaggedStudents);
   const data = await callAI(prompt);
-  const text = data?.choices?.[0]?.message?.content || '';
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
   const synthesis = text.replace(/```/g, '').trim();
   if (!synthesis) {
     const err = new Error('AI returned no usable synthesis');
@@ -533,7 +541,7 @@ const interpretAdminQuery = async (question) => {
 
   const prompt = buildQueryInterpretationPrompt(question);
   const data = await callAI(prompt);
-  const text = data?.choices?.[0]?.message?.content || '';
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
   return parseIntentResponse(text);
 };
 
@@ -570,7 +578,7 @@ const summarizeQueryResult = async (question, rows) => {
 
   const prompt = buildQuerySummaryPrompt(question, rows);
   const data = await callAI(prompt);
-  const text = data?.choices?.[0]?.message?.content || '';
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
   return text.replace(/```/g, '').trim() || null;
 };
 
