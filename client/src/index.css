@@ -150,45 +150,55 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); opacity: 1
   text-align: left;
 }
 
-/* Cosmic login page — starfield + drifting gradient orbs behind a glass card */
+/* Cosmic login page — dark teal diagonal field behind a set of pill inputs
+   with circular icon badges. Shared by every auth page (Login, LoginModal,
+   ForgotPassword, ResetPassword, VerifyEmail, Super Admin login) via these
+   same classes, so a change here refreshes all six consistently. */
 .cosmic-auth-page {
-  --cosmic-purple: #a855f7;
-  --cosmic-blue: #4338ca;
-  --cosmic-orange: #f97316;
+  --cosmic-teal-a: #0f3d3d;
+  --cosmic-teal-b: #123a3a;
+  --cosmic-teal-glow: #1f6f6a;
   min-height: 100svh;
   position: relative;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #0a0812;
+  background: #0a2323;
   padding: 24px;
+}
+.cosmic-auth-page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent 0%, transparent 42%, rgba(255, 255, 255, 0.05) 42%, rgba(255, 255, 255, 0.05) 58%, transparent 58%, transparent 100%);
+  pointer-events: none;
 }
 
 .cosmic-orb { position: absolute; border-radius: 50%; filter: blur(2px); }
 .cosmic-orb-purple {
   width: 420px; height: 420px; left: -140px; top: -60px;
-  background: radial-gradient(circle at 35% 30%, var(--cosmic-purple), #3b1d6e 65%, transparent 80%);
+  background: radial-gradient(circle at 35% 30%, var(--cosmic-teal-glow), var(--cosmic-teal-a) 65%, transparent 80%);
   animation: orb-drift-a 14s ease-in-out infinite;
 }
 .cosmic-orb-blue {
   width: 380px; height: 380px; left: -80px; bottom: -160px;
-  background: radial-gradient(circle at 40% 40%, var(--cosmic-blue), #1e1a4d 65%, transparent 80%);
+  background: radial-gradient(circle at 40% 40%, var(--cosmic-teal-glow), var(--cosmic-teal-b) 65%, transparent 80%);
   animation: orb-drift-b 16s ease-in-out infinite;
 }
 .cosmic-orb-orange {
   width: 360px; height: 360px; right: -140px; bottom: -140px;
-  background: radial-gradient(circle at 45% 35%, var(--cosmic-orange), #7c2d12 65%, transparent 80%);
+  background: radial-gradient(circle at 45% 35%, var(--cosmic-teal-glow), var(--cosmic-teal-a) 65%, transparent 80%);
   animation: orb-drift-a 18s ease-in-out infinite reverse;
 }
 .cosmic-orb-dot-purple {
   width: 26px; height: 26px; right: 12%; top: 18%;
-  background: radial-gradient(circle at 35% 30%, #c084fc, var(--cosmic-purple));
+  background: radial-gradient(circle at 35% 30%, #6fd8d1, var(--cosmic-teal-glow));
   animation: orb-drift-b 9s ease-in-out infinite;
 }
 .cosmic-orb-dot-brown {
   width: 18px; height: 18px; left: 8%; bottom: 14%;
-  background: radial-gradient(circle at 35% 30%, #c2854f, #7c4a24);
+  background: radial-gradient(circle at 35% 30%, #6fd8d1, var(--cosmic-teal-glow));
   animation: orb-drift-a 11s ease-in-out infinite;
 }
 @keyframes orb-drift-a {
@@ -218,16 +228,17 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); opacity: 1
   padding: 40px 34px;
   border-radius: 32px;
   text-align: center;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 .cosmic-card h1 {
-  font-family: Georgia, 'Times New Roman', serif;
-  font-weight: 400;
-  font-size: 34px;
+  font-family: var(--sans);
+  font-weight: 800;
+  font-size: 26px;
+  letter-spacing: 0.3px;
   color: #fff;
   margin: 0 0 8px;
 }
@@ -247,40 +258,49 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); opacity: 1
 }
 .cosmic-field input {
   width: 100%;
-  padding: 13px 42px 13px 16px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  background: rgba(255, 255, 255, 0.05);
+  height: 52px;
+  padding: 0 20px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
   color: #fff;
   font-size: 14px;
 }
-.cosmic-field input::placeholder { color: rgba(255, 255, 255, 0.45); }
-.cosmic-field input:focus { outline: none; border-color: var(--cosmic-purple); }
-.cosmic-field-icon {
-  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
-  color: rgba(255, 255, 255, 0.6);
-  display: flex; align-items: center;
+.cosmic-field--icon-left input { padding-left: 60px; }
+.cosmic-field--icon-right input { padding-right: 60px; }
+.cosmic-field input::placeholder { color: rgba(255, 255, 255, 0.5); }
+.cosmic-field input:focus { outline: none; border-color: var(--cosmic-teal-glow); }
+.cosmic-field-badge {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 42px; height: 42px; border-radius: 50%;
+  background: #fff; color: var(--cosmic-teal-a);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+  border: none; padding: 0;
 }
-.cosmic-field-icon-btn { background: none; border: none; cursor: pointer; padding: 0; }
+.cosmic-field-badge--left { left: 5px; }
+.cosmic-field-badge--right { right: 5px; }
+button.cosmic-field-badge { cursor: pointer; }
 .cosmic-remember {
   display: flex; align-items: center; gap: 8px; justify-content: flex-start;
   color: rgba(255, 255, 255, 0.75); font-size: 13px; margin-bottom: 22px; cursor: pointer;
 }
-.cosmic-remember input { accent-color: var(--cosmic-orange); width: 15px; height: 15px; }
+.cosmic-remember input { accent-color: var(--cosmic-teal-glow); width: 15px; height: 15px; }
 .cosmic-submit {
   width: 100%;
-  padding: 13px;
-  border-radius: 12px;
+  padding: 15px;
+  border-radius: 999px;
   border: none;
   cursor: pointer;
-  font-weight: 700;
+  font-weight: 800;
   font-size: 14px;
-  letter-spacing: 0.5px;
-  color: #fff;
-  background: linear-gradient(90deg, var(--cosmic-orange), #ef4444);
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--cosmic-teal-a);
+  background: #fff;
   transition: transform 0.15s ease, box-shadow 0.2s ease;
 }
-.cosmic-submit:hover { transform: translateY(-2px); box-shadow: 0 12px 24px rgba(249, 115, 22, 0.35); }
+.cosmic-submit:hover { transform: translateY(-2px); box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35); }
 .cosmic-submit:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 .cosmic-card .alert-error { text-align: left; margin-bottom: 16px; }
 

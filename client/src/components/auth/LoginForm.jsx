@@ -69,7 +69,7 @@ export default function LoginForm({ onSuccess, defaultSchoolCode = '' }) {
 
       {error && <div className="alert-error">{error}</div>}
 
-      <label className="cosmic-field">
+      <label className="cosmic-field cosmic-field--icon-left">
         <input
           type="text"
           placeholder="School Code"
@@ -79,10 +79,10 @@ export default function LoginForm({ onSuccess, defaultSchoolCode = '' }) {
           autoFocus={!defaultSchoolCode}
           disabled={isSubmitting}
         />
-        <span className="cosmic-field-icon"><SchoolIcon /></span>
+        <span className="cosmic-field-badge cosmic-field-badge--left"><SchoolIcon /></span>
       </label>
 
-      <label className="cosmic-field">
+      <label className="cosmic-field cosmic-field--icon-left">
         <input
           type="text"
           placeholder="Email or Phone"
@@ -92,10 +92,10 @@ export default function LoginForm({ onSuccess, defaultSchoolCode = '' }) {
           autoFocus={Boolean(defaultSchoolCode)}
           disabled={isSubmitting}
         />
-        <span className="cosmic-field-icon"><MailIcon /></span>
+        <span className="cosmic-field-badge cosmic-field-badge--left"><MailIcon /></span>
       </label>
 
-      <label className="cosmic-field">
+      <label className="cosmic-field cosmic-field--icon-right">
         <input
           type={showPassword ? 'text' : 'password'}
           placeholder="Password"
@@ -106,7 +106,7 @@ export default function LoginForm({ onSuccess, defaultSchoolCode = '' }) {
         />
         <button
           type="button"
-          className="cosmic-field-icon cosmic-field-icon-btn"
+          className="cosmic-field-badge cosmic-field-badge--right"
           onClick={() => setShowPassword((v) => !v)}
           aria-label={showPassword ? 'Hide password' : 'Show password'}
         >
