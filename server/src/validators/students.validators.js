@@ -45,7 +45,7 @@ const updateValidator = [
   body('admissionDate').optional({ nullable: true, checkFalsy: true }).isISO8601(),
   body('category').optional({ nullable: true, checkFalsy: true }).isIn(['Day', 'Boarding']),
   body('programme').optional({ nullable: true }).trim().isLength({ max: 100 }),
-  body('status').optional().isIn(['active', 'inactive', 'archived']),
+  body('status').optional().isIn(['active', 'inactive', 'archived', 'transferred', 'withdrawn', 'graduated']),
   body('waecIndexNumber').optional({ nullable: true, checkFalsy: true }).trim().isLength({ max: 20 }),
   ...guardianArrayValidator,
   ...safetyNotesArrayValidator,
@@ -59,6 +59,14 @@ const waecExportValidator = [
   query('classId').isMongoId(),
 ];
 
+const promoteValidator = [
+  body('sourceClassId').isMongoId().withMessage('sourceClassId is required'),
+  body('destinationClassId').optional({ nullable: true }).isMongoId(),
+  body('promotions').isArray({ min: 1 }).withMessage('At least one student promotion decision is required'),
+  body('promotions.*.studentId').isMongoId(),
+  body('promotions.*.action').isIn(['promote', 'repeat', 'graduate']),
+];
+
 module.exports = {
-  createValidator, updateValidator, idCardsValidator, waecExportValidator,
+  createValidator, updateValidator, idCardsValidator, waecExportValidator, promoteValidator,
 };

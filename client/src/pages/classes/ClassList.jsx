@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import useApiResource from '../../hooks/useApiResource';
 import { listClasses, createClass, updateClass, deleteClass } from '../../api/classes.api';
 import { listTeachers } from '../../api/teachers.api';
+import { listStudents, promoteStudents } from '../../api/students.api';
 import { listSubjects, listSubjectsForClass, assignSubjectToClass, unassignSubjectFromClass } from '../../api/subjects.api';
 import { listAssignmentsForClass, createAssignment, deleteAssignment } from '../../api/assignments.api';
 import Modal from '../../components/common/Modal';
@@ -18,6 +19,7 @@ export default function ClassList() {
   const [formError, setFormError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [subjectsPanel, setSubjectsPanel] = useState(null); // the class row for which we're managing subjects
+  const [promotionPanel, setPromotionPanel] = useState(null); // the class row we're promoting students out of
 
   useEffect(() => {
     listTeachers().then(setTeachers).catch(() => setTeachers([]));
@@ -90,6 +92,7 @@ export default function ClassList() {
                   <td>
                     <div className="row-actions">
                       <button type="button" className="link-btn" onClick={() => setSubjectsPanel(classRow)}>Subjects</button>
+                      <button type="button" className="link-btn" onClick={() => setPromotionPanel(classRow)}>Promote</button>
                       <button type="button" className="link-btn" onClick={() => openEdit(classRow)}>Edit</button>
                       <button type="button" className="link-btn danger" onClick={() => handleDelete(classRow)}>Delete</button>
                     </div>
@@ -144,6 +147,15 @@ export default function ClassList() {
 
       {subjectsPanel && (
         <ClassSubjectsModal classRow={subjectsPanel} onClose={() => setSubjectsPanel(null)} />
+      )}
+
+      {promotionPanel && (
+        <PromoteStudentsModal
+          classRow={promotionPanel}
+          allClasses={classes}
+          onClose={() => setPromotionPanel(null)}
+          onDone={() => { setPromotionPanel(null); reload(); }}
+        />
       )}
     </div>
   );
@@ -256,6 +268,124 @@ function ClassSubjectsModal({ classRow, onClose }) {
             <button type="button" className="btn-primary" onClick={handleAssign} disabled={!selectedSubjectId}>Add</button>
           </div>
         </>
+      )}
+    </Modal>
+  );
+}
+
+const PROMOTION_ACTIONS = [
+  { value: 'promote', label: 'Promote' },
+  { value: 'repeat', label: 'Repeat' },
+  { value: 'graduate', label: 'Graduate' },
+];
+
+// End-of-year batch transition — only ever touches the students actually
+// listed here (active students currently in this exact class), matching
+// what POST /students/promote itself re-validates server-side before
+// applying anything.
+function PromoteStudentsModal({
+  classRow, allClasses, onClose, onDone,
+}) {
+  const [students, setStudents] = useState(null);
+  const [actions, setActions] = useState({});
+  const [destinationClassId, setDestinationClassId] = useState('');
+  const [error, setError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    listStudents({ classId: classRow.id, status: 'active' }).then((rows) => {
+      setStudents(rows);
+      setActions(Object.fromEntries(rows.map((s) => [s.id, 'promote'])));
+    }).catch(() => setStudents([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classRow.id]);
+
+  const otherClasses = allClasses.filter((c) => c.id !== classRow.id);
+
+  const counts = (students || []).reduce((acc, s) => {
+    const a = actions[s.id] || 'promote';
+    acc[a] = (acc[a] || 0) + 1;
+    return acc;
+  }, {});
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!students || students.length === 0) return;
+
+    const needsDestination = students.some((s) => (actions[s.id] || 'promote') === 'promote');
+    if (needsDestination && !destinationClassId) {
+      setError('Choose a destination class for students being promoted.');
+      return;
+    }
+
+    const destLabel = destinationClassId ? (allClasses.find((c) => c.id === destinationClassId)?.name || 'the destination class') : '';
+    const summary = [
+      counts.promote ? `${counts.promote} promoted to ${destLabel}` : null,
+      counts.repeat ? `${counts.repeat} repeating` : null,
+      counts.graduate ? `${counts.graduate} graduating` : null,
+    ].filter(Boolean).join(', ');
+    if (!window.confirm(`${summary}. Continue?`)) return;
+
+    setIsSaving(true);
+    setError('');
+    try {
+      await promoteStudents({
+        sourceClassId: classRow.id,
+        destinationClassId: destinationClassId || undefined,
+        promotions: students.map((s) => ({ studentId: s.id, action: actions[s.id] || 'promote' })),
+      });
+      onDone();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to promote students.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <Modal title={`Promote Students — ${classRow.name}${classRow.section ? ` ${classRow.section}` : ''}`} onClose={onClose}>
+      {error && <div className="alert-error">{error}</div>}
+      {students === null ? <p className="muted">Loading...</p> : (
+        <form onSubmit={handleSubmit}>
+          <label className="field">
+            <span>Destination Class (for promoted students)</span>
+            <select value={destinationClassId} onChange={(e) => setDestinationClassId(e.target.value)}>
+              <option value="">Select destination class...</option>
+              {otherClasses.map((c) => <option key={c.id} value={c.id}>{c.name} {c.section || ''}</option>)}
+            </select>
+          </label>
+
+          {students.length === 0 ? (
+            <p className="muted">No active students in this class.</p>
+          ) : (
+            <table style={{ marginBottom: 16 }}>
+              <thead><tr><th>Student</th><th>Action</th></tr></thead>
+              <tbody>
+                {students.map((s) => (
+                  <tr key={s.id}>
+                    <td>{s.firstName} {s.lastName}</td>
+                    <td>
+                      <select value={actions[s.id] || 'promote'} onChange={(e) => setActions({ ...actions, [s.id]: e.target.value })}>
+                        {PROMOTION_ACTIONS.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
+                      </select>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          <p className="muted" style={{ fontSize: 13 }}>
+            {counts.promote || 0} promoted &middot; {counts.repeat || 0} repeating &middot; {counts.graduate || 0} graduating
+          </p>
+
+          <div className="modal-actions">
+            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn-primary" disabled={isSaving || students.length === 0}>
+              {isSaving ? 'Processing...' : 'Confirm Promotion'}
+            </button>
+          </div>
+        </form>
       )}
     </Modal>
   );

@@ -12,6 +12,23 @@ import Modal from '../../components/common/Modal';
 
 const SAFETY_NOTE_TYPES = ['pickup', 'medical', 'other'];
 
+const STATUS_LABELS = {
+  active: 'Active',
+  inactive: 'Inactive',
+  archived: 'Archived',
+  transferred: 'Transferred',
+  withdrawn: 'Withdrawn',
+  graduated: 'Graduated',
+};
+const STATUS_BADGE_TONE = {
+  active: 'success',
+  inactive: 'warning',
+  archived: 'neutral',
+  transferred: 'neutral',
+  withdrawn: 'neutral',
+  graduated: 'success',
+};
+
 const emptyGuardian = (contactPriority) => ({
   contactPriority, phone: '', fullName: '', email: '', relationship: '', linkedInfo: null, lookupError: '',
 });
@@ -28,18 +45,18 @@ export default function StudentList() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState('');
-  const [showArchived, setShowArchived] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('');
   const [classes, setClasses] = useState([]);
   const [houses, setHouses] = useState([]);
 
   const params = {
     ...(search ? { search } : {}),
     ...(classFilter ? { classId: classFilter } : {}),
-    ...(showArchived ? { status: 'archived' } : {}),
+    ...(statusFilter ? { status: statusFilter } : {}),
   };
   const { data: students, isLoading, error, reload } = useApiResource(
     () => listStudents(params),
-    [search, classFilter, showArchived],
+    [search, classFilter, statusFilter],
   );
 
   const [editing, setEditing] = useState(null);
@@ -199,9 +216,9 @@ export default function StudentList() {
     }
   };
 
-  const handleArchive = async (student) => {
-    const nextStatus = student.status === 'archived' ? 'active' : 'archived';
-    if (!window.confirm(`${nextStatus === 'archived' ? 'Archive' : 'Restore'} ${student.firstName} ${student.lastName}?`)) return;
+  const handleStatusChange = async (student, nextStatus) => {
+    if (nextStatus === student.status) return;
+    if (!window.confirm(`Set ${student.firstName} ${student.lastName}'s status to "${STATUS_LABELS[nextStatus]}"?`)) return;
     await updateStudent(student.id, { status: nextStatus });
     reload();
   };
@@ -236,10 +253,10 @@ export default function StudentList() {
             {classes.map((c) => <option key={c.id} value={c.id}>{c.name} {c.section}</option>)}
           </select>
           {canEdit && (
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
-              <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
-              Show archived
-            </label>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="">Active roster</option>
+              {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
           )}
           {canEdit && classFilter && (
             <button type="button" className="btn-secondary" onClick={handlePrintIdCards} disabled={isPrintingCards}>
@@ -275,19 +292,23 @@ export default function StudentList() {
                   </td>
                   <td>{student.class ? `${student.class.name} ${student.class.section || ''}` : '—'}</td>
                   <td>
-                    {student.status === 'active' && <span className="badge badge-success">Active</span>}
-                    {student.status === 'inactive' && <span className="badge badge-warning">Inactive</span>}
-                    {student.status === 'archived' && <span className="badge badge-neutral">Archived</span>}
+                    {canEdit ? (
+                      <select
+                        value={student.status}
+                        onChange={(e) => handleStatusChange(student, e.target.value)}
+                        className={`badge badge-${STATUS_BADGE_TONE[student.status]}`}
+                        style={{ border: 'none', cursor: 'pointer' }}
+                      >
+                        {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                      </select>
+                    ) : (
+                      <span className={`badge badge-${STATUS_BADGE_TONE[student.status]}`}>{STATUS_LABELS[student.status]}</span>
+                    )}
                   </td>
                   <td>
                     <div className="row-actions">
                       <button type="button" className="link-btn" onClick={() => navigate(`/students/${student.id}`)}>View</button>
                       {canEdit && <button type="button" className="link-btn" onClick={() => openEdit(student)}>Edit</button>}
-                      {canEdit && (
-                        <button type="button" className="link-btn" onClick={() => handleArchive(student)}>
-                          {student.status === 'archived' ? 'Restore' : 'Archive'}
-                        </button>
-                      )}
                       {canEdit && <button type="button" className="link-btn danger" onClick={() => handleDelete(student)}>Delete</button>}
                     </div>
                   </td>

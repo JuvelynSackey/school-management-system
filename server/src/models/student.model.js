@@ -16,7 +16,17 @@ const studentSchema = new mongoose.Schema({
   admissionDate: { type: String, default: null },
   category: { type: String, enum: ['Day', 'Boarding', null], default: null },
   programme: { type: String, default: null, maxlength: 100 },
-  status: { type: String, required: true, enum: ['active', 'inactive', 'archived'], default: 'active' },
+  // Additive to the original 3 -- 'active'/'inactive'/'archived' are used
+  // throughout the app (dashboard counts, reports, results, attendance) and
+  // stay unchanged; 'transferred'/'withdrawn'/'graduated' are new lifecycle
+  // end-states rather than replacements, so every existing status: 'active'
+  // filter keeps working exactly as before.
+  status: {
+    type: String,
+    required: true,
+    enum: ['active', 'inactive', 'archived', 'transferred', 'withdrawn', 'graduated'],
+    default: 'active',
+  },
   photoUrl: { type: String, default: null },
   // No `default: null` here on purpose — same reasoning as subject.model.js's
   // `code` field: a sparse unique index only skips documents where the field

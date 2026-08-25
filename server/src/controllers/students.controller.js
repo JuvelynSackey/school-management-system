@@ -50,7 +50,10 @@ const list = asyncHandler(async (req, res) => {
   if (status) {
     where.status = status;
   } else {
-    where.status = { $ne: 'archived' };
+    // Same intent as the original archived-only exclusion, extended to the
+    // newer lifecycle end-states -- none of these show up on the default
+    // roster view unless specifically filtered for.
+    where.status = { $nin: ['archived', 'transferred', 'withdrawn', 'graduated'] };
   }
   if (classId) where.classId = classId;
   if (search) {
@@ -190,9 +193,12 @@ const update = asyncHandler(async (req, res, next) => {
   }
 
   if (status) {
+    // Any non-active student status deactivates the linked login -- covers
+    // the new lifecycle end-states the same way it already covered
+    // archived/inactive, without needing to list every value by name.
     await User.updateOne(
       { _id: student.userId },
-      { $set: { status: status === 'archived' || status === 'inactive' ? 'inactive' : 'active' } },
+      { $set: { status: status === 'active' ? 'active' : 'inactive' } },
     );
   }
 
@@ -208,6 +214,84 @@ const update = asyncHandler(async (req, res, next) => {
 
   const full = await populateFull(Student.findById(student.id));
   res.json({ success: true, data: await attachGuardians(full) });
+});
+
+// POST /students/promote { sourceClassId, destinationClassId, promotions: [{ studentId, action }] }
+// End-of-year batch transition. Deliberately touches only Student -- Result,
+// Attendance, and Fee documents each already store their own classId/
+// academicTermId snapshot at the time they were recorded (not a live
+// reference to Student.classId), so promoting a student never rewrites or
+// reinterprets any historical record; this only changes where they sit
+// going forward.
+const promote = asyncHandler(async (req, res, next) => {
+  const { sourceClassId, destinationClassId, promotions } = req.body;
+
+  const sourceClass = await Class.findById(sourceClassId);
+  if (!sourceClass) return next(new AppError('Source class not found', 404));
+
+  const wantsPromote = promotions.some((p) => p.action === 'promote');
+  let destinationClass = null;
+  if (wantsPromote) {
+    if (!destinationClassId) return next(new AppError('destinationClassId is required when promoting any student', 400));
+    destinationClass = await Class.findById(destinationClassId);
+    if (!destinationClass) return next(new AppError('Destination class not found', 400));
+  }
+
+  const studentIds = promotions.map((p) => p.studentId);
+  const students = await Student.find({ _id: { $in: studentIds } });
+  const studentById = new Map(students.map((s) => [s.id, s]));
+
+  // A student who isn't actually in sourceClassId (stale UI state, or the
+  // payload was tampered with) or isn't currently active is skipped rather
+  // than failing the whole batch -- reported back, not silently dropped.
+  const skipped = [];
+  const applied = { promote: 0, repeat: 0, graduate: 0 };
+
+  const session = await mongoose.startSession();
+  try {
+    await session.withTransaction(async () => {
+      // Sequential, not Promise.all -- a MongoDB session/transaction doesn't
+      // support concurrent operations on itself; running these in parallel
+      // silently corrupted results (some updates were dropped) rather than
+      // throwing, which is exactly why this needed a real test to catch.
+      // eslint-disable-next-line no-restricted-syntax
+      for (const { studentId, action } of promotions) {
+        const student = studentById.get(studentId);
+        if (!student || String(student.classId) !== String(sourceClassId) || student.status !== 'active') {
+          skipped.push(studentId);
+          // eslint-disable-next-line no-continue
+          continue;
+        }
+
+        if (action === 'promote') {
+          student.classId = destinationClassId;
+        } else if (action === 'graduate') {
+          student.status = 'graduated';
+        }
+        // 'repeat' touches nothing -- same class, same active status.
+        // eslint-disable-next-line no-await-in-loop
+        await student.save({ session });
+
+        if (action === 'graduate') {
+          // eslint-disable-next-line no-await-in-loop
+          await User.updateOne({ _id: student.userId }, { $set: { status: 'inactive' } }, { session });
+        }
+        applied[action] += 1;
+      }
+    });
+  } finally {
+    await session.endSession();
+  }
+
+  await auditLog.record({
+    req,
+    action: 'student.promote',
+    entityType: 'Class',
+    entityId: sourceClass.id,
+    description: `Promoted ${applied.promote} student(s) from ${sourceClass.name} ${sourceClass.section || ''}${destinationClass ? ` to ${destinationClass.name} ${destinationClass.section || ''}` : ''}, ${applied.repeat} repeating, ${applied.graduate} graduated`,
+  });
+
+  res.json({ success: true, data: { applied, skipped } });
 });
 
 const remove = asyncHandler(async (req, res, next) => {
@@ -365,5 +449,5 @@ const downloadWaecExport = asyncHandler(async (req, res, next) => {
 });
 
 module.exports = {
-  list, getById, getMe, getMyChildren, create, update, remove, uploadPhoto, downloadIdCardsPdf, previewWaecExport, downloadWaecExport, getTeacherClassIds,
+  list, getById, getMe, getMyChildren, create, update, promote, remove, uploadPhoto, downloadIdCardsPdf, previewWaecExport, downloadWaecExport, getTeacherClassIds,
 };

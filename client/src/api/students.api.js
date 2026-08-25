@@ -7,6 +7,7 @@ export const getMyChildren = () => apiClient.get('/students/my-children').then((
 export const createStudent = (payload) => apiClient.post('/students', payload).then((res) => res.data.data);
 export const updateStudent = (id, payload) => apiClient.put(`/students/${id}`, payload).then((res) => res.data.data);
 export const deleteStudent = (id) => apiClient.delete(`/students/${id}`).then((res) => res.data.data);
+export const promoteStudents = (payload) => apiClient.post('/students/promote', payload).then((res) => res.data.data);
 export const uploadStudentPhoto = (id, file) => {
   const formData = new FormData();
   formData.append('photo', file);
