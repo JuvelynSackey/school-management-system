@@ -17,6 +17,17 @@ const announcementSchema = new mongoose.Schema({
     type: [{ channel: String, status: String, recipientCount: Number }], default: [], _id: false,
   },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  // Per-recipient read receipts — small and bounded (one entry per staff/
+  // parent/student who has actually opened this notice), not one row per
+  // potential recipient, so this stays cheap even on a school-wide notice.
+  readBy: {
+    type: [{
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      readAt: { type: Date, default: Date.now },
+    }],
+    default: [],
+    _id: false,
+  },
 }, { timestamps: { createdAt: true, updatedAt: false } });
 
 announcementSchema.index({ targetType: 1, targetClassId: 1, targetStudentId: 1 });

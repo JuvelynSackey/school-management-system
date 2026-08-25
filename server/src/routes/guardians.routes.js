@@ -7,10 +7,11 @@ const authorize = require('../middleware/authorize');
 
 const router = express.Router();
 
-router.use(authenticate, authorize('admin'));
+router.use(authenticate);
 
-router.get('/', controller.lookupByPhone);
-router.get('/:id', controller.getById);
-router.post('/:id/login', createLoginValidator, validate, controller.createLogin);
+router.get('/list', authorize('admin', 'teacher'), controller.list);
+router.get('/', authorize('admin'), controller.lookupByPhone);
+router.get('/:id', authorize('admin'), controller.getById);
+router.post('/:id/login', authorize('admin'), createLoginValidator, validate, controller.createLogin);
 
 module.exports = router;

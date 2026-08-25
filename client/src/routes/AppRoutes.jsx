@@ -31,6 +31,8 @@ import MyAccount from '../pages/account/MyAccount';
 import Announcements from '../pages/announcements/Announcements';
 import ExamTimetable from '../pages/examSchedule/ExamTimetable';
 import Intelligence from '../pages/intelligence/Intelligence';
+import Parents from '../pages/parents/Parents';
+import IDCards from '../pages/idCards/IDCards';
 import Unauthorized from '../pages/errors/Unauthorized';
 import NotFound from '../pages/errors/NotFound';
 import VerifyDocument from '../pages/verify/VerifyDocument';
@@ -63,6 +65,7 @@ export default function AppRoutes() {
             <Route path="/houses" element={<HouseList />} />
             <Route path="/teachers" element={<TeacherList />} />
             <Route path="/reports" element={<ReportsHub />} />
+            <Route path="/id-cards" element={<IDCards />} />
             <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/school-settings" element={<SchoolSettings />} />
             <Route path="/audit-log" element={<AuditLogPage />} />
@@ -71,6 +74,7 @@ export default function AppRoutes() {
           <Route element={<RoleRoute roles={['admin', 'teacher']} />}>
             <Route path="/students" element={<StudentList />} />
             <Route path="/assessment-sheets" element={<AssessmentSheetsPage />} />
+            <Route path="/parents" element={<Parents />} />
           </Route>
 
           <Route element={<RoleRoute roles={['admin', 'teacher', 'parent']} />}>

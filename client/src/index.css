@@ -156,6 +156,16 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); opacity: 1
   text-align: left;
 }
 
+.alert-success {
+  background: var(--success-bg);
+  color: var(--success);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 14px;
+  margin-bottom: 14px;
+  text-align: left;
+}
+
 /* Cosmic login page — dark teal diagonal field behind a set of pill inputs
    with circular icon badges. Shared by every auth page (Login, LoginModal,
    ForgotPassword, ResetPassword, VerifyEmail, Super Admin login) via these

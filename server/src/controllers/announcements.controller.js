@@ -67,45 +67,88 @@ const remove = asyncHandler(async (req, res, next) => {
   res.json({ success: true, data: null });
 });
 
-// GET /announcements/me — the notice board for the logged-in teacher/student
-const getMyNoticeBoard = asyncHandler(async (req, res, next) => {
-  let where;
-
-  if (req.user.role === 'student') {
-    const student = await Student.findOne({ userId: req.user.id });
-    if (!student) return next(new AppError('Student profile not found', 404));
-    where = {
+// Shared by getMyNoticeBoard and unreadCount — same "what can this user see"
+// targeting rule, computed once so the two never drift apart.
+const resolveNoticeBoardWhere = async (user) => {
+  if (user.role === 'student') {
+    const student = await Student.findOne({ userId: user.id });
+    if (!student) return null;
+    return {
       $or: [
         { targetType: 'school' },
         { targetType: 'class', targetClassId: student.classId },
         { targetType: 'student', targetStudentId: student.id },
       ],
     };
-  } else if (req.user.role === 'teacher') {
-    const { classIds } = await getTeacherClassIds(req.user.id);
-    where = {
+  }
+  if (user.role === 'teacher') {
+    const { classIds } = await getTeacherClassIds(user.id);
+    return {
       $or: [
         { targetType: 'school' },
         { targetType: 'class', targetClassId: { $in: classIds } },
       ],
     };
-  } else if (req.user.role === 'parent') {
-    const { studentIds } = await getParentStudentIds(req.user.id);
+  }
+  if (user.role === 'parent') {
+    const { studentIds } = await getParentStudentIds(user.id);
     const children = await Student.find({ _id: { $in: studentIds } }, { classId: 1 });
     const classIds = children.map((c) => c.classId).filter(Boolean);
-    where = {
+    return {
       $or: [
         { targetType: 'school' },
         { targetType: 'class', targetClassId: { $in: classIds } },
         { targetType: 'student', targetStudentId: { $in: studentIds } },
       ],
     };
-  } else {
-    return next(new AppError('Admins should use the full announcement history instead', 400));
   }
+  return undefined; // admin — not a notice-board consumer
+};
+
+// GET /announcements/me — the notice board for the logged-in teacher/student/parent
+const getMyNoticeBoard = asyncHandler(async (req, res, next) => {
+  const where = await resolveNoticeBoardWhere(req.user);
+  if (where === undefined) return next(new AppError('Admins should use the full announcement history instead', 400));
+  if (where === null) return next(new AppError('Student profile not found', 404));
 
   const announcements = await populateForDisplay(Announcement.find(where)).sort({ createdAt: -1 });
-  res.json({ success: true, data: announcements });
+  const withReadState = announcements.map((a) => {
+    const data = a.toJSON();
+    data.isRead = a.readBy.some((r) => r.userId.toString() === req.user.id);
+    delete data.readBy;
+    return data;
+  });
+  res.json({ success: true, data: withReadState });
 });
 
-module.exports = { create, list, remove, getMyNoticeBoard };
+// GET /announcements/unread-count
+const unreadCount = asyncHandler(async (req, res, next) => {
+  const where = await resolveNoticeBoardWhere(req.user);
+  if (where === undefined) return next(new AppError('Admins should use the full announcement history instead', 400));
+  if (where === null) return res.json({ success: true, data: { count: 0 } });
+
+  const count = await Announcement.countDocuments({
+    ...where,
+    'readBy.userId': { $ne: req.user.id },
+  });
+  res.json({ success: true, data: { count } });
+});
+
+// POST /announcements/:id/read — idempotent; marking an already-read notice
+// read again is a no-op, not an error.
+const markRead = asyncHandler(async (req, res, next) => {
+  const announcement = await Announcement.findById(req.params.id);
+  if (!announcement) return next(new AppError('Announcement not found', 404));
+
+  const alreadyRead = announcement.readBy.some((r) => r.userId.toString() === req.user.id);
+  if (!alreadyRead) {
+    announcement.readBy.push({ userId: req.user.id, readAt: new Date() });
+    await announcement.save();
+  }
+
+  res.json({ success: true, data: { isRead: true } });
+});
+
+module.exports = {
+  create, list, remove, getMyNoticeBoard, unreadCount, markRead,
+};
