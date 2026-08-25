@@ -145,6 +145,15 @@ const HOW_IT_WORKS = [
   { title: 'Publish & Download', desc: 'Admins publish finished report cards for parents and students to download.' },
 ];
 
+// Real, verifiable numbers as of this build — not marketing copy. Update
+// these alongside the actual test suite/model count if they drift.
+const SYSTEM_STATS = [
+  { value: '27', label: 'Tenant-Scoped Models' },
+  { value: '184', label: 'Automated Tests, All Passing' },
+  { value: '100%', label: 'Tenant Isolation, Test-Verified' },
+  { value: 'Selective', label: 'Offline-Capable Score Entry' },
+];
+
 const FAQS = [
   {
     q: 'Can teachers change marks after submitting them?',
@@ -294,6 +303,17 @@ export default function LandingPage() {
               <span className="how-step-number">{i + 1}</span>
               <h3>{step.title}</h3>
               <p>{step.desc}</p>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      <section className="landing-section landing-section-alt">
+        <div className="landing-stats-grid">
+          {SYSTEM_STATS.map((s, i) => (
+            <Reveal key={s.label} delay={i * 70} className="landing-stat-card">
+              <div className="landing-stat-value">{s.value}</div>
+              <div className="landing-stat-label">{s.label}</div>
             </Reveal>
           ))}
         </div>

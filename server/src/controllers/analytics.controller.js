@@ -1,53 +1,12 @@
 const {
-  mongoose, Result, Class, Subject, AcademicTerm, Fee,
+  Class, Subject, AcademicTerm, Fee,
 } = require('../models');
 const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/AppError');
 const { getFeeBalance } = require('../services/fees.service');
-const { getSchemeForSchool } = require('../services/grading.service');
-
-const round1 = (n) => Math.round(n * 10) / 10;
-
-// Result.aggregate() bypasses tenantScopePlugin (only find/findOne/etc. are
-// scoped, not aggregate) — schoolId must be matched explicitly here to avoid
-// leaking another tenant's scores.
-const classAverages = (schoolId, academicTermId) => Result.aggregate([
-  { $match: { schoolId: new mongoose.Types.ObjectId(schoolId), academicTermId: new mongoose.Types.ObjectId(academicTermId) } },
-  { $group: { _id: '$classId', average: { $avg: '$totalScore' }, count: { $sum: 1 } } },
-]);
-
-const subjectAverages = (schoolId, academicTermId) => Result.aggregate([
-  { $match: { schoolId: new mongoose.Types.ObjectId(schoolId), academicTermId: new mongoose.Types.ObjectId(academicTermId) } },
-  { $group: { _id: '$subjectId', average: { $avg: '$totalScore' }, count: { $sum: 1 } } },
-]);
-
-// Same "pass" definition as ai.controller.js's computeSubjectPerformance —
-// at or above the grading scheme's second-lowest band minimum — but across
-// every result this term rather than broken out per subject.
-const overallPassRate = async (schoolId, academicTermId) => {
-  const scheme = await getSchemeForSchool(schoolId);
-  const sortedBands = [...scheme.bands].sort((a, b) => a.min - b.min);
-  const passCutoff = sortedBands[1]?.min ?? 0;
-
-  const [row] = await Result.aggregate([
-    { $match: { schoolId: new mongoose.Types.ObjectId(schoolId), academicTermId: new mongoose.Types.ObjectId(academicTermId) } },
-    {
-      $group: {
-        _id: null,
-        count: { $sum: 1 },
-        passCount: { $sum: { $cond: [{ $gte: ['$totalScore', passCutoff] }, 1, 0] } },
-      },
-    },
-  ]);
-
-  return row && row.count > 0 ? round1((row.passCount / row.count) * 100) : null;
-};
-
-const resolvePreviousTerm = async (schoolId, currentTerm) => {
-  const terms = await AcademicTerm.find({ schoolId }).sort({ academicYear: 1, termNumber: 1 });
-  const idx = terms.findIndex((t) => t.id === currentTerm.id);
-  return idx > 0 ? terms[idx - 1] : null;
-};
+const {
+  round1, classAverages, subjectAverages, overallPassRate, resolvePreviousTerm,
+} = require('../services/academicAnalytics.service');
 
 // GET /analytics/academic?academicTermId=
 const getAcademic = asyncHandler(async (req, res, next) => {

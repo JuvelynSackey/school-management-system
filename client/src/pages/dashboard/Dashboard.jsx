@@ -328,7 +328,7 @@ const FLAG_LABELS = {
 // "declining performance" count, so it fetches once and passes it down via
 // `data` — this component only fetches its own copy when no `data` prop is
 // given (TeacherDashboard's usage, unchanged).
-function AtRiskStudentsPanel({ index, data: externalData }) {
+export function AtRiskStudentsPanel({ index, data: externalData }) {
   const [internalData, setInternalData] = useState(null);
 
   useEffect(() => {

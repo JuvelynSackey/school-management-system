@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import ThemeToggle from '../common/ThemeToggle';
 import OfflineIndicator from '../common/OfflineIndicator';
@@ -7,12 +7,33 @@ import AskJesManage from '../common/AskJesManage';
 import CommandPalette from '../common/CommandPalette';
 import { NAV_ITEMS, NAV_GROUPS } from '../../config/navItems';
 
+const COLLAPSED_GROUPS_KEY = 'jm_sidebar_collapsed_groups';
+
+const loadCollapsedGroups = () => {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(COLLAPSED_GROUPS_KEY) || '[]'));
+  } catch {
+    return new Set();
+  }
+};
+
 export default function AppShell() {
   const { user, logout } = useAuth();
+  const location = useLocation();
   const [askOpen, setAskOpen] = useState(false);
   const [askInitialQuestion, setAskInitialQuestion] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState(loadCollapsedGroups);
   const visibleNavItems = NAV_ITEMS.filter((item) => item.roles.includes(user?.role));
+
+  const toggleGroup = (group) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(group)) next.delete(group); else next.add(group);
+      try { localStorage.setItem(COLLAPSED_GROUPS_KEY, JSON.stringify([...next])); } catch { /* ignore */ }
+      return next;
+    });
+  };
 
   return (
     <div className="app-shell">
@@ -26,10 +47,22 @@ export default function AppShell() {
           {NAV_GROUPS.map((group) => {
             const items = visibleNavItems.filter((item) => item.group === group);
             if (items.length === 0) return null;
+            const hasActiveItem = items.some((item) => location.pathname.startsWith(item.to));
+            const isExpanded = group === 'MAIN' || hasActiveItem || !collapsedGroups.has(group);
             return (
               <div className="sidebar-group" key={group}>
-                {group !== 'MAIN' && <div className="sidebar-group-label">{group}</div>}
-                {items.map((item) => (
+                {group !== 'MAIN' && (
+                  <button
+                    type="button"
+                    className="sidebar-group-label"
+                    onClick={() => toggleGroup(group)}
+                    aria-expanded={isExpanded}
+                  >
+                    <span>{group}</span>
+                    <span className={`sidebar-group-chevron${isExpanded ? ' is-open' : ''}`}>▾</span>
+                  </button>
+                )}
+                {isExpanded && items.map((item) => (
                   <NavLink key={item.to} to={item.to} onClick={() => setSidebarOpen(false)} className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}>
                     {item.label}
                   </NavLink>

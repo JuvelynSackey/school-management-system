@@ -9,6 +9,7 @@ export const NAV_GROUPS = ['MAIN', 'PEOPLE', 'ACADEMICS', 'FINANCE', 'COMMUNICAT
 
 export const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', roles: ['admin', 'teacher', 'student', 'parent'], group: 'MAIN' },
+  { to: '/intelligence', label: 'JesManage Intelligence', roles: ['admin'], group: 'MAIN' },
   { to: '/admissions', label: 'Admissions', roles: ['admin'], group: 'PEOPLE' },
   { to: '/students', label: 'Students', roles: ['admin', 'teacher'], group: 'PEOPLE' },
   { to: '/teachers', label: 'Teachers', roles: ['admin'], group: 'PEOPLE' },

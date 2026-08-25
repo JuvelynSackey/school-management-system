@@ -30,6 +30,7 @@ import AssessmentSheetsPage from '../pages/assessmentSheets/AssessmentSheetsPage
 import MyAccount from '../pages/account/MyAccount';
 import Announcements from '../pages/announcements/Announcements';
 import ExamTimetable from '../pages/examSchedule/ExamTimetable';
+import Intelligence from '../pages/intelligence/Intelligence';
 import Unauthorized from '../pages/errors/Unauthorized';
 import NotFound from '../pages/errors/NotFound';
 import VerifyDocument from '../pages/verify/VerifyDocument';
@@ -54,6 +55,7 @@ export default function AppRoutes() {
           <Route path="/unauthorized" element={<Unauthorized />} />
 
           <Route element={<RoleRoute roles={['admin']} />}>
+            <Route path="/intelligence" element={<Intelligence />} />
             <Route path="/admissions" element={<AdmissionsList />} />
             <Route path="/terms" element={<TermList />} />
             <Route path="/classes" element={<ClassList />} />
