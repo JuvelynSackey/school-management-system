@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { previewReport, downloadReportCsv, downloadBroadsheetPdf } from '../../api/reports.api';
+import {
+  previewReport, downloadReportCsv, downloadBroadsheetPdf, downloadFinanceSummaryPdf, downloadAttendanceSummaryPdf,
+} from '../../api/reports.api';
 import { listClasses } from '../../api/classes.api';
 import { listSubjects } from '../../api/subjects.api';
 import { listTerms } from '../../api/terms.api';
@@ -10,7 +12,12 @@ const REPORT_TYPES = [
   { key: 'attendance', label: 'Attendance' },
   { key: 'results', label: 'Academic Results' },
   { key: 'fees', label: 'Fees' },
+  { key: 'financeSummary', label: 'Financial Overview' },
+  { key: 'attendanceSummary', label: 'Attendance Summary' },
 ];
+
+const SUMMARY_TYPES = new Set(['financeSummary', 'attendanceSummary']);
+const CSV_FILENAMES = { financeSummary: 'finance-summary.csv', attendanceSummary: 'attendance-summary.csv' };
 
 const COLUMNS = {
   students: [
@@ -49,10 +56,16 @@ export default function ReportsHub() {
     listTerms().then(setTerms).catch(() => {});
   }, []);
 
-  useEffect(() => {
+  // Switches type, filters, and rows together in one batched update — doing
+  // this via a useEffect keyed on `type` left a single render frame where
+  // `type` had already changed but `rows` still held the previous report's
+  // shape (e.g. a financeSummary object with no `chronicAbsentees`), which
+  // crashed SummaryView and got stuck in the error boundary.
+  const handleTypeChange = (key) => {
+    setType(key);
     setFilters({});
     setRows(null);
-  }, [type]);
+  };
 
   const handlePreview = async () => {
     setIsLoading(true);
@@ -67,7 +80,7 @@ export default function ReportsHub() {
     }
   };
 
-  const handleDownload = () => downloadReportCsv(type, filters, `${type}.csv`);
+  const handleDownload = () => downloadReportCsv(type, filters, CSV_FILENAMES[type] || `${type}.csv`);
 
   const canDownloadBroadsheet = type === 'results' && filters.classId && filters.subjectId && filters.academicTermId;
   const handleDownloadBroadsheet = () => {
@@ -75,8 +88,11 @@ export default function ReportsHub() {
     const subjectLabel = subjects.find((s) => s.id === filters.subjectId)?.name || 'subject';
     downloadBroadsheetPdf(filters, `broadsheet-${classLabel}-${subjectLabel}.pdf`.replace(/\s+/g, '-'));
   };
+  const handleDownloadFinancePdf = () => downloadFinanceSummaryPdf(filters, 'finance-summary.pdf');
+  const handleDownloadAttendanceSummaryPdf = () => downloadAttendanceSummaryPdf(filters, 'attendance-summary.pdf');
 
   const columns = COLUMNS[type];
+  const isSummaryType = SUMMARY_TYPES.has(type);
 
   return (
     <div>
@@ -89,7 +105,7 @@ export default function ReportsHub() {
               key={t.key}
               type="button"
               className={type === t.key ? 'btn-primary' : 'btn-secondary'}
-              onClick={() => setType(t.key)}
+              onClick={() => handleTypeChange(t.key)}
             >
               {t.label}
             </button>
@@ -97,10 +113,16 @@ export default function ReportsHub() {
         </div>
 
         <div className="toolbar" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
-          {(type === 'students' || type === 'attendance' || type === 'results') && (
+          {(type === 'students' || type === 'attendance' || type === 'results' || type === 'attendanceSummary') && (
             <select value={filters.classId || ''} onChange={(e) => setFilters({ ...filters, classId: e.target.value })}>
               <option value="">All classes</option>
               {classes.map((c) => <option key={c.id} value={c.id}>{c.name} {c.section}</option>)}
+            </select>
+          )}
+          {(type === 'financeSummary' || type === 'attendanceSummary') && (
+            <select value={filters.academicTermId || ''} onChange={(e) => setFilters({ ...filters, academicTermId: e.target.value })}>
+              <option value="">All terms</option>
+              {terms.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           )}
           {type === 'results' && (
@@ -142,12 +164,22 @@ export default function ReportsHub() {
               Download Broadsheet PDF
             </button>
           )}
+          {type === 'financeSummary' && (
+            <button type="button" className="btn-secondary" onClick={handleDownloadFinancePdf}>Download PDF</button>
+          )}
+          {type === 'attendanceSummary' && (
+            <button type="button" className="btn-secondary" onClick={handleDownloadAttendanceSummaryPdf}>Download PDF</button>
+          )}
         </div>
 
         {isLoading && <p className="muted">Loading...</p>}
         {error && <div className="alert-error">{error}</div>}
 
-        {rows && !isLoading && (
+        {rows && !isLoading && isSummaryType && (
+          <SummaryView type={type} summary={rows} />
+        )}
+
+        {rows && !isLoading && !isSummaryType && (
           <table>
             <thead><tr>{columns.map((c) => <th key={c.key}>{c.label}</th>)}</tr></thead>
             <tbody>
@@ -160,6 +192,85 @@ export default function ReportsHub() {
           </table>
         )}
       </div>
+    </div>
+  );
+}
+
+function SummaryView({ type, summary }) {
+  if (type === 'financeSummary') {
+    return (
+      <div>
+        <div className="stat-card-row" style={{ marginBottom: 20 }}>
+          <div className="stat-card stat-card-accent"><div><div className="stat-card-label">Total Assigned</div><div className="stat-card-value">{formatCurrency(summary.totalAssigned)}</div></div></div>
+          <div className="stat-card stat-card-success"><div><div className="stat-card-label">Total Collected</div><div className="stat-card-value">{formatCurrency(summary.totalCollected)}</div></div></div>
+          <div className="stat-card stat-card-warning"><div><div className="stat-card-label">Total Outstanding</div><div className="stat-card-value">{formatCurrency(summary.totalOutstanding)}</div></div></div>
+        </div>
+
+        <h3>By Fee Category</h3>
+        <table style={{ marginBottom: 20 }}>
+          <thead><tr><th>Category</th><th>Assigned</th><th>Collected</th></tr></thead>
+          <tbody>
+            {summary.byCategory.map((c) => (
+              <tr key={c.category}><td>{c.category}</td><td>{formatCurrency(c.assigned)}</td><td>{formatCurrency(c.collected)}</td></tr>
+            ))}
+            {summary.byCategory.length === 0 && <tr><td colSpan={3} className="muted">No data found.</td></tr>}
+          </tbody>
+        </table>
+
+        <h3>Outstanding Arrears by Class</h3>
+        <table style={{ marginBottom: 20 }}>
+          <thead><tr><th>Class</th><th>Arrears</th></tr></thead>
+          <tbody>
+            {summary.byClass.map((c) => (
+              <tr key={c.classId}><td>{c.className}</td><td>{formatCurrency(c.arrears)}</td></tr>
+            ))}
+            {summary.byClass.length === 0 && <tr><td colSpan={2} className="muted">No outstanding arrears.</td></tr>}
+          </tbody>
+        </table>
+
+        <h3>Payments by Method</h3>
+        <table>
+          <thead><tr><th>Method</th><th>Count</th><th>Total</th></tr></thead>
+          <tbody>
+            {summary.byMethod.map((m) => (
+              <tr key={m.method}><td>{m.method}</td><td>{m.count}</td><td>{formatCurrency(m.total)}</td></tr>
+            ))}
+            {summary.byMethod.length === 0 && <tr><td colSpan={3} className="muted">No payments recorded.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="stat-card-row" style={{ marginBottom: 20 }}>
+        <div className="stat-card stat-card-accent"><div><div className="stat-card-label">Records</div><div className="stat-card-value">{summary.totalRecords}</div></div></div>
+        <div className="stat-card stat-card-success"><div><div className="stat-card-label">Overall Attendance</div><div className="stat-card-value">{summary.overallPercent === null ? '—' : `${summary.overallPercent}%`}</div></div></div>
+        <div className="stat-card stat-card-warning"><div><div className="stat-card-label">Chronic Absentees</div><div className="stat-card-value">{summary.chronicAbsentees.length}</div></div></div>
+      </div>
+
+      <h3>Monthly Trend</h3>
+      <table style={{ marginBottom: 20 }}>
+        <thead><tr><th>Month</th><th>Present/Total</th><th>%</th></tr></thead>
+        <tbody>
+          {summary.monthlyTrend.map((m) => (
+            <tr key={m.month}><td>{m.month}</td><td>{m.present}/{m.total}</td><td>{m.percent}%</td></tr>
+          ))}
+          {summary.monthlyTrend.length === 0 && <tr><td colSpan={3} className="muted">No attendance recorded.</td></tr>}
+        </tbody>
+      </table>
+
+      <h3>Chronic Absenteeism Flag List <span className="muted" style={{ fontWeight: 'normal', fontSize: 12.5 }}>(below 75% attendance, min. 5 recorded days)</span></h3>
+      <table>
+        <thead><tr><th>Admission No.</th><th>Student</th><th>Class</th><th>Present/Total</th><th>%</th></tr></thead>
+        <tbody>
+          {summary.chronicAbsentees.map((s) => (
+            <tr key={s.studentId}><td>{s.admissionNo || '—'}</td><td>{s.name}</td><td>{s.className || '—'}</td><td>{s.present}/{s.total}</td><td>{s.percent}%</td></tr>
+          ))}
+          {summary.chronicAbsentees.length === 0 && <tr><td colSpan={5} className="muted">No students flagged.</td></tr>}
+        </tbody>
+      </table>
     </div>
   );
 }

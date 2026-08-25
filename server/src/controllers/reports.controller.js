@@ -8,6 +8,10 @@ const { getFeeBalance } = require('../services/fees.service');
 const { findOrCreate } = require('../utils/findOrCreate');
 const { renderHtmlToPdfBuffer } = require('../services/pdf.service');
 const { buildBroadsheetPdfHtml } = require('../services/broadsheetTemplate.service');
+const { buildFinanceSummary } = require('../services/financeReport.service');
+const { buildAttendanceSummary } = require('../services/attendanceReport.service');
+const { buildFinanceReportPdfHtml } = require('../services/financeReportTemplate.service');
+const { buildAttendanceReportPdfHtml } = require('../services/attendanceReportTemplate.service');
 
 const respond = (req, res, rows, columns, filename) => {
   if (req.query.format === 'csv') {
@@ -193,6 +197,112 @@ const broadsheetPdf = asyncHandler(async (req, res, next) => {
   res.send(pdfBuffer);
 });
 
+// GET /reports/finance-summary?academicTermId=&format=csv
+const financeSummary = asyncHandler(async (req, res) => {
+  const { academicTermId } = req.query;
+  const summary = await buildFinanceSummary({ academicTermId });
+
+  if (req.query.format === 'csv') {
+    const rows = [
+      { section: 'Overview', label: 'Total Assigned', assigned: summary.totalAssigned.toFixed(2), collected: '', balanceOrTotal: '', count: '' },
+      { section: 'Overview', label: 'Total Collected', assigned: '', collected: summary.totalCollected.toFixed(2), balanceOrTotal: '', count: '' },
+      { section: 'Overview', label: 'Total Outstanding', assigned: '', collected: '', balanceOrTotal: summary.totalOutstanding.toFixed(2), count: '' },
+      ...summary.byCategory.map((c) => ({
+        section: 'Category', label: c.category, assigned: c.assigned.toFixed(2), collected: c.collected.toFixed(2), balanceOrTotal: '', count: '',
+      })),
+      ...summary.byClass.map((c) => ({
+        section: 'Class Arrears', label: c.className, assigned: '', collected: '', balanceOrTotal: c.arrears.toFixed(2), count: '',
+      })),
+      ...summary.byMethod.map((m) => ({
+        section: 'Payment Method', label: m.method, assigned: '', collected: '', balanceOrTotal: m.total.toFixed(2), count: m.count,
+      })),
+    ];
+    const columns = [
+      { key: 'section', label: 'Section' }, { key: 'label', label: 'Label' },
+      { key: 'assigned', label: 'Assigned' }, { key: 'collected', label: 'Collected' },
+      { key: 'balanceOrTotal', label: 'Balance / Total' }, { key: 'count', label: 'Count' },
+    ];
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="finance-summary.csv"');
+    return res.send(toCsv(rows, columns));
+  }
+  return res.json({ success: true, data: summary });
+});
+
+// GET /reports/finance-summary-pdf?academicTermId=
+const financeSummaryPdf = asyncHandler(async (req, res) => {
+  const { academicTermId } = req.query;
+  const [summary, [settings], term] = await Promise.all([
+    buildFinanceSummary({ academicTermId }),
+    findOrCreate(SchoolSettings, { where: { schoolId: req.user.schoolId } }),
+    academicTermId ? AcademicTerm.findById(academicTermId) : null,
+  ]);
+
+  const html = buildFinanceReportPdfHtml({ school: settings, term, summary });
+  const pdfBuffer = await renderHtmlToPdfBuffer(html, { format: 'A4' });
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'attachment; filename="finance-summary.pdf"');
+  res.send(pdfBuffer);
+});
+
+// GET /reports/attendance-summary?classId=&academicTermId=&format=csv
+const attendanceSummary = asyncHandler(async (req, res) => {
+  const { classId, academicTermId } = req.query;
+  const summary = await buildAttendanceSummary({ classId, academicTermId });
+
+  if (req.query.format === 'csv') {
+    const rows = [
+      {
+        section: 'Overview', label: 'Overall Attendance', admissionNo: '', className: '', presentTotal: `${summary.totalRecords} records`, percent: summary.overallPercent === null ? '' : `${summary.overallPercent}%`,
+      },
+      ...summary.monthlyTrend.map((m) => ({
+        section: 'Monthly Trend', label: m.month, admissionNo: '', className: '', presentTotal: `${m.present}/${m.total}`, percent: `${m.percent}%`,
+      })),
+      ...summary.chronicAbsentees.map((s) => ({
+        section: 'Chronic Absentee', label: s.name, admissionNo: s.admissionNo, className: s.className, presentTotal: `${s.present}/${s.total}`, percent: `${s.percent}%`,
+      })),
+    ];
+    const columns = [
+      { key: 'section', label: 'Section' }, { key: 'label', label: 'Label' },
+      { key: 'admissionNo', label: 'Admission No.' }, { key: 'className', label: 'Class' },
+      { key: 'presentTotal', label: 'Present/Total' }, { key: 'percent', label: '%' },
+    ];
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="attendance-summary.csv"');
+    return res.send(toCsv(rows, columns));
+  }
+  return res.json({ success: true, data: summary });
+});
+
+// GET /reports/attendance-summary-pdf?classId=&academicTermId=
+const attendanceSummaryPdf = asyncHandler(async (req, res) => {
+  const { classId, academicTermId } = req.query;
+  const [summary, [settings], classRow, term] = await Promise.all([
+    buildAttendanceSummary({ classId, academicTermId }),
+    findOrCreate(SchoolSettings, { where: { schoolId: req.user.schoolId } }),
+    classId ? Class.findById(classId) : null,
+    academicTermId ? AcademicTerm.findById(academicTermId) : null,
+  ]);
+
+  const html = buildAttendanceReportPdfHtml({
+    school: settings, classRow, term, summary,
+  });
+  const pdfBuffer = await renderHtmlToPdfBuffer(html, { format: 'A4' });
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'attachment; filename="attendance-summary.pdf"');
+  res.send(pdfBuffer);
+});
+
 module.exports = {
-  studentList, attendanceReport, resultsReport, feesReport, broadsheetPdf,
+  studentList,
+  attendanceReport,
+  resultsReport,
+  feesReport,
+  broadsheetPdf,
+  financeSummary,
+  financeSummaryPdf,
+  attendanceSummary,
+  attendanceSummaryPdf,
 };
