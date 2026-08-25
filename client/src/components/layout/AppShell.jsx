@@ -6,14 +6,24 @@ import OfflineIndicator from '../common/OfflineIndicator';
 import AskJesManage from '../common/AskJesManage';
 import CommandPalette from '../common/CommandPalette';
 import { NAV_ITEMS, NAV_GROUPS } from '../../config/navItems';
+import { NAV_ICONS } from '../icons/NavIcons';
 
 const COLLAPSED_GROUPS_KEY = 'jm_sidebar_collapsed_groups';
+const ICON_ONLY_KEY = 'jm_sidebar_iconOnly';
 
 const loadCollapsedGroups = () => {
   try {
     return new Set(JSON.parse(localStorage.getItem(COLLAPSED_GROUPS_KEY) || '[]'));
   } catch {
     return new Set();
+  }
+};
+
+const loadIconOnly = () => {
+  try {
+    return localStorage.getItem(ICON_ONLY_KEY) === 'true';
+  } catch {
+    return false;
   }
 };
 
@@ -24,6 +34,7 @@ export default function AppShell() {
   const [askInitialQuestion, setAskInitialQuestion] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState(loadCollapsedGroups);
+  const [iconOnly, setIconOnly] = useState(loadIconOnly);
   const visibleNavItems = NAV_ITEMS.filter((item) => item.roles.includes(user?.role));
 
   const toggleGroup = (group) => {
@@ -35,23 +46,39 @@ export default function AppShell() {
     });
   };
 
+  const toggleIconOnly = () => {
+    setIconOnly((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(ICON_ONLY_KEY, String(next)); } catch { /* ignore */ }
+      return next;
+    });
+  };
+
   return (
     <div className="app-shell">
       {sidebarOpen && <div className="sidebar-backdrop is-open" onClick={() => setSidebarOpen(false)} />}
-      <aside className={`sidebar${sidebarOpen ? ' is-open' : ''}`}>
+      <aside className={`sidebar${sidebarOpen ? ' is-open' : ''}${iconOnly ? ' is-icon-only' : ''}`}>
         <div className="sidebar-brand">
           <img src="/logo.png" alt="JesManage" className="brand-logo" />
           <span>JesManage</span>
+          <button
+            type="button"
+            className="sidebar-collapse-toggle"
+            onClick={toggleIconOnly}
+            aria-label={iconOnly ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg>
+          </button>
         </div>
         <nav className="sidebar-nav">
           {NAV_GROUPS.map((group) => {
             const items = visibleNavItems.filter((item) => item.group === group);
             if (items.length === 0) return null;
             const hasActiveItem = items.some((item) => location.pathname.startsWith(item.to));
-            const isExpanded = group === 'MAIN' || hasActiveItem || !collapsedGroups.has(group);
+            const isExpanded = iconOnly || group === 'MAIN' || hasActiveItem || !collapsedGroups.has(group);
             return (
               <div className="sidebar-group" key={group}>
-                {group !== 'MAIN' && (
+                {group !== 'MAIN' && !iconOnly && (
                   <button
                     type="button"
                     className="sidebar-group-label"
@@ -63,8 +90,16 @@ export default function AppShell() {
                   </button>
                 )}
                 {isExpanded && items.map((item) => (
-                  <NavLink key={item.to} to={item.to} onClick={() => setSidebarOpen(false)} className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}>
-                    {item.label}
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    title={item.label}
+                    onClick={() => setSidebarOpen(false)}
+                    className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}${item.to === '/intelligence' ? ' sidebar-link--intelligence' : ''}`}
+                  >
+                    <span className="sidebar-link-icon">{NAV_ICONS[item.icon]}</span>
+                    <span className="sidebar-link-label">{item.label}</span>
+                    <span className="sidebar-link-tooltip">{item.label}</span>
                   </NavLink>
                 ))}
               </div>

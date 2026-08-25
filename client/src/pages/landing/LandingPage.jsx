@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MotionConfig } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
-import Hero3D from '../../components/landing/Hero3D';
 import Reveal from '../../components/landing/Reveal';
 import TiltCard from '../../components/landing/TiltCard';
 import LoginModal from '../../components/auth/LoginModal';
@@ -271,9 +270,34 @@ export default function LandingPage() {
           </Reveal>
         </div>
         <Reveal className="landing-hero-illustration" delay={150}>
-          <div className="landing-hero-3d">
-            <Hero3D />
-          </div>
+          <TiltCard className="landing-dashboard-preview" maxTilt={7}>
+            <div className="dp-titlebar">
+              <span className="dp-dot" /><span className="dp-dot" /><span className="dp-dot" />
+              <span className="dp-titlebar-label">JesManage — Dashboard</span>
+            </div>
+            <div className="dp-body">
+              <div className="dp-nav-sliver">
+                <span className="dp-nav-pill is-active" />
+                <span className="dp-nav-pill" />
+                <span className="dp-nav-pill" />
+                <span className="dp-nav-pill" />
+              </div>
+              <div className="dp-main">
+                <div className="dp-stat-row">
+                  <div className="dp-stat-tile dp-stat-gold"><span className="dp-stat-num">482</span><span className="dp-stat-label">Students</span></div>
+                  <div className="dp-stat-tile dp-stat-cyan"><span className="dp-stat-num">96%</span><span className="dp-stat-label">Attendance</span></div>
+                  <div className="dp-stat-tile"><span className="dp-stat-num">GH₵12k</span><span className="dp-stat-label">Fees Collected</span></div>
+                </div>
+                <div className="dp-chart">
+                  <span style={{ height: '40%' }} /><span style={{ height: '65%' }} /><span style={{ height: '52%' }} />
+                  <span style={{ height: '80%' }} /><span style={{ height: '70%' }} /><span style={{ height: '90%' }} />
+                </div>
+                <div className="dp-rows">
+                  <span className="dp-row" /><span className="dp-row" style={{ width: '70%' }} /><span className="dp-row" style={{ width: '85%' }} />
+                </div>
+              </div>
+            </div>
+          </TiltCard>
         </Reveal>
       </header>
 
@@ -328,7 +352,7 @@ export default function LandingPage() {
         <div className="landing-feature-grid">
           {INTELLIGENCE_FEATURES.map((f, i) => (
             <Reveal key={f.title} delay={i * 70}>
-              <TiltCard className="landing-feature-card">
+              <TiltCard className="landing-feature-card landing-feature-card--intelligence">
                 <span className="quick-action-icon landing-feature-icon">{INTELLIGENCE_ICONS[f.icon]}</span>
                 <h3>{f.title}</h3>
                 <p>{f.desc}</p>
@@ -336,7 +360,7 @@ export default function LandingPage() {
             </Reveal>
           ))}
           <Reveal delay={INTELLIGENCE_FEATURES.length * 70}>
-            <TiltCard className="landing-feature-card">
+            <TiltCard className="landing-feature-card landing-feature-card--intelligence">
               <span className="quick-action-icon landing-feature-icon">✓</span>
               <h3>AI assists. Staff decide.</h3>
               <p>A school switches Intelligence on with one setting. Until then, everything works exactly the same — just without the extra insight.</p>

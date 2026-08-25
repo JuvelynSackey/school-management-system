@@ -63,7 +63,7 @@ export default function Intelligence() {
             <MetricBadge
               label="Term Attendance Average"
               value={summary.termAttendanceAveragePercent === null ? '—' : `${summary.termAttendanceAveragePercent}%`}
-              tone="accent"
+              tone="cyan"
             />
           </div>
 

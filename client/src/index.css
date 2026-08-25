@@ -18,6 +18,9 @@
   --warning-bg: rgba(217, 119, 6, 0.1);
   --rose: #db2777;
   --rose-bg: rgba(219, 39, 119, 0.1);
+  --intelligence: #0e7490;
+  --intelligence-bg: rgba(14, 116, 144, 0.08);
+  --sidebar-intelligence: #22d3ee;
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
 
   font: 15px/145% var(--sans);
@@ -53,6 +56,8 @@
     --warning-bg: rgba(251, 191, 36, 0.16);
     --rose: #f472b6;
     --rose-bg: rgba(244, 114, 182, 0.16);
+    --intelligence: #22d3ee;
+    --intelligence-bg: rgba(34, 211, 238, 0.16);
   }
 }
 :root[data-theme="dark"] {
@@ -73,6 +78,8 @@
   --warning-bg: rgba(251, 191, 36, 0.16);
   --rose: #f472b6;
   --rose-bg: rgba(244, 114, 182, 0.16);
+  --intelligence: #22d3ee;
+  --intelligence-bg: rgba(34, 211, 238, 0.16);
 }
 
 * { box-sizing: border-box; }
@@ -394,15 +401,28 @@ button.cosmic-field-badge { cursor: pointer; }
 /* App shell */
 .app-shell { display: flex; min-height: 100svh; }
 .sidebar {
-  width: 226px;
+  width: 240px;
   flex-shrink: 0;
   background: var(--sidebar-bg);
   color: #cbc7e8;
   display: flex;
   flex-direction: column;
   padding: 22px 0;
+  transition: width 0.2s ease;
 }
 .sidebar-brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; color: #fff; padding: 0 22px 22px; letter-spacing: 0.2px; }
+.sidebar-collapse-toggle {
+  display: none;
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: rgba(203, 199, 232, 0.6);
+  cursor: pointer;
+  padding: 4px;
+  flex-shrink: 0;
+}
+.sidebar-collapse-toggle:hover { color: #fff; }
+.sidebar-collapse-toggle svg { transition: transform 0.2s ease; }
 .sidebar-nav { display: flex; flex-direction: column; gap: 2px; padding: 0 10px; }
 .sidebar-group { display: flex; flex-direction: column; gap: 2px; }
 .sidebar-group-label {
@@ -425,15 +445,66 @@ button.cosmic-field-badge { cursor: pointer; }
 .sidebar-group-chevron { display: inline-block; font-size: 9px; transition: transform 0.15s ease; transform: rotate(-90deg); }
 .sidebar-group-chevron.is-open { transform: rotate(0deg); }
 .sidebar-link {
+  position: relative;
+  display: block;
+  width: 100%;
   color: #a8a3d6;
   text-decoration: none;
-  padding: 10px 12px;
+  padding: 10px 12px 10px 44px;
   font-size: 14px;
   font-weight: 500;
   border-radius: 8px;
 }
 .sidebar-link:hover { color: #fff; background: rgba(255,255,255,0.06); }
 .sidebar-link.active { color: #fff; background: var(--sidebar-bg-active); }
+.sidebar-link-icon {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
+}
+.sidebar-link-label { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-link-tooltip { display: none; }
+
+/* Intelligence Cyan accent — additive, scoped to the one AI-related item. */
+.sidebar-link--intelligence .sidebar-link-icon { color: var(--sidebar-intelligence); }
+.sidebar-link--intelligence.active { background: rgba(34, 211, 238, 0.16); }
+.sidebar-link--intelligence.active .sidebar-link-icon,
+.sidebar-link--intelligence.active .sidebar-link-label { color: var(--sidebar-intelligence); }
+
+/* Icon-only collapse mode — desktop only. Scoped to the exact inverse of the
+   mobile breakpoint below, so a stale is-icon-only class has zero effect on
+   the mobile drawer: it always shows full labels/group headers there. */
+@media (min-width: 861px) {
+  .sidebar-collapse-toggle { display: inline-flex; align-items: center; justify-content: center; }
+  .sidebar.is-icon-only { width: 72px; }
+  .sidebar.is-icon-only .sidebar-collapse-toggle svg { transform: rotate(180deg); }
+  .sidebar.is-icon-only .sidebar-brand { justify-content: center; padding: 0 0 22px; position: relative; }
+  .sidebar.is-icon-only .sidebar-brand > span { display: none; }
+  .sidebar.is-icon-only .sidebar-brand .sidebar-collapse-toggle { margin-left: 0; position: absolute; right: 10px; top: 0; }
+  .sidebar.is-icon-only .sidebar-link { padding: 10px 0; text-align: center; }
+  .sidebar.is-icon-only .sidebar-link-icon { position: static; transform: none; margin: 0 auto; }
+  .sidebar.is-icon-only .sidebar-link-label { display: none; }
+  .sidebar.is-icon-only .sidebar-link-tooltip {
+    display: block;
+    position: absolute;
+    left: calc(100% + 10px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: #262158;
+    color: #fff;
+    font-size: 12.5px;
+    font-weight: 500;
+    padding: 6px 10px;
+    border-radius: 8px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+    z-index: 30;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+  }
+  .sidebar.is-icon-only .sidebar-link:hover .sidebar-link-tooltip,
+  .sidebar.is-icon-only .sidebar-link:focus-visible .sidebar-link-tooltip { opacity: 1; }
+}
 
 .app-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .topbar {
@@ -607,6 +678,7 @@ th { color: var(--text-muted); font-weight: 500; font-size: 12px; text-transform
 .badge-danger { background: var(--danger-bg); color: var(--danger); }
 .badge-neutral { background: var(--bg); color: var(--text-muted); border: 1px solid var(--border); }
 .badge-rose { background: var(--rose-bg); color: var(--rose); }
+.badge-cyan { background: var(--intelligence-bg); color: var(--intelligence); }
 
 /* Solid, vivid variant — used for headline indicators like exam grades,
    mirroring the color-coded grade chips in the design reference. */
@@ -659,6 +731,7 @@ th { color: var(--text-muted); font-weight: 500; font-size: 12px; text-transform
   --landing-bg-alt: #262158;
   --landing-gold: #f5c344;
   --landing-gold-dark: #e0af2e;
+  --landing-cyan: #22d3ee;
   --landing-ink: #ffffff;
   --landing-muted: #c7c3e3;
   background: var(--landing-bg);
@@ -743,7 +816,11 @@ th { color: var(--text-muted); font-weight: 500; font-size: 12px; text-transform
 .landing-hero-illustration { flex: 1 1 50%; display: flex; justify-content: center; }
 
 .landing-section { max-width: 1200px; margin: 0 auto; padding: 60px 48px; text-align: center; }
-.landing-section h2 { color: var(--landing-ink); font-size: 26px; margin-bottom: 36px; }
+.landing-section h2 { color: var(--landing-ink); font-size: 26px; margin-bottom: 36px; position: relative; display: inline-block; padding-bottom: 14px; }
+.landing-section h2::after {
+  content: ''; position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
+  width: 40px; height: 3px; border-radius: 2px; background: var(--landing-gold);
+}
 .landing-section-alt { background: var(--landing-bg-alt); max-width: none; }
 .landing-section-alt > * { max-width: 1200px; margin-left: auto; margin-right: auto; }
 
@@ -752,25 +829,36 @@ th { color: var(--text-muted); font-weight: 500; font-size: 12px; text-transform
 }
 .landing-feature-card {
   background: var(--landing-bg-alt); border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 16px; padding: 22px;
+  border-radius: 20px; padding: 22px;
   transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
 }
 .landing-feature-card:hover {
-  transform: translateY(-6px); border-color: rgba(245,195,68,0.4); box-shadow: 0 16px 32px rgba(0,0,0,0.3);
+  transform: translateY(-8px); border-color: rgba(245,195,68,0.4); box-shadow: 0 20px 44px rgba(0,0,0,0.38);
 }
-.landing-feature-icon { background: rgba(245,195,68,0.14); color: var(--landing-gold); margin-bottom: 14px; transition: transform 0.25s ease; }
+.landing-feature-icon {
+  background: rgba(245,195,68,0.14); color: var(--landing-gold); margin-bottom: 14px;
+  border-radius: 14px; box-shadow: inset 0 0 0 1px rgba(245,195,68,0.18);
+  transition: transform 0.25s ease;
+}
 .landing-feature-card:hover .landing-feature-icon { transform: scale(1.08); }
 .landing-feature-card h3 { color: var(--landing-ink); font-size: 16px; margin-bottom: 6px; }
 .landing-feature-card p { color: var(--landing-muted); font-size: 13.5px; }
 
+/* Intelligence Cyan accent — additive, scoped to the Intelligence section's
+   cards only; the FEATURES grid's gold cards are untouched. */
+.landing-feature-card--intelligence:hover { border-color: rgba(34,211,238,0.4); }
+.landing-feature-card--intelligence .landing-feature-icon {
+  background: rgba(34,211,238,0.14); color: var(--landing-cyan); box-shadow: inset 0 0 0 1px rgba(34,211,238,0.22);
+}
+
 .landing-roles-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; text-align: left; }
 .landing-role-card {
   background: var(--landing-bg); border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 16px; padding: 24px;
+  border-radius: 20px; padding: 24px;
   transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
 }
 .landing-role-card:hover {
-  transform: translateY(-6px); border-color: rgba(245,195,68,0.4); box-shadow: 0 16px 32px rgba(0,0,0,0.3);
+  transform: translateY(-8px); border-color: rgba(245,195,68,0.4); box-shadow: 0 20px 44px rgba(0,0,0,0.38);
 }
 .landing-role-card h3 { color: var(--landing-gold); font-size: 17px; margin-bottom: 4px; }
 .landing-role-tagline { color: var(--landing-ink); font-size: 13px; font-weight: 600; margin-bottom: 14px; }
@@ -778,7 +866,10 @@ th { color: var(--text-muted); font-weight: 500; font-size: 12px; text-transform
 
 /* Real System Metrics strip */
 .landing-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
-.landing-stat-card { text-align: center; padding: 8px 12px; }
+.landing-stat-card {
+  text-align: center; padding: 20px 14px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px;
+}
 .landing-stat-value { font-size: 30px; font-weight: 800; color: var(--landing-gold); line-height: 1.15; }
 .landing-stat-label { margin-top: 6px; font-size: 12.5px; color: var(--landing-muted); letter-spacing: 0.2px; }
 
@@ -795,10 +886,10 @@ th { color: var(--text-muted); font-weight: 500; font-size: 12px; text-transform
 .how-it-works-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; text-align: left; }
 .how-step {
   background: var(--landing-bg); border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 16px; padding: 22px;
+  border-radius: 20px; padding: 22px;
   transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
 }
-.how-step:hover { transform: translateY(-4px); border-color: rgba(245,195,68,0.35); }
+.how-step:hover { transform: translateY(-6px); border-color: rgba(245,195,68,0.35); box-shadow: 0 16px 32px rgba(0,0,0,0.3); }
 .how-step-number {
   display: inline-flex; align-items: center; justify-content: center;
   width: 30px; height: 30px; border-radius: 50%;
@@ -849,8 +940,34 @@ th { color: var(--text-muted); font-weight: 500; font-size: 12px; text-transform
    Framer Motion (inline styles) — MotionConfig in LandingPage.jsx handles
    prefers-reduced-motion, so no CSS transition/keyframe rules are needed here. */
 
-.landing-hero-3d { width: 100%; height: 420px; cursor: grab; }
-.landing-hero-3d canvas { outline: none; }
+/* Dashboard-preview hero card — a static styled mockup replacing the old
+   react-three-fiber 3D scene, reusing TiltCard for the same cursor-tilt
+   interactivity without a WebGL dependency. */
+.landing-dashboard-preview {
+  width: 100%; max-width: 440px; aspect-ratio: 4 / 3;
+  background: var(--landing-bg-alt); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 20px; padding: 0; overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.35); cursor: default;
+  display: flex; flex-direction: column;
+}
+.dp-titlebar { display: flex; align-items: center; gap: 6px; padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.dp-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.18); }
+.dp-titlebar-label { margin-left: 8px; font-size: 11.5px; color: var(--landing-muted); }
+.dp-body { display: flex; flex: 1; min-height: 0; }
+.dp-nav-sliver { width: 34px; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; padding: 14px 8px; border-right: 1px solid rgba(255,255,255,0.08); }
+.dp-nav-pill { height: 7px; border-radius: 999px; background: rgba(255,255,255,0.14); }
+.dp-nav-pill.is-active { background: var(--landing-gold); }
+.dp-main { flex: 1; min-width: 0; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.dp-stat-row { display: flex; gap: 8px; }
+.dp-stat-tile { flex: 1; background: rgba(255,255,255,0.05); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
+.dp-stat-gold { box-shadow: inset 0 0 0 1px rgba(245,195,68,0.3); }
+.dp-stat-cyan { box-shadow: inset 0 0 0 1px rgba(34,211,238,0.3); }
+.dp-stat-num { font-size: 14px; font-weight: 700; color: var(--landing-ink); }
+.dp-stat-label { font-size: 9.5px; color: var(--landing-muted); }
+.dp-chart { flex: 1; display: flex; align-items: flex-end; gap: 6px; min-height: 60px; }
+.dp-chart span { flex: 1; border-radius: 4px 4px 0 0; background: linear-gradient(180deg, var(--landing-gold), var(--landing-gold-dark)); }
+.dp-rows { display: flex; flex-direction: column; gap: 6px; }
+.dp-row { height: 8px; width: 100%; border-radius: 999px; background: rgba(255,255,255,0.08); }
 
 @media (max-width: 900px) {
   .landing-nav-links { display: none; }
@@ -862,6 +979,7 @@ th { color: var(--text-muted); font-weight: 500; font-size: 12px; text-transform
   .landing-feature-grid, .landing-roles-grid, .how-it-works-grid { grid-template-columns: 1fr; }
   .landing-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 24px; }
   .landing-section, .landing-final-cta { padding: 44px 24px; }
+  .landing-dashboard-preview { max-width: 340px; }
 }
 
 /* Admin dashboard */
@@ -916,6 +1034,8 @@ th { color: var(--text-muted); font-weight: 500; font-size: 12px; text-transform
 .stat-card-success .stat-card-icon { background: var(--success-bg); color: var(--success); }
 .stat-card-warning .stat-card-icon { background: var(--warning-bg); color: var(--warning); }
 .stat-card-rose .stat-card-icon { background: var(--rose-bg); color: var(--rose); }
+.stat-card-cyan .stat-card-icon { background: var(--intelligence-bg); color: var(--intelligence); }
+.stat-card-cyan .stat-card-value { color: var(--intelligence); }
 .stat-card-label { color: var(--text-muted); font-size: 13px; font-weight: 500; }
 .stat-card-value { font-size: 22px; font-weight: 700; color: var(--text-h); margin-top: 2px; }
 
