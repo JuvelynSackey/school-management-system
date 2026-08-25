@@ -13,6 +13,13 @@ function StatTile({ label, value, tone }) {
   );
 }
 
+const formatBytes = (bytes) => {
+  if (!bytes) return '0 MB';
+  const mb = bytes / (1024 * 1024);
+  if (mb < 1024) return `${mb.toFixed(1)} MB`;
+  return `${(mb / 1024).toFixed(2)} GB`;
+};
+
 export default function DashboardPage() {
   const { data, isLoading, error } = useApiResource(getDashboard);
 
@@ -31,6 +38,17 @@ export default function DashboardPage() {
             <StatTile label="Pending Approval" value={data.pendingSchools} tone="warning" />
             <StatTile label="Suspended Schools" value={data.suspendedSchools} tone="warning" />
             <StatTile label="Total Platform Users" value={data.totalUsers} tone="rose" />
+          </div>
+
+          <div className="stat-card-row">
+            <StatTile label="Active Students (platform-wide)" value={data.totalActiveStudents} tone="accent" />
+            <StatTile label="Active Teachers (platform-wide)" value={data.totalActiveTeachers} tone="accent" />
+            <StatTile label="Terminal Reports Generated" value={data.totalTerminalReports} tone="rose" />
+            <StatTile
+              label="Result Completion (current terms)"
+              value={data.resultCompletionPercent === null ? 'No data yet' : `${data.resultCompletionPercent}%`}
+              tone="success"
+            />
           </div>
 
           {data.schoolsPendingApproval.length > 0 && (
@@ -87,6 +105,15 @@ export default function DashboardPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          <div className="panel">
+            <h2>Database Storage</h2>
+            <p>
+              Data size: <strong>{formatBytes(data.storage.dataSizeBytes)}</strong>
+              {' · '}Index size: <strong>{formatBytes(data.storage.indexSizeBytes)}</strong>
+              {' · '}Total on disk: <strong>{formatBytes(data.storage.storageSizeBytes)}</strong>
+            </p>
           </div>
 
           <div className="panel">
