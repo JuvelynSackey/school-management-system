@@ -119,6 +119,12 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); opacity: 1
 .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; text-align: left; }
 .field span { font-size: 13px; font-weight: 500; color: var(--text-h); }
 .field input, .field select, .field textarea {
+  /* Explicit, not left to flex-stretch from the .field parent — an input
+     wrapped in its own positioning div (e.g. RegisterSchool.jsx's password
+     field, for the show/hide button) is no longer a direct flex child, so
+     it silently fell back to the browser's intrinsic input width instead
+     of filling its container. */
+  width: 100%;
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 9px 12px;
@@ -154,10 +160,22 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); opacity: 1
    with circular icon badges. Shared by every auth page (Login, LoginModal,
    ForgotPassword, ResetPassword, VerifyEmail, Super Admin login) via these
    same classes, so a change here refreshes all six consistently. */
-.cosmic-auth-page {
+:root {
+  /* Also consumed by .cosmic-field-badge/.cosmic-submit (color, not just the
+     orb gradients below) — deliberately global rather than scoped to
+     .cosmic-auth-page, since LoginModal.jsx (the landing page's login popup)
+     renders the same cosmic-* classes without that page wrapper. Scoped-only
+     versions of these left the modal's icon badges and submit-button text
+     with no valid color at all — invisible, not just low-contrast. This
+     styling is intentionally theme-invariant (same as .cosmic-card h1's
+     hardcoded #fff), so living on :root unconditionally is correct, not a
+     light/dark gap. */
   --cosmic-teal-a: #0f3d3d;
   --cosmic-teal-b: #123a3a;
   --cosmic-teal-glow: #1f6f6a;
+}
+
+.cosmic-auth-page {
   min-height: 100svh;
   position: relative;
   overflow-x: hidden;
