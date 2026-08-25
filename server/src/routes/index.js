@@ -31,6 +31,7 @@ const aiRoutes = require('./ai.routes');
 const earlyWarningRoutes = require('./earlyWarning.routes');
 const superAdminRoutes = require('../superAdmin/routes');
 const schoolRegistrationRoutes = require('./schoolRegistration.routes');
+const examScheduleRoutes = require('./examSchedule.routes');
 
 const router = express.Router();
 
@@ -70,5 +71,6 @@ router.use('/ai', aiRoutes);
 router.use('/early-warning', earlyWarningRoutes);
 router.use('/super-admin', superAdminRoutes);
 router.use('/schools', schoolRegistrationRoutes);
+router.use('/exam-schedules', examScheduleRoutes);
 
 module.exports = router;

@@ -28,6 +28,7 @@ const PlatformSettings = require('./platformSettings.model');
 const FeedingCharge = require('./feedingCharge.model');
 const GradingScheme = require('./gradingScheme.model');
 const PersonalAttribute = require('./personalAttribute.model');
+const ExamSchedule = require('./examSchedule.model');
 
 // Relationships now live in-schema as `ref` fields (see each *.model.js);
 // there's no separate association-wiring step the way Sequelize needed.
@@ -61,4 +62,5 @@ module.exports = {
   FeedingCharge,
   GradingScheme,
   PersonalAttribute,
+  ExamSchedule,
 };

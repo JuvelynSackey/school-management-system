@@ -29,6 +29,7 @@ import AnalyticsPage from '../pages/analytics/AnalyticsPage';
 import AssessmentSheetsPage from '../pages/assessmentSheets/AssessmentSheetsPage';
 import MyAccount from '../pages/account/MyAccount';
 import Announcements from '../pages/announcements/Announcements';
+import ExamTimetable from '../pages/examSchedule/ExamTimetable';
 import Unauthorized from '../pages/errors/Unauthorized';
 import NotFound from '../pages/errors/NotFound';
 import VerifyDocument from '../pages/verify/VerifyDocument';
@@ -88,6 +89,7 @@ export default function AppRoutes() {
           </Route>
 
           <Route path="/announcements" element={<Announcements />} />
+          <Route path="/exam-timetable" element={<ExamTimetable />} />
         </Route>
       </Route>
 

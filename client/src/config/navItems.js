@@ -18,6 +18,7 @@ export const NAV_ITEMS = [
   { to: '/houses', label: 'Houses', roles: ['admin'], group: 'ACADEMICS' },
   { to: '/terms', label: 'Academic Terms', roles: ['admin'], group: 'ACADEMICS' },
   { to: '/attendance', label: 'Attendance', roles: ['admin', 'teacher', 'student'], group: 'ACADEMICS' },
+  { to: '/exam-timetable', label: 'Exam Timetable', roles: ['admin', 'teacher', 'student', 'parent'], group: 'ACADEMICS' },
   { to: '/results', label: 'Results', roles: ['admin', 'teacher', 'student'], group: 'ACADEMICS' },
   { to: '/assessment-sheets', label: 'Assessment Sheets', roles: ['admin', 'teacher'], group: 'ACADEMICS' },
   { to: '/fees', label: 'Fees', roles: ['admin', 'student'], group: 'FINANCE' },
