@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { previewReport, downloadReportCsv } from '../../api/reports.api';
+import { previewReport, downloadReportCsv, downloadBroadsheetPdf } from '../../api/reports.api';
 import { listClasses } from '../../api/classes.api';
 import { listSubjects } from '../../api/subjects.api';
 import { listTerms } from '../../api/terms.api';
@@ -69,6 +69,13 @@ export default function ReportsHub() {
 
   const handleDownload = () => downloadReportCsv(type, filters, `${type}.csv`);
 
+  const canDownloadBroadsheet = type === 'results' && filters.classId && filters.subjectId && filters.academicTermId;
+  const handleDownloadBroadsheet = () => {
+    const classLabel = classes.find((c) => c.id === filters.classId)?.name || 'class';
+    const subjectLabel = subjects.find((s) => s.id === filters.subjectId)?.name || 'subject';
+    downloadBroadsheetPdf(filters, `broadsheet-${classLabel}-${subjectLabel}.pdf`.replace(/\s+/g, '-'));
+  };
+
   const columns = COLUMNS[type];
 
   return (
@@ -124,6 +131,17 @@ export default function ReportsHub() {
           )}
           <button type="button" className="btn-secondary" onClick={handlePreview}>Preview</button>
           <button type="button" className="btn-primary" onClick={handleDownload}>Download CSV</button>
+          {type === 'results' && (
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={handleDownloadBroadsheet}
+              disabled={!canDownloadBroadsheet}
+              title={canDownloadBroadsheet ? '' : 'Select a class, subject, and term to generate a broadsheet'}
+            >
+              Download Broadsheet PDF
+            </button>
+          )}
         </div>
 
         {isLoading && <p className="muted">Loading...</p>}

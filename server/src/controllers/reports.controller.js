@@ -1,9 +1,13 @@
 const {
-  Student, Attendance, Result, Fee,
+  Student, Attendance, Result, Fee, Class, Subject, AcademicTerm, SchoolSettings,
 } = require('../models');
 const asyncHandler = require('../middleware/asyncHandler');
+const AppError = require('../utils/AppError');
 const { toCsv } = require('../services/csv.service');
 const { getFeeBalance } = require('../services/fees.service');
+const { findOrCreate } = require('../utils/findOrCreate');
+const { renderHtmlToPdfBuffer } = require('../services/pdf.service');
+const { buildBroadsheetPdfHtml } = require('../services/broadsheetTemplate.service');
 
 const respond = (req, res, rows, columns, filename) => {
   if (req.query.format === 'csv') {
@@ -146,4 +150,49 @@ const feesReport = asyncHandler(async (req, res) => {
   respond(req, res, rows, columns, 'fees.csv');
 });
 
-module.exports = { studentList, attendanceReport, resultsReport, feesReport };
+// GET /reports/broadsheet-pdf?classId=&subjectId=&academicTermId=
+// Same underlying data as resultsReport, but rendered as an official,
+// signable A4 landscape PDF via the same pipeline as report cards/ID
+// cards/fee receipts, rather than bolted onto the generic CSV export tool.
+const broadsheetPdf = asyncHandler(async (req, res, next) => {
+  const { classId, subjectId, academicTermId } = req.query;
+  if (!classId || !subjectId || !academicTermId) {
+    return next(new AppError('classId, subjectId, and academicTermId are required', 400));
+  }
+
+  const [classRow, subject, term] = await Promise.all([
+    Class.findById(classId),
+    Subject.findById(subjectId),
+    AcademicTerm.findById(academicTermId),
+  ]);
+  if (!classRow) return next(new AppError('Class not found', 404));
+  if (!subject) return next(new AppError('Subject not found', 404));
+  if (!term) return next(new AppError('Academic term not found', 404));
+
+  const [settings] = await findOrCreate(SchoolSettings, { where: { schoolId: req.user.schoolId } });
+
+  const results = await Result.find({ classId, subjectId, academicTermId }).populate('student', 'firstName lastName');
+  results.sort((a, b) => `${a.student?.firstName} ${a.student?.lastName}`.localeCompare(`${b.student?.firstName} ${b.student?.lastName}`));
+
+  const rows = results.map((r) => ({
+    name: `${r.student?.firstName || ''} ${r.student?.lastName || ''}`.trim(),
+    classScore: r.classScore,
+    examScore: r.examScore,
+    totalScore: r.totalScore,
+    grade: r.grade,
+    position: r.subjectPosition,
+  }));
+
+  const html = buildBroadsheetPdfHtml({
+    school: settings, classRow, subject, term, rows,
+  });
+  const pdfBuffer = await renderHtmlToPdfBuffer(html, { format: 'A4', landscape: true });
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="broadsheet-${classRow.name}-${subject.name}-${term.name}.pdf"`.replace(/\s+/g, '-'));
+  res.send(pdfBuffer);
+});
+
+module.exports = {
+  studentList, attendanceReport, resultsReport, feesReport, broadsheetPdf,
+};

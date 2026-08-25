@@ -20,3 +20,15 @@ export const downloadReportCsv = async (type, params = {}, filename) => {
   link.remove();
   window.URL.revokeObjectURL(url);
 };
+
+export const downloadBroadsheetPdf = async (params, filename) => {
+  const response = await apiClient.get('/reports/broadsheet-pdf', { params, responseType: 'blob' });
+  const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename || 'broadsheet.pdf');
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};

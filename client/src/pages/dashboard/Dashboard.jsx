@@ -111,6 +111,8 @@ const SETUP_CHECKLIST_ITEMS = [
   { key: 'hasSchoolInfo', label: 'School information', to: '/school-settings' },
   { key: 'hasLogo', label: 'School logo', to: '/school-settings' },
   { key: 'hasClassesAndSubjects', label: 'Classes & subjects', to: '/classes' },
+  { key: 'hasAcademicTerm', label: 'Academic term', to: '/terms' },
+  { key: 'hasGradingScheme', label: 'Grading scheme', to: '/school-settings' },
   { key: 'hasTeachers', label: 'Teachers', to: '/teachers' },
   { key: 'hasStudents', label: 'Students', to: '/students' },
 ];

@@ -1,6 +1,6 @@
 const {
   Student, Teacher, Class, Subject, Attendance, Fee, Payment, AcademicTerm, TerminalReport, SchoolSettings,
-  TeacherSubjectAssignment, ResultSheet,
+  TeacherSubjectAssignment, ResultSheet, GradingScheme,
 } = require('../models');
 const asyncHandler = require('../middleware/asyncHandler');
 const { getTeacherClassIds } = require('../services/teacherScope.service');
@@ -127,12 +127,26 @@ const getAdminDashboard = async () => {
 
   // --- Setup readiness (surfaced as a banner until the school is fully set up) ---
   const settings = await SchoolSettings.findOne();
+  // findOne, not exists() -- exists() isn't in tenantScopePlugin's scoped
+  // op list (only find/findOne/countDocuments/etc. are), so it would read
+  // across every school in the database instead of just this one.
+  const [hasAcademicTermDoc, hasGradingSchemeDoc] = await Promise.all([
+    AcademicTerm.findOne({}, { _id: 1 }),
+    // Meaningful even though getSchemeForSchool() elsewhere auto-creates a
+    // NaCCA-default scheme on first read -- a brand-new school that hasn't
+    // touched results/grading anywhere yet (the exact audience this banner
+    // is for) won't have triggered that, so this still reads as "not done"
+    // at the point that actually matters.
+    GradingScheme.findOne({}, { _id: 1 }),
+  ]);
   const setupChecklist = {
     hasSchoolInfo: Boolean(settings?.address && settings?.phone),
     hasLogo: Boolean(settings?.logoUrl),
     hasClassesAndSubjects: classCount > 0 && subjectCount > 0,
     hasTeachers: teacherCount > 0,
     hasStudents: studentCount > 0,
+    hasAcademicTerm: Boolean(hasAcademicTermDoc),
+    hasGradingScheme: Boolean(hasGradingSchemeDoc),
   };
   const completedCount = Object.values(setupChecklist).filter(Boolean).length;
   const setupStatus = {

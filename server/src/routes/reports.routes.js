@@ -11,5 +11,6 @@ router.get('/students', controller.studentList);
 router.get('/attendance', controller.attendanceReport);
 router.get('/results', controller.resultsReport);
 router.get('/fees', controller.feesReport);
+router.get('/broadsheet-pdf', controller.broadsheetPdf);
 
 module.exports = router;
