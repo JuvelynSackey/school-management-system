@@ -27,11 +27,16 @@ const createUser = async (models, schoolId, { role, email, password = DEFAULT_PA
 
 const createAdmin = (models, schoolId, overrides = {}) => createUser(models, schoolId, { role: 'admin', email: `admin-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@test.local`, ...overrides });
 
+// overrides applies to BOTH the User doc (email/fullName/etc.) and the
+// Teacher doc (staffNo/phone/qualification/gender/etc.) — each model's
+// schema only picks up the fields it actually declares, so passing e.g.
+// { email: '...' } (User-only) or { phone: '...' } (Teacher-only) is safe
+// either way.
 const createTeacher = async (models, schoolId, overrides = {}) => {
   const { Teacher } = models;
   const { user, password } = await createUser(models, schoolId, { role: 'teacher', email: `teacher-${Date.now()}-${Math.random().toString(36).slice(2, 6)}@test.local`, ...overrides });
   const teacher = await runWithSchool(schoolId, () => Teacher.create({
-    schoolId, userId: user.id, staffNo: `T-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, firstName: 'Test', lastName: 'Teacher', status: 'active',
+    schoolId, userId: user.id, staffNo: `T-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, firstName: 'Test', lastName: 'Teacher', status: 'active', ...overrides,
   }));
   return { user, teacher, password };
 };

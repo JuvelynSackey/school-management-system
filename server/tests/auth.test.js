@@ -153,3 +153,47 @@ describe('Authentication', () => {
     expect(meRes.body.data.mustChangePassword).toBe(false);
   });
 });
+
+describe('Teacher profile hydration (GET /auth/me and POST /auth/login)', () => {
+  test('a teacher\'s session payload includes their staff profile fields', async () => {
+    const school = await fixtures.createSchool(models);
+    const { teacher, user, password } = await fixtures.createTeacher(models, school._id, {
+      staffNo: 'T-999', phone: '0555123456', qualification: 'B.Ed Mathematics', gender: 'Female',
+    });
+
+    const loginRes = await request(app).post('/api/auth/login').send({ schoolCode: school.slug, identifier: user.email, password });
+    expect(loginRes.status).toBe(200);
+    expect(loginRes.body.data.user.staffNo).toBe('T-999');
+    expect(loginRes.body.data.user.staffPhone).toBe('0555123456');
+    expect(loginRes.body.data.user.qualification).toBe('B.Ed Mathematics');
+    expect(loginRes.body.data.user.gender).toBe('Female');
+
+    const token = loginRes.body.data.token;
+    const meRes = await request(app).get('/api/auth/me').set(fixtures.authHeader(token));
+    expect(meRes.body.data.staffNo).toBe(teacher.staffNo);
+    expect(meRes.body.data.staffPhone).toBe('0555123456');
+  });
+
+  test('staffPhone falls back to null (not User.phone) when Teacher.phone is unset — the two are never conflated', async () => {
+    const school = await fixtures.createSchool(models);
+    const { user, password } = await fixtures.createTeacher(models, school._id);
+    // User.phone is separately settable via MyAccount — set it here to prove
+    // staffPhone doesn't silently borrow it.
+    await models.User.updateOne({ _id: user._id }, { $set: { phone: '0500000000' } }).setOptions({ skipTenantScope: true });
+
+    const token = await fixtures.login(app, school.slug, user.email, password);
+    const meRes = await request(app).get('/api/auth/me').set(fixtures.authHeader(token));
+    expect(meRes.body.data.staffPhone).toBeNull();
+    expect(meRes.body.data.phone).toBe('0500000000');
+  });
+
+  test('a non-teacher session never includes staff fields', async () => {
+    const school = await fixtures.createSchool(models);
+    const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin@teacherprofile-test.local' });
+    const token = await fixtures.login(app, school.slug, 'admin@teacherprofile-test.local', password);
+
+    const meRes = await request(app).get('/api/auth/me').set(fixtures.authHeader(token));
+    expect(meRes.body.data.staffNo).toBeUndefined();
+    expect(meRes.body.data.staffPhone).toBeUndefined();
+  });
+});

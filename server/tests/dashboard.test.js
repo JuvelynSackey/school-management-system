@@ -332,3 +332,63 @@ describe('Teacher dashboard — My Class Insights (Phase 3)', () => {
     ]);
   });
 });
+
+describe('Teacher dashboard — teachingResponsibilities (My Teaching Responsibilities)', () => {
+  test('a homeroom-only teacher (no subject assignments) still appears, flagged isHomeroom with an empty subjects list', async () => {
+    const school = await fixtures.createSchool(models);
+    const { teacher, user, password } = await fixtures.createTeacher(models, school._id);
+    const classRow = await fixtures.createClass(models, school._id, { name: 'Basic 7', section: 'A', classTeacherId: teacher.id });
+    const token = await fixtures.login(app, school.slug, user.email, password);
+
+    const res = await request(app).get('/api/dashboard').set(fixtures.authHeader(token));
+    expect(res.status).toBe(200);
+    expect(res.body.data.teachingResponsibilities).toEqual([
+      { classId: classRow.id, className: 'Basic 7 A', isHomeroom: true, subjects: [] },
+    ]);
+    // The flat, subject-only list stays empty — existing "Enter Scores"
+    // cards and assignmentPerformance are unaffected by a homeroom-only teacher.
+    expect(res.body.data.myClasses).toEqual([]);
+  });
+
+  test('a subject-only teacher (no homeroom) appears with isHomeroom: false and their subjects listed', async () => {
+    const school = await fixtures.createSchool(models);
+    const classRow = await fixtures.createClass(models, school._id, { name: 'Basic 8', section: 'A' });
+    const subject = await fixtures.createSubject(models, school._id, { name: 'Integrated Science' });
+    const { teacher, user, password } = await fixtures.createTeacher(models, school._id);
+    await fixtures.assignTeacherToClass(models, school._id, { teacherId: teacher.id, subjectId: subject.id, classId: classRow.id });
+    const token = await fixtures.login(app, school.slug, user.email, password);
+
+    const res = await request(app).get('/api/dashboard').set(fixtures.authHeader(token));
+    expect(res.body.data.teachingResponsibilities).toEqual([
+      {
+        classId: classRow.id, className: 'Basic 8 A', isHomeroom: false, subjects: [{ subjectId: subject.id, subjectName: 'Integrated Science' }],
+      },
+    ]);
+  });
+
+  test('a teacher who is both homeroom and subject-assigned in the same class gets one merged entry', async () => {
+    const school = await fixtures.createSchool(models);
+    const { teacher, user, password } = await fixtures.createTeacher(models, school._id);
+    const classRow = await fixtures.createClass(models, school._id, { name: 'Basic 9', section: 'A', classTeacherId: teacher.id });
+    const subject = await fixtures.createSubject(models, school._id, { name: 'Mathematics' });
+    await fixtures.assignTeacherToClass(models, school._id, { teacherId: teacher.id, subjectId: subject.id, classId: classRow.id });
+    const token = await fixtures.login(app, school.slug, user.email, password);
+
+    const res = await request(app).get('/api/dashboard').set(fixtures.authHeader(token));
+    expect(res.body.data.teachingResponsibilities).toEqual([
+      {
+        classId: classRow.id, className: 'Basic 9 A', isHomeroom: true, subjects: [{ subjectId: subject.id, subjectName: 'Mathematics' }],
+      },
+    ]);
+  });
+
+  test('a teacher with neither a homeroom nor a subject assignment gets an empty list, not an error', async () => {
+    const school = await fixtures.createSchool(models);
+    const { user, password } = await fixtures.createTeacher(models, school._id);
+    const token = await fixtures.login(app, school.slug, user.email, password);
+
+    const res = await request(app).get('/api/dashboard').set(fixtures.authHeader(token));
+    expect(res.status).toBe(200);
+    expect(res.body.data.teachingResponsibilities).toEqual([]);
+  });
+});

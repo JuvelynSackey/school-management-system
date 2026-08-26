@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
-const { User, School, PlatformSettings } = require('../models');
+const { User, School, PlatformSettings, Teacher } = require('../models');
 const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/AppError');
 const config = require('../config');
@@ -74,8 +74,12 @@ const login = asyncHandler(async (req, res, next) => {
     description: `${user.fullName} logged in`,
   });
 
+  // login() runs before any tenant context is established (there's no JWT
+  // yet) — schoolId must be in the filter itself, same as the User lookup
+  // above, or tenantScopePlugin has nothing to read and throws.
+  const teacher = user.role === 'teacher' ? await Teacher.findOne({ userId: user.id, schoolId: school.id }) : null;
   const token = signToken(user, school.id);
-  return res.json({ success: true, data: { token, user: toPublicUser(user, school) } });
+  return res.json({ success: true, data: { token, user: toPublicUser(user, school, teacher) } });
 });
 
 const me = asyncHandler(async (req, res, next) => {
@@ -84,7 +88,8 @@ const me = asyncHandler(async (req, res, next) => {
     return next(new AppError('User not found', 404));
   }
   const school = await School.findById(req.user.schoolId);
-  return res.json({ success: true, data: toPublicUser(user, school) });
+  const teacher = user.role === 'teacher' ? await Teacher.findOne({ userId: user.id, schoolId: req.user.schoolId }) : null;
+  return res.json({ success: true, data: toPublicUser(user, school, teacher) });
 });
 
 // POST /auth/forgot-password { schoolCode, identifier }

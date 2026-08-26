@@ -710,9 +710,10 @@ function TeacherInsightsPanel({ insights }) {
 
 function TeacherDashboard({ data, user }) {
   const {
-    counts, attendanceStats, myClasses, insights,
+    counts, attendanceStats, myClasses, teachingResponsibilities, insights,
   } = data;
   const navigate = useNavigate();
+  const homeroomClasses = (teachingResponsibilities || []).filter((r) => r.isHomeroom);
   return (
     <>
       <h1 style={{ marginBottom: 4 }}>{timeOfDayGreeting()}, {user?.fullName?.split(' ')[0]} 👋</h1>
@@ -725,7 +726,19 @@ function TeacherDashboard({ data, user }) {
 
       <div className="panel">
         <h2>My Classes</h2>
-        {myClasses.length === 0 && <p className="muted">No class/subject assignments yet — ask an admin to assign you one.</p>}
+        {homeroomClasses.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            {homeroomClasses.map((c) => (
+              <span key={c.classId} className="badge badge-success" style={{ marginRight: 8 }}>🏠 Homeroom: {c.className}</span>
+            ))}
+          </div>
+        )}
+        {myClasses.length === 0 && homeroomClasses.length === 0 && (
+          <p className="muted">No class/subject assignments yet — ask an admin to assign you one.</p>
+        )}
+        {myClasses.length === 0 && homeroomClasses.length > 0 && (
+          <p className="muted">No subject assignments yet — you still have full Master Entry access to your homeroom class above.</p>
+        )}
         {myClasses.length > 0 && (
           <div className="quick-actions-grid">
             {myClasses.map((c) => (

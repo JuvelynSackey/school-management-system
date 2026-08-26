@@ -211,6 +211,31 @@ const getTeacherDashboard = async (userId, schoolId) => {
       subjectName: a.subject.name,
     }));
 
+  // Class-grouped view for "My Teaching Responsibilities" — combines
+  // homeroom classes (no subject assignment required) with subject
+  // assignments (grouped by class), so a homeroom-only teacher isn't
+  // invisible here the way they are in the flat, subject-assignment-only
+  // myClasses list above (kept as-is: teacherInsights and the "Enter
+  // Scores" cards both depend on its existing per-(class,subject) shape).
+  const homeroomClasses = teacherId
+    ? await Class.find({ classTeacherId: teacherId }, { name: 1, section: 1 })
+    : [];
+  const responsibilityByClassId = new Map();
+  homeroomClasses.forEach((c) => {
+    responsibilityByClassId.set(c.id, {
+      classId: c.id, className: `${c.name} ${c.section || ''}`.trim(), isHomeroom: true, subjects: [],
+    });
+  });
+  myClasses.forEach((mc) => {
+    if (!responsibilityByClassId.has(mc.classId)) {
+      responsibilityByClassId.set(mc.classId, {
+        classId: mc.classId, className: mc.className, isHomeroom: false, subjects: [],
+      });
+    }
+    responsibilityByClassId.get(mc.classId).subjects.push({ subjectId: mc.subjectId, subjectName: mc.subjectName });
+  });
+  const teachingResponsibilities = [...responsibilityByClassId.values()];
+
   // Insights only need the current term's data and only make sense once the
   // teacher actually has assignments/classes — skipped otherwise rather
   // than running empty aggregates.
@@ -227,6 +252,7 @@ const getTeacherDashboard = async (userId, schoolId) => {
     counts: { classes: classIds.length, students: studentCount },
     attendanceStats,
     myClasses,
+    teachingResponsibilities,
     insights: {
       currentTermId: currentTerm?.id || null,
       assignmentPerformance,

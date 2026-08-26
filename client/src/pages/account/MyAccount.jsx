@@ -1,9 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { updateMe, changePassword } from '../../api/auth.api';
+import { getDashboard } from '../../api/dashboard.api';
 
 export default function MyAccount() {
   const { user, setUser } = useAuth();
+  const [teachingResponsibilities, setTeachingResponsibilities] = useState(null);
+
+  useEffect(() => {
+    if (user?.role !== 'teacher') return;
+    getDashboard().then((data) => setTeachingResponsibilities(data.teachingResponsibilities || [])).catch(() => setTeachingResponsibilities([]));
+  }, [user?.role]);
 
   const [fullName, setFullName] = useState(user?.fullName || '');
   const [phone, setPhone] = useState(user?.phone || '');
@@ -89,6 +96,48 @@ export default function MyAccount() {
           </div>
         </form>
       </div>
+
+      {user?.role === 'teacher' && (
+        <div className="panel" style={{ maxWidth: 480, marginBottom: 20 }}>
+          <h3 style={{ fontSize: 14, margin: '0 0 12px' }}>Staff Details</h3>
+          <p className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>
+            Set by your school&apos;s admin — contact them to update these.
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13.5 }}>
+            <div><strong>Staff Number:</strong> {user.staffNo || '—'}</div>
+            <div><strong>Staff Phone:</strong> {user.staffPhone || user.phone || '—'}</div>
+            <div><strong>Qualification:</strong> {user.qualification || '—'}</div>
+            <div><strong>Gender:</strong> {user.gender || '—'}</div>
+          </div>
+        </div>
+      )}
+
+      {user?.role === 'teacher' && (
+        <div className="panel" style={{ maxWidth: 480, marginBottom: 20 }}>
+          <h3 style={{ fontSize: 14, margin: '0 0 12px' }}>My Teaching Responsibilities</h3>
+          {teachingResponsibilities === null && <p className="muted" style={{ fontSize: 13 }}>Loading...</p>}
+          {teachingResponsibilities?.length === 0 && (
+            <p className="muted" style={{ fontSize: 13 }}>No class or subject assignments yet — ask an admin to assign you one.</p>
+          )}
+          {teachingResponsibilities?.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {teachingResponsibilities.map((r) => (
+                <div key={r.classId}>
+                  <div style={{ fontSize: 13.5 }}>
+                    {r.isHomeroom && <span className="badge badge-success" style={{ marginRight: 6 }}>🏠 Homeroom</span>}
+                    <strong>{r.className}</strong>
+                  </div>
+                  {r.subjects.length > 0 && (
+                    <p className="muted" style={{ fontSize: 12.5, margin: '4px 0 0' }}>
+                      📘 {r.subjects.map((s) => s.subjectName).join(', ')}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="panel" style={{ maxWidth: 480 }}>
         <h3 style={{ fontSize: 14, margin: '0 0 12px' }}>Change Password</h3>
