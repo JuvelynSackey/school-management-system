@@ -17,7 +17,9 @@ const safetyNotesArrayValidator = [
 ];
 
 const createValidator = [
-  body('email').isEmail().withMessage('A valid email is required'),
+  // Optional -- students can be enrolled without one and log in by
+  // admission number + PIN instead (see auth.controller.js).
+  body('email').optional({ nullable: true, checkFalsy: true }).isEmail().withMessage('Must be a valid email if provided'),
   body('admissionNo').trim().notEmpty().withMessage('Admission number is required'),
   body('firstName').trim().notEmpty().withMessage('First name is required'),
   body('lastName').trim().notEmpty().withMessage('Last name is required'),

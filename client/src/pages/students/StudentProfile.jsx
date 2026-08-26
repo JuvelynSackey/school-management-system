@@ -121,7 +121,7 @@ export function StudentProfileView({
           <tbody>
             <tr><th>Admission No.</th><td>{student.admissionNo}</td></tr>
             {student.waecIndexNumber && <tr><th>WAEC/BECE Index No.</th><td>{student.waecIndexNumber}</td></tr>}
-            <tr><th>Email</th><td>{student.user?.email}</td></tr>
+            <tr><th>Email</th><td>{student.user?.email || '—'}</td></tr>
             <tr><th>Class</th><td>{student.class ? `${student.class.name} ${student.class.section || ''}` : 'Unassigned'}</td></tr>
             <tr><th>Gender</th><td>{student.gender || '—'}</td></tr>
             <tr><th>Date of Birth</th><td>{student.dateOfBirth || '—'}</td></tr>

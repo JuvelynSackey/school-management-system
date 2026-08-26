@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
-const { User, School, PlatformSettings, Teacher } = require('../models');
+const { User, School, PlatformSettings, Teacher, Student } = require('../models');
 const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/AppError');
 const config = require('../config');
@@ -41,10 +41,20 @@ const login = asyncHandler(async (req, res, next) => {
   if (!school) return invalidCredentials(null, 'unknown or inactive school code');
 
   const normalized = identifier.trim();
-  const user = await User.findOne({
+  let user = await User.findOne({
     schoolId: school._id,
     $or: [{ email: normalized.toLowerCase() }, { phone: normalized }],
   });
+
+  // Admission number is only ever a Student thing, and lives on Student,
+  // not User -- checked as a fallback (not merged into the $or above) so it
+  // never has to be duplicated onto User just to make one query possible.
+  if (!user) {
+    const student = await Student.findOne({ schoolId: school._id, admissionNo: normalized });
+    // findById alone would throw here -- login() has no tenant context yet
+    // (same reason the Teacher lookup below needs schoolId in its filter).
+    if (student) user = await User.findOne({ _id: student.userId, schoolId: school._id });
+  }
   if (!user) return invalidCredentials(school, 'unknown identifier');
 
   const passwordMatches = await bcrypt.compare(password, user.passwordHash);

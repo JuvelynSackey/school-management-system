@@ -6,4 +6,11 @@ const generateTempPassword = () => {
   return `${part()}-${part()}`;
 };
 
-module.exports = { generateTempPassword };
+// A short numeric PIN for student accounts (basic-school pupils, not the
+// longer alphanumeric temp password every other role gets) — easy for a
+// young pupil to be told and type. Weaker than a real password by design;
+// the existing /auth/login rate limiter (20 attempts/15min) is this app's
+// only brute-force defense for it, same as every other account.
+const generateStudentPin = () => String(crypto.randomInt(0, 10000)).padStart(4, '0');
+
+module.exports = { generateTempPassword, generateStudentPin };

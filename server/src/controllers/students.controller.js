@@ -121,7 +121,10 @@ const create = asyncHandler(async (req, res, next) => {
     address, admissionDate, category, programme, guardians, safetyNotes,
   } = req.body;
 
-  const existing = await User.findOne({ email });
+  // email is optional for students -- a bare { email: undefined } filter
+  // would have Mongoose drop the key entirely and match the first document
+  // in the collection instead of "no email set".
+  const existing = email ? await User.findOne({ email }) : null;
   if (existing) return next(new AppError('A user with this email already exists', 400));
   if (classId && !(await Class.findById(classId))) return next(new AppError('Class not found', 400));
 

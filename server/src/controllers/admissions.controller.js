@@ -131,7 +131,7 @@ const enroll = asyncHandler(async (req, res, next) => {
     email, admissionNo, classId, admissionDate,
   } = req.body;
 
-  const existing = await User.findOne({ email });
+  const existing = email ? await User.findOne({ email }) : null;
   if (existing) return next(new AppError('A user with this email already exists', 400));
 
   const resolvedClassId = classId || admission.desiredClassId;

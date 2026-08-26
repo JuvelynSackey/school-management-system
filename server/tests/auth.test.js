@@ -1,6 +1,8 @@
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const { startTestServer, stopTestServer, clearTestDb } = require('./testServer');
+const { runWithSchool } = require('../src/middleware/tenantContext');
 
 let app;
 let models;
@@ -195,5 +197,87 @@ describe('Teacher profile hydration (GET /auth/me and POST /auth/login)', () => 
     const meRes = await request(app).get('/api/auth/me').set(fixtures.authHeader(token));
     expect(meRes.body.data.staffNo).toBeUndefined();
     expect(meRes.body.data.staffPhone).toBeUndefined();
+  });
+});
+
+describe('Email-free student authentication (login by Admission No. + PIN)', () => {
+  // Bypasses fixtures.createStudent (which always assigns an email) to
+  // build the email-less case this feature is actually for.
+  const createEmaillessStudent = async (schoolId, { admissionNo, pin }) => {
+    const { User, Student } = models;
+    const passwordHash = await bcrypt.hash(pin, 10);
+    const user = await runWithSchool(schoolId, () => User.create({
+      schoolId, email: null, passwordHash, fullName: 'No Email Student', role: 'student', status: 'active',
+    }));
+    const student = await runWithSchool(schoolId, () => Student.create({
+      schoolId, userId: user.id, admissionNo, firstName: 'No', lastName: 'Email', status: 'active',
+    }));
+    return { user, student };
+  };
+
+  test('a student can be created with no email at all', async () => {
+    const school = await fixtures.createSchool(models);
+    const { student } = await createEmaillessStudent(school._id, { admissionNo: 'ACC-2026-0001', pin: '4821' });
+    const stored = await models.User.findById(student.userId).setOptions({ skipTenantScope: true });
+    expect(stored.email).toBeNull();
+  });
+
+  test('two email-less students in the same school can coexist (sparse unique index)', async () => {
+    const school = await fixtures.createSchool(models);
+    await expect(createEmaillessStudent(school._id, { admissionNo: 'ACC-2026-0002', pin: '1111' })).resolves.toBeDefined();
+    await expect(createEmaillessStudent(school._id, { admissionNo: 'ACC-2026-0003', pin: '2222' })).resolves.toBeDefined();
+  });
+
+  test('an email-less student logs in with their admission number and PIN', async () => {
+    const school = await fixtures.createSchool(models);
+    await createEmaillessStudent(school._id, { admissionNo: 'ACC-2026-0004', pin: '7734' });
+
+    const res = await request(app).post('/api/auth/login').send({
+      schoolCode: school.slug, identifier: 'ACC-2026-0004', password: '7734',
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.data.user.role).toBe('student');
+  });
+
+  test('the wrong PIN against a valid admission number is still rejected', async () => {
+    const school = await fixtures.createSchool(models);
+    await createEmaillessStudent(school._id, { admissionNo: 'ACC-2026-0005', pin: '9999' });
+
+    const res = await request(app).post('/api/auth/login').send({
+      schoolCode: school.slug, identifier: 'ACC-2026-0005', password: '0000',
+    });
+    expect(res.status).toBe(401);
+  });
+
+  test('a student who does have an email can still log in by email as before', async () => {
+    const school = await fixtures.createSchool(models);
+    const { student: withEmailStudent } = await fixtures.createStudent(models, school._id);
+    const withEmailUser = await models.User.findById(withEmailStudent.userId).setOptions({ skipTenantScope: true });
+
+    // fixtures.createStudent's generated password is 'TestPass@123' (DEFAULT_PASSWORD).
+    const res = await request(app).post('/api/auth/login').send({
+      schoolCode: school.slug, identifier: withEmailUser.email, password: 'TestPass@123',
+    });
+    expect(res.status).toBe(200);
+  });
+
+  test('an admin/teacher account still requires an email at the model level', async () => {
+    const school = await fixtures.createSchool(models);
+    await expect(runWithSchool(school._id, () => models.User.create({
+      schoolId: school._id, email: null, passwordHash: 'x', fullName: 'No Email Admin', role: 'admin', status: 'active',
+    }))).rejects.toThrow();
+  });
+
+  test('POST /students succeeds with no email in the payload', async () => {
+    const school = await fixtures.createSchool(models);
+    const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin@studentauth-test.local' });
+    const token = await fixtures.login(app, school.slug, 'admin@studentauth-test.local', password);
+
+    const res = await request(app).post('/api/students').set(fixtures.authHeader(token)).send({
+      admissionNo: 'ACC-2026-0006', firstName: 'Kojo', lastName: 'Mensah',
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.data.tempPassword).toMatch(/^\d{4}$/);
+    expect(res.body.data.admissionNo).toBe('ACC-2026-0006');
   });
 });

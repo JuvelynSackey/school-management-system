@@ -199,7 +199,7 @@ export default function AdmissionsList() {
       const result = await enrollAdmission(enrolling.id, payload);
       closeEnroll();
       reload();
-      setCreatedCredentials({ email: enrollForm.email, password: result.tempPassword });
+      setCreatedCredentials({ email: enrollForm.email, admissionNo: enrollForm.admissionNo, password: result.tempPassword });
     } catch (err) {
       setEnrollError(err.response?.data?.message || 'Failed to enroll applicant.');
     } finally {
@@ -396,8 +396,13 @@ export default function AdmissionsList() {
             {enrollError && <div className="alert-error">{enrollError}</div>}
             <p>Creating a student account and login for <strong>{enrolling.firstName} {enrolling.lastName}</strong>.</p>
             <label className="field">
-              <span>Email</span>
-              <input type="email" value={enrollForm.email} onChange={(e) => setEnrollForm({ ...enrollForm, email: e.target.value })} required />
+              <span>Email (optional)</span>
+              <input
+                type="email"
+                value={enrollForm.email}
+                onChange={(e) => setEnrollForm({ ...enrollForm, email: e.target.value })}
+                placeholder="Leave blank to log in by Admission No. + PIN instead"
+              />
             </label>
             <label className="field">
               <span>Admission Number</span>
@@ -424,11 +429,17 @@ export default function AdmissionsList() {
 
       {createdCredentials && (
         <Modal title="Student account created" onClose={() => setCreatedCredentials(null)}>
-          <p>Share these login details with the student/guardian. The password won&apos;t be shown again.</p>
+          <p>Share these login details with the student/guardian. The PIN won&apos;t be shown again.</p>
           <div className="panel" style={{ marginTop: 12 }}>
-            <p><strong>Email:</strong> {createdCredentials.email}</p>
-            <p><strong>Temporary password:</strong> {createdCredentials.password}</p>
+            <p><strong>Admission No.:</strong> {createdCredentials.admissionNo}</p>
+            {createdCredentials.email && <p><strong>Email:</strong> {createdCredentials.email}</p>}
+            <p><strong>PIN:</strong> {createdCredentials.password}</p>
           </div>
+          <p className="muted" style={{ fontSize: 12.5 }}>
+            {createdCredentials.email
+              ? 'They can log in with either the email above or their Admission No., plus this PIN.'
+              : 'No email was set — they log in with their Admission No. and this PIN.'}
+          </p>
           <div className="modal-actions">
             <button type="button" className="btn-primary" onClick={() => setCreatedCredentials(null)}>Done</button>
           </div>

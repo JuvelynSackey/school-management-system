@@ -3,7 +3,7 @@ const { passwordLengthValidator } = require('./passwordPolicy');
 
 const loginValidator = [
   body('schoolCode').trim().notEmpty().withMessage('School code is required'),
-  body('identifier').trim().notEmpty().withMessage('Email or phone is required'),
+  body('identifier').trim().notEmpty().withMessage('Email, phone, or admission number is required'),
   body('password').notEmpty().withMessage('Password is required'),
 ];
 

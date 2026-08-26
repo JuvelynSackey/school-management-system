@@ -93,7 +93,7 @@ export default function LoginForm({ onSuccess, defaultSchoolCode = '' }) {
       <label className="cosmic-field cosmic-field--icon-left">
         <input
           type="text"
-          placeholder="Email or Phone"
+          placeholder="Email, Phone, or Admission No."
           value={identifier}
           onChange={(e) => setIdentifier(e.target.value)}
           required

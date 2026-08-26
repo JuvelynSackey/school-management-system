@@ -1,6 +1,6 @@
 const bcrypt = require('bcryptjs');
 const { mongoose, Student, User, Guardian, StudentGuardian, StudentSafetyNote } = require('../models');
-const { generateTempPassword } = require('../utils/password');
+const { generateStudentPin } = require('../utils/password');
 const { findOrCreate } = require('../utils/findOrCreate');
 
 // Links (or creates) guardians for a student. Re-using a phone number always
@@ -49,7 +49,10 @@ const createStudentAccount = async ({
   email, admissionNo, firstName, lastName, gender, dateOfBirth, classId,
   address, admissionDate, category, programme, guardians, safetyNotes,
 }) => {
-  const tempPassword = generateTempPassword();
+  // A short PIN, not the longer alphanumeric password every other role
+  // gets -- a basic-school pupil is far more likely to actually be told
+  // and remember "4821" than a generated "Kx7m-Qp2r".
+  const tempPassword = generateStudentPin();
   const passwordHash = await bcrypt.hash(tempPassword, 10);
 
   const session = await mongoose.startSession();
@@ -57,7 +60,7 @@ const createStudentAccount = async ({
   try {
     await session.withTransaction(async () => {
       const [user] = await User.create([{
-        email,
+        email: email || null,
         passwordHash,
         fullName: `${firstName} ${lastName}`,
         role: 'student',

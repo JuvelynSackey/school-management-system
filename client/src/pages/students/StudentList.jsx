@@ -197,7 +197,7 @@ export default function StudentList() {
       if (editing === 'new') {
         const created = await createStudent(payload);
         close();
-        setCreatedCredentials({ email: created.user.email, password: created.tempPassword });
+        setCreatedCredentials({ email: created.user.email, admissionNo: created.admissionNo, password: created.tempPassword });
       } else {
         const { email, ...updatable } = payload;
         await updateStudent(editing.id, updatable);
@@ -313,8 +313,13 @@ export default function StudentList() {
             {formError && <div className="alert-error">{formError}</div>}
             {editing === 'new' && (
               <label className="field">
-                <span>Email</span>
-                <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+                <span>Email (optional)</span>
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  placeholder="Leave blank to log in by Admission No. + PIN instead"
+                />
               </label>
             )}
             <label className="field">
@@ -466,11 +471,17 @@ export default function StudentList() {
 
       {createdCredentials && (
         <Modal title="Student account created" onClose={() => setCreatedCredentials(null)}>
-          <p>Share these login details with the student/guardian. The password won&apos;t be shown again.</p>
+          <p>Share these login details with the student/guardian. The PIN won&apos;t be shown again.</p>
           <div className="panel" style={{ marginTop: 12 }}>
-            <p><strong>Email:</strong> {createdCredentials.email}</p>
-            <p><strong>Temporary password:</strong> {createdCredentials.password}</p>
+            <p><strong>Admission No.:</strong> {createdCredentials.admissionNo}</p>
+            {createdCredentials.email && <p><strong>Email:</strong> {createdCredentials.email}</p>}
+            <p><strong>PIN:</strong> {createdCredentials.password}</p>
           </div>
+          <p className="muted" style={{ fontSize: 12.5 }}>
+            {createdCredentials.email
+              ? 'They can log in with either the email above or their Admission No., plus this PIN.'
+              : 'No email was set — they log in with their Admission No. and this PIN.'}
+          </p>
           <div className="modal-actions">
             <button type="button" className="btn-primary" onClick={() => setCreatedCredentials(null)}>Done</button>
           </div>
