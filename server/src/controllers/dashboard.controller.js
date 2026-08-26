@@ -7,6 +7,7 @@ const { getTeacherClassIds } = require('../services/teacherScope.service');
 const { getParentStudentIds } = require('../services/parentScope.service');
 const { getFeeBalance } = require('../services/fees.service');
 const { getTeachersWithUnsubmittedMarksheets } = require('../services/teacherSubmissionStatus.service');
+const teacherInsights = require('../services/teacherInsights.service');
 
 const STAGES = ['Creche', 'Nursery', 'KG', 'Primary', 'JHS'];
 
@@ -169,7 +170,7 @@ const getAdminDashboard = async () => {
   };
 };
 
-const getTeacherDashboard = async (userId) => {
+const getTeacherDashboard = async (userId, schoolId) => {
   const { teacherId, classIds } = await getTeacherClassIds(userId);
   const studentCount = await Student.countDocuments({ classId: { $in: classIds }, status: 'active' });
 
@@ -207,11 +208,27 @@ const getTeacherDashboard = async (userId) => {
       subjectName: a.subject.name,
     }));
 
+  // Insights only need the current term's data and only make sense once the
+  // teacher actually has assignments/classes — skipped otherwise rather
+  // than running empty aggregates.
+  const currentTerm = await AcademicTerm.findOne({ isCurrent: true });
+  const [assignmentPerformance, topImprovingStudents] = currentTerm
+    ? await Promise.all([
+      teacherInsights.getAssignmentPerformance(schoolId, currentTerm.id, myClasses),
+      teacherInsights.getTopImprovingStudents(schoolId, classIds),
+    ])
+    : [[], []];
+
   return {
     role: 'teacher',
     counts: { classes: classIds.length, students: studentCount },
     attendanceStats,
     myClasses,
+    insights: {
+      currentTermId: currentTerm?.id || null,
+      assignmentPerformance,
+      topImprovingStudents,
+    },
   };
 };
 
@@ -266,7 +283,7 @@ const getParentDashboard = async (userId) => {
 const getDashboard = asyncHandler(async (req, res) => {
   let data;
   if (req.user.role === 'admin') data = await getAdminDashboard();
-  else if (req.user.role === 'teacher') data = await getTeacherDashboard(req.user.id);
+  else if (req.user.role === 'teacher') data = await getTeacherDashboard(req.user.id, req.user.schoolId);
   else if (req.user.role === 'parent') data = await getParentDashboard(req.user.id);
   else data = await getStudentDashboard(req.user.id);
 

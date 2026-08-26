@@ -42,8 +42,16 @@ const getRoster = asyncHandler(async (req, res, next) => {
   const results = await Result.find({ classId, subjectId, academicTermId });
   const byStudent = new Map(results.map((r) => [r.studentId.toString(), r]));
 
+  // Own-history σ stats, batched once for the whole roster — lets the
+  // Score Entry screen flag statistical outliers live, per keystroke,
+  // with zero further network calls (and so it keeps working offline).
+  const statsByStudent = await anomalyDetection.getHistoricalStatsForRoster(
+    req.user.schoolId, students.map((s) => s.id), subjectId, academicTermId,
+  );
+
   const roster = students.map((s) => {
     const existing = byStudent.get(s.id);
+    const stats = statsByStudent.get(s.id) ?? null;
     return {
       resultId: existing?.id ?? null,
       studentId: s.id,
@@ -55,6 +63,9 @@ const getRoster = asyncHandler(async (req, res, next) => {
       totalScore: existing?.totalScore ?? null,
       grade: existing?.grade ?? null,
       subjectPosition: existing?.subjectPosition ?? null,
+      historyMean: stats?.mean ?? null,
+      historyStdDev: stats?.stdDev ?? null,
+      historyCount: stats?.count ?? 0,
     };
   });
 
@@ -76,7 +87,7 @@ const getAnomalies = asyncHandler(async (req, res, next) => {
 
   const scheme = await getSchemeForSchool(req.user.schoolId);
   const flags = await anomalyDetection.detectAnomalies({
-    classId, subjectId, academicTermId, scheme,
+    schoolId: req.user.schoolId, classId, subjectId, academicTermId, scheme,
   });
 
   let aiSummary = null;

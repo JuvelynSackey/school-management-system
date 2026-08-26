@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import {
+  useEffect, useMemo, useRef, useState,
+} from 'react';
 import { listClasses } from '../../api/classes.api';
 import { listSubjectsForClass } from '../../api/subjects.api';
 import { listTerms } from '../../api/terms.api';
@@ -15,6 +17,75 @@ import Modal from '../../components/common/Modal';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 const rosterCacheKey = (classId, subjectId, academicTermId) => `roster:${classId}:${subjectId}:${academicTermId}`;
+
+// Mirrors anomalyDetection.service.js's STDDEV_THRESHOLD/MIN_HISTORY_FOR_STDDEV
+// on the backend — kept in sync by hand since this check runs entirely
+// client-side (see rationale below) rather than calling that service.
+const STDDEV_THRESHOLD = 2.5;
+const MIN_HISTORY_FOR_STDDEV = 3;
+
+const rowTotal = (r) => {
+  const hasBoth = r.classScore !== '' && r.examScore !== '' && r.classScore !== null && r.examScore !== null;
+  return hasBoth ? Number(r.classScore) + Number(r.examScore) : null;
+};
+
+// Leave-one-out class mean/stdDev for every student's CURRENTLY-TYPED total
+// this session — computed purely client-side, live, on every keystroke, so
+// the flag appears instantly with no network round trip and keeps working
+// offline (roster.historyMean/historyStdDev came down once with the roster
+// load; this half of the check needs nothing further from the server).
+const computeClassStats = (roster) => {
+  const valid = roster.map((r) => ({ studentId: r.studentId, total: rowTotal(r) })).filter((r) => r.total !== null);
+  const n = valid.length;
+  const sum = valid.reduce((s, r) => s + r.total, 0);
+  const sumSq = valid.reduce((s, r) => s + r.total * r.total, 0);
+  const map = new Map();
+  valid.forEach(({ studentId, total }) => {
+    const exclN = n - 1;
+    if (exclN < MIN_HISTORY_FOR_STDDEV) return;
+    const exclMean = (sum - total) / exclN;
+    const exclVar = (sumSq - total * total) / exclN - exclMean * exclMean;
+    map.set(studentId, { mean: exclMean, stdDev: Math.sqrt(Math.max(exclVar, 0)) });
+  });
+  return map;
+};
+
+// A student's own history and the rest of the class are two independent
+// >2.5sigma checks — either one firing is worth a second look before saving.
+const computeAnomalies = (roster, classStats) => {
+  const map = new Map();
+  roster.forEach((r) => {
+    const total = rowTotal(r);
+    if (total === null) return;
+    const reasons = [];
+
+    if (r.historyCount >= MIN_HISTORY_FOR_STDDEV && r.historyStdDev > 0) {
+      const z = Math.abs((total - r.historyMean) / r.historyStdDev);
+      if (z >= STDDEV_THRESHOLD) {
+        reasons.push({
+          key: 'history',
+          message: "⚠️ Score deviates significantly from student's historical average",
+          detail: `${total} is ${z.toFixed(1)}σ from their own ${r.historyCount}-term average of ${r.historyMean} in this subject.`,
+        });
+      }
+    }
+
+    const classStat = classStats.get(r.studentId);
+    if (classStat && classStat.stdDev > 0) {
+      const z = Math.abs((total - classStat.mean) / classStat.stdDev);
+      if (z >= STDDEV_THRESHOLD) {
+        reasons.push({
+          key: 'class',
+          message: '⚠️ Score deviates significantly from the class average',
+          detail: `${total} is ${z.toFixed(1)}σ from the rest of the class's average of ${Math.round(classStat.mean)}.`,
+        });
+      }
+    }
+
+    if (reasons.length > 0) map.set(r.studentId, { total, reasons });
+  });
+  return map;
+};
 
 const sheetStatusBadge = (status) => {
   if (status === 'Approved') return <span className="badge badge-success">Approved</span>;
@@ -47,7 +118,15 @@ export default function ResultsEntry({ initialClassId = '', initialSubjectId = '
   const [message, setMessage] = useState('');
   const [amending, setAmending] = useState(null);
   const [showingCached, setShowingCached] = useState(false);
+  const [ackedAnomalies, setAckedAnomalies] = useState(new Set());
+  const [confirmingSave, setConfirmingSave] = useState(false);
   const appliedInitialSubjectRef = useRef(false);
+
+  const classStats = useMemo(() => computeClassStats(roster), [roster]);
+  const anomalies = useMemo(() => computeAnomalies(roster, classStats), [roster, classStats]);
+  const pendingAnomalies = [...anomalies.entries()]
+    .filter(([studentId, a]) => !ackedAnomalies.has(`${studentId}:${a.total}`))
+    .map(([studentId, a]) => ({ studentId, ...a }));
 
   const pickClassId = (rows) => {
     const preselected = initialClassId && rows.some((c) => String(c.id) === initialClassId);
@@ -150,6 +229,7 @@ export default function ResultsEntry({ initialClassId = '', initialSubjectId = '
 
   useEffect(() => {
     setMessage('');
+    setAckedAnomalies(new Set());
     loadRoster();
     loadSheet();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -195,6 +275,26 @@ export default function ResultsEntry({ initialClassId = '', initialSubjectId = '
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // A flagged score isn't blocked, just interrupted once: Save opens a
+  // review modal instead of saving directly whenever an unacknowledged
+  // >2.5sigma flag is present. Acknowledging is per exact score value (the
+  // ack key includes the total), so editing a flagged cell after dismissing
+  // it re-flags it rather than silently trusting the old confirmation.
+  const handleSaveClick = () => {
+    if (pendingAnomalies.length > 0) { setConfirmingSave(true); return; }
+    handleSave();
+  };
+
+  const handleConfirmSave = () => {
+    setAckedAnomalies((prev) => {
+      const next = new Set(prev);
+      pendingAnomalies.forEach((a) => next.add(`${a.studentId}:${a.total}`));
+      return next;
+    });
+    setConfirmingSave(false);
+    handleSave();
   };
 
   // Registers with OfflineContext so reconnecting anywhere in the app
@@ -314,7 +414,20 @@ export default function ResultsEntry({ initialClassId = '', initialSubjectId = '
                           style={{ width: 70, padding: '6px 8px', border: '1px solid var(--border)', borderRadius: 6 }}
                         />
                       </td>
-                      <td>{previewTotal ?? '—'}</td>
+                      <td>
+                        {previewTotal ?? '—'}
+                        {anomalies.has(r.studentId) && (
+                          <div
+                            className="badge badge-warning"
+                            style={{
+                              display: 'block', marginTop: 4, fontSize: 10.5, whiteSpace: 'normal', lineHeight: 1.3, maxWidth: 160,
+                            }}
+                            title={anomalies.get(r.studentId).reasons.map((x) => x.detail).join(' ')}
+                          >
+                            {anomalies.get(r.studentId).reasons[0].message}
+                          </div>
+                        )}
+                      </td>
                       <td>{previewGrade || '—'}</td>
                       <td>{r.subjectPosition ?? '—'}</td>
                       {isAdmin && sheet?.status === 'Approved' && (
@@ -333,7 +446,7 @@ export default function ResultsEntry({ initialClassId = '', initialSubjectId = '
             {roster.length > 0 && (
               <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
                 {!isLocked && (
-                  <button type="button" className="btn-primary" onClick={handleSave} disabled={isSaving}>
+                  <button type="button" className="btn-primary" onClick={handleSaveClick} disabled={isSaving}>
                     {isSaving ? 'Saving...' : 'Save Results'}
                   </button>
                 )}
@@ -361,6 +474,33 @@ export default function ResultsEntry({ initialClassId = '', initialSubjectId = '
           onClose={() => setAmending(null)}
           onChanged={() => { setAmending(null); loadRoster(); }}
         />
+      )}
+
+      {confirmingSave && (
+        <Modal title="Unusual scores detected" onClose={() => setConfirmingSave(false)}>
+          <p className="muted" style={{ marginBottom: 12 }}>
+            {pendingAnomalies.length} student{pendingAnomalies.length === 1 ? '' : 's'} {pendingAnomalies.length === 1 ? 'has' : 'have'} a score
+            that looks statistically unusual compared to {pendingAnomalies.length === 1 ? 'its' : 'their'} own history or the rest of the class.
+            Review before saving:
+          </p>
+          <ul style={{ marginBottom: 16, paddingLeft: 18 }}>
+            {pendingAnomalies.map((a) => {
+              const student = roster.find((r) => r.studentId === a.studentId);
+              return (
+                <li key={a.studentId} style={{ marginBottom: 10 }}>
+                  <strong>{student?.firstName} {student?.lastName}</strong>
+                  {a.reasons.map((reason) => (
+                    <div key={reason.key} className="muted" style={{ fontSize: 12.5, marginTop: 2 }}>{reason.message} — {reason.detail}</div>
+                  ))}
+                </li>
+              );
+            })}
+          </ul>
+          <div className="modal-actions">
+            <button type="button" className="btn-secondary" onClick={() => setConfirmingSave(false)}>Cancel, let me review</button>
+            <button type="button" className="btn-primary" onClick={handleConfirmSave}>Save Anyway</button>
+          </div>
+        </Modal>
       )}
     </div>
   );

@@ -83,5 +83,5 @@ const resolvePreviousTerm = async (schoolId, currentTerm) => {
 };
 
 module.exports = {
-  round1, classAverages, subjectAverages, overallPassRate, subjectPassRates, resolvePreviousTerm,
+  round1, classAverages, subjectAverages, overallPassRate, subjectPassRates, resolvePreviousTerm, passCutoffFor,
 };

@@ -664,8 +664,54 @@ const timeOfDayGreeting = () => {
   return 'Good evening';
 };
 
+function TeacherInsightsPanel({ insights }) {
+  const { assignmentPerformance, topImprovingStudents } = insights || {};
+  if (!assignmentPerformance || assignmentPerformance.length === 0) return null;
+
+  return (
+    <div className="panel">
+      <h2>My Class Insights</h2>
+      <p className="muted" style={{ marginBottom: 12 }}>How your own classes are doing this term — averages, subjects worth a closer look, and who&apos;s pulling ahead.</p>
+      <table>
+        <thead><tr><th>Class</th><th>Subject</th><th>Average</th><th>Pass Rate</th></tr></thead>
+        <tbody>
+          {assignmentPerformance.map((a) => (
+            <tr key={`${a.classId}:${a.subjectId}`}>
+              <td>{a.className}</td>
+              <td>{a.subjectName}</td>
+              <td>{a.average === null ? '—' : `${a.average}%`}</td>
+              <td>
+                {a.passRate === null ? '—' : (
+                  <span className={`badge ${a.lowPassRate ? 'badge-warning' : 'badge-success'}`}>
+                    {a.passRate}%{a.lowPassRate ? ' ⚠️' : ''}
+                  </span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {topImprovingStudents.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <h3 style={{ fontSize: 14, marginBottom: 8 }}>Top Improving Students</h3>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {topImprovingStudents.map((s) => (
+              <li key={s.studentId} style={{ marginBottom: 4 }}>
+                {s.name} <span className="badge badge-success" style={{ marginLeft: 6 }}>+{s.deltaPercent}%</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TeacherDashboard({ data, user }) {
-  const { counts, attendanceStats, myClasses } = data;
+  const {
+    counts, attendanceStats, myClasses, insights,
+  } = data;
   const navigate = useNavigate();
   return (
     <>
@@ -708,6 +754,7 @@ function TeacherDashboard({ data, user }) {
         <h2>Today&apos;s Attendance (My Classes)</h2>
         <AttendanceCards stats={attendanceStats} />
       </div>
+      <TeacherInsightsPanel insights={insights} />
       <AtRiskStudentsPanel />
     </>
   );

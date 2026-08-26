@@ -1,4 +1,4 @@
-const { Result } = require('../models');
+const { mongoose, Result } = require('../models');
 
 // Purely advisory, deterministic, and never calls the AI on its own — see
 // the boundary rule in results.controller.js's getAnomalies: a flag is a
@@ -8,6 +8,51 @@ const { Result } = require('../models');
 const PERFORMANCE_DROP_THRESHOLD = 0.25; // a 25%+ drop vs. the student's own history in this subject
 const SCORE_GAP_THRESHOLD_POINTS = 40; // percentage points between normalized class% and exam%
 const MIN_HISTORY_TERMS = 1;
+const STDDEV_THRESHOLD = 2.5; // z-score magnitude past which a score is a statistical outlier
+const MIN_HISTORY_FOR_STDDEV = 3; // fewer prior terms than this and a stddev isn't meaningful
+
+// One batched aggregate for a whole roster's worth of students, rather than
+// a per-student query — this is also what getRoster uses to hand the
+// frontend live, per-keystroke σ bounds without any further network calls.
+// Result.aggregate() bypasses tenantScopePlugin, so schoolId is matched
+// explicitly to avoid leaking another tenant's scores.
+const getHistoricalStatsForRoster = async (schoolId, studentIds, subjectId, academicTermId) => {
+  if (studentIds.length === 0) return new Map();
+  const rows = await Result.aggregate([
+    {
+      $match: {
+        schoolId: new mongoose.Types.ObjectId(schoolId),
+        studentId: { $in: studentIds.map((id) => new mongoose.Types.ObjectId(id)) },
+        subjectId: new mongoose.Types.ObjectId(subjectId),
+        academicTermId: { $ne: new mongoose.Types.ObjectId(academicTermId) },
+      },
+    },
+    {
+      $group: {
+        _id: '$studentId', mean: { $avg: '$totalScore' }, stdDev: { $stdDevSamp: '$totalScore' }, count: { $sum: 1 },
+      },
+    },
+  ]);
+  return new Map(rows.map((r) => [
+    r._id.toString(),
+    { mean: Math.round(r.mean * 10) / 10, stdDev: Math.round((r.stdDev || 0) * 10) / 10, count: r.count },
+  ]));
+};
+
+// A genuinely different signal from detectPerformanceDrop's flat 25% ratio:
+// a naturally high-variance student's usual swings won't trip this, while a
+// usually-rock-steady student's smaller-but-unusual swing will.
+const detectStatisticalOutlier = (totalScore, stats) => {
+  if (!stats || stats.count < MIN_HISTORY_FOR_STDDEV || stats.stdDev <= 0) return null;
+  const z = (totalScore - stats.mean) / stats.stdDev;
+  if (Math.abs(z) < STDDEV_THRESHOLD) return null;
+
+  const direction = z < 0 ? 'below' : 'above';
+  return {
+    type: 'statistical_outlier',
+    message: `Scored ${totalScore}, ${Math.abs(z).toFixed(1)}σ ${direction} their own ${stats.count}-term average (${stats.mean}) in this subject — unusual even accounting for their normal variation.`,
+  };
+};
 
 // Compares this term's total against the student's own average in the SAME
 // subject across other terms — a student's usual level is the only
@@ -52,8 +97,13 @@ const detectScoreDiscrepancy = (classScore, examScore, scheme) => {
 // One class/subject/term's worth of already-recorded Results only — a
 // student with no score yet has nothing to flag. Returns only the students
 // that actually have at least one flag, keyed by studentId.
-const detectAnomalies = async ({ classId, subjectId, academicTermId, scheme }) => {
+const detectAnomalies = async ({
+  schoolId, classId, subjectId, academicTermId, scheme,
+}) => {
   const results = await Result.find({ classId, subjectId, academicTermId });
+  const statsByStudent = await getHistoricalStatsForRoster(
+    schoolId, results.map((r) => r.studentId.toString()), subjectId, academicTermId,
+  );
 
   const flagged = await Promise.all(results.map(async (r) => {
     const studentFlags = [];
@@ -61,6 +111,8 @@ const detectAnomalies = async ({ classId, subjectId, academicTermId, scheme }) =
     if (drop) studentFlags.push(drop);
     const discrepancy = detectScoreDiscrepancy(r.classScore, r.examScore, scheme);
     if (discrepancy) studentFlags.push(discrepancy);
+    const outlier = detectStatisticalOutlier(r.totalScore, statsByStudent.get(r.studentId.toString()));
+    if (outlier) studentFlags.push(outlier);
     return studentFlags.length > 0 ? { studentId: r.studentId.toString(), flags: studentFlags } : null;
   }));
 
@@ -68,5 +120,11 @@ const detectAnomalies = async ({ classId, subjectId, academicTermId, scheme }) =
 };
 
 module.exports = {
-  detectAnomalies, PERFORMANCE_DROP_THRESHOLD, SCORE_GAP_THRESHOLD_POINTS,
+  detectAnomalies,
+  getHistoricalStatsForRoster,
+  detectStatisticalOutlier,
+  PERFORMANCE_DROP_THRESHOLD,
+  SCORE_GAP_THRESHOLD_POINTS,
+  STDDEV_THRESHOLD,
+  MIN_HISTORY_FOR_STDDEV,
 };

@@ -202,3 +202,133 @@ describe('Teacher dashboard — My Classes', () => {
     expect(res.body.data.myClasses).toEqual([]);
   });
 });
+
+describe('Teacher dashboard — My Class Insights (Phase 3)', () => {
+  test('reports this term\'s average and pass rate for the teacher\'s own class/subject assignment', async () => {
+    const school = await fixtures.createSchool(models);
+    const classRow = await fixtures.createClass(models, school._id, { name: 'Basic 4', section: 'A' });
+    const subject = await fixtures.createSubject(models, school._id, { name: 'Mathematics' });
+    const term = await fixtures.createTerm(models, school._id, { isCurrent: true, startDate: new Date('2025-05-10') });
+    const { teacher, user, password } = await fixtures.createTeacher(models, school._id);
+    await fixtures.assignTeacherToClass(models, school._id, { teacherId: teacher.id, subjectId: subject.id, classId: classRow.id });
+
+    const { Result } = models;
+    const studentA = await fixtures.createStudent(models, school._id, { classId: classRow.id });
+    const studentB = await fixtures.createStudent(models, school._id, { classId: classRow.id });
+    // 90 (pass) and 20 (fail) -> average 55, pass rate 50% (not < 50, so not flagged low).
+    await runWithSchool(school._id, () => Result.create({
+      schoolId: school._id, studentId: studentA.student.id, subjectId: subject.id, classId: classRow.id, academicTermId: term.id, classScore: 45, examScore: 45,
+    }));
+    await runWithSchool(school._id, () => Result.create({
+      schoolId: school._id, studentId: studentB.student.id, subjectId: subject.id, classId: classRow.id, academicTermId: term.id, classScore: 10, examScore: 10,
+    }));
+
+    const token = await fixtures.login(app, school.slug, user.email, password);
+    const res = await request(app).get('/api/dashboard').set(fixtures.authHeader(token));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.insights.assignmentPerformance).toEqual([
+      {
+        classId: classRow.id, className: 'Basic 4 A', subjectId: subject.id, subjectName: 'Mathematics', average: 55, passRate: 50, resultCount: 2, lowPassRate: false,
+      },
+    ]);
+  });
+
+  test('flags lowPassRate when under half the class is passing', async () => {
+    const school = await fixtures.createSchool(models);
+    const classRow = await fixtures.createClass(models, school._id);
+    const subject = await fixtures.createSubject(models, school._id);
+    const term = await fixtures.createTerm(models, school._id, { isCurrent: true, startDate: new Date('2025-05-10') });
+    const { teacher, user, password } = await fixtures.createTeacher(models, school._id);
+    await fixtures.assignTeacherToClass(models, school._id, { teacherId: teacher.id, subjectId: subject.id, classId: classRow.id });
+
+    const { Result } = models;
+    const studentA = await fixtures.createStudent(models, school._id, { classId: classRow.id });
+    const studentB = await fixtures.createStudent(models, school._id, { classId: classRow.id });
+    const studentC = await fixtures.createStudent(models, school._id, { classId: classRow.id });
+    // Only 1 of 3 passes -> 33% pass rate, well under 50%.
+    await runWithSchool(school._id, () => Result.create({
+      schoolId: school._id, studentId: studentA.student.id, subjectId: subject.id, classId: classRow.id, academicTermId: term.id, classScore: 45, examScore: 45,
+    }));
+    await runWithSchool(school._id, () => Result.create({
+      schoolId: school._id, studentId: studentB.student.id, subjectId: subject.id, classId: classRow.id, academicTermId: term.id, classScore: 10, examScore: 10,
+    }));
+    await runWithSchool(school._id, () => Result.create({
+      schoolId: school._id, studentId: studentC.student.id, subjectId: subject.id, classId: classRow.id, academicTermId: term.id, classScore: 5, examScore: 5,
+    }));
+
+    const token = await fixtures.login(app, school.slug, user.email, password);
+    const res = await request(app).get('/api/dashboard').set(fixtures.authHeader(token));
+
+    expect(res.body.data.insights.assignmentPerformance[0].lowPassRate).toBe(true);
+  });
+
+  test('surfaces a student in Top Improving Students only once their trend crosses the improving threshold', async () => {
+    const school = await fixtures.createSchool(models);
+    const classRow = await fixtures.createClass(models, school._id);
+    const subject = await fixtures.createSubject(models, school._id);
+    const priorTerm = await fixtures.createTerm(models, school._id, {
+      termNumber: 1, isCurrent: false, startDate: new Date('2025-01-10'), name: 'Term 1',
+    });
+    const currentTerm = await fixtures.createTerm(models, school._id, {
+      termNumber: 2, isCurrent: true, startDate: new Date('2025-05-10'), name: 'Term 2',
+    });
+    const { teacher, user, password } = await fixtures.createTeacher(models, school._id);
+    await fixtures.assignTeacherToClass(models, school._id, { teacherId: teacher.id, subjectId: subject.id, classId: classRow.id });
+
+    const { Result } = models;
+    const { student } = await fixtures.createStudent(models, school._id, { classId: classRow.id });
+    await runWithSchool(school._id, () => Result.create({
+      schoolId: school._id, studentId: student.id, subjectId: subject.id, classId: classRow.id, academicTermId: priorTerm.id, classScore: 20, examScore: 20,
+    }));
+    await runWithSchool(school._id, () => Result.create({
+      schoolId: school._id, studentId: student.id, subjectId: subject.id, classId: classRow.id, academicTermId: currentTerm.id, classScore: 45, examScore: 45,
+    }));
+
+    const token = await fixtures.login(app, school.slug, user.email, password);
+    const res = await request(app).get('/api/dashboard').set(fixtures.authHeader(token));
+
+    expect(res.body.data.insights.topImprovingStudents).toHaveLength(1);
+    expect(res.body.data.insights.topImprovingStudents[0].studentId).toBe(student.id);
+    expect(res.body.data.insights.topImprovingStudents[0].deltaPercent).toBeGreaterThan(0);
+  });
+
+  test('with no current term set, insights are empty arrays rather than throwing', async () => {
+    const school = await fixtures.createSchool(models);
+    const { user, password } = await fixtures.createTeacher(models, school._id);
+    const token = await fixtures.login(app, school.slug, user.email, password);
+
+    const res = await request(app).get('/api/dashboard').set(fixtures.authHeader(token));
+    expect(res.status).toBe(200);
+    expect(res.body.data.insights.assignmentPerformance).toEqual([]);
+    expect(res.body.data.insights.topImprovingStudents).toEqual([]);
+  });
+
+  test('is tenant-isolated — another school\'s results in an identically-shaped class/subject never leak in', async () => {
+    const otherSchool = await fixtures.createSchool(models);
+    const otherClass = await fixtures.createClass(models, otherSchool._id);
+    const otherSubject = await fixtures.createSubject(models, otherSchool._id);
+    const otherTerm = await fixtures.createTerm(models, otherSchool._id, { isCurrent: true, startDate: new Date('2025-05-10') });
+    const { student: otherStudent } = await fixtures.createStudent(models, otherSchool._id, { classId: otherClass.id });
+    const { Result } = models;
+    await runWithSchool(otherSchool._id, () => Result.create({
+      schoolId: otherSchool._id, studentId: otherStudent.id, subjectId: otherSubject.id, classId: otherClass.id, academicTermId: otherTerm.id, classScore: 50, examScore: 50,
+    }));
+
+    const school = await fixtures.createSchool(models);
+    const classRow = await fixtures.createClass(models, school._id);
+    const subject = await fixtures.createSubject(models, school._id);
+    await fixtures.createTerm(models, school._id, { isCurrent: true, startDate: new Date('2025-05-10') });
+    const { teacher, user, password } = await fixtures.createTeacher(models, school._id);
+    await fixtures.assignTeacherToClass(models, school._id, { teacherId: teacher.id, subjectId: subject.id, classId: classRow.id });
+
+    const token = await fixtures.login(app, school.slug, user.email, password);
+    const res = await request(app).get('/api/dashboard').set(fixtures.authHeader(token));
+
+    expect(res.body.data.insights.assignmentPerformance).toEqual([
+      {
+        classId: classRow.id, className: expect.any(String), subjectId: subject.id, subjectName: expect.any(String), average: null, passRate: null, resultCount: 0, lowPassRate: false,
+      },
+    ]);
+  });
+});
