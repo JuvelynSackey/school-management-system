@@ -1,7 +1,7 @@
 const { Attendance, Student, Class } = require('../models');
 const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/AppError');
-const { getTeacherClassIds } = require('../services/teacherScope.service');
+const { getTeacherClassIds, isHomeroomTeacher } = require('../services/teacherScope.service');
 const { getParentStudentIds } = require('../services/parentScope.service');
 
 const assertClassAccess = async (req, classId) => {
@@ -14,6 +14,17 @@ const assertClassAccess = async (req, classId) => {
     return;
   }
   throw new AppError('You do not have permission to perform this action', 403);
+};
+
+// The daily register is taken once, by the homeroom (Form Tutor) teacher,
+// during morning roll call -- it stands as the day's official record across
+// every lesson. A subject specialist can still view it (assertClassAccess,
+// used by getByClassDate/getClassSummary), just never write to it, so it
+// can't be silently overwritten by whoever happens to enter scores later.
+const assertHomeroomAccess = async (req, classId) => {
+  if (req.user.role === 'admin') return;
+  if (req.user.role === 'teacher' && await isHomeroomTeacher(req.user.id, classId)) return;
+  throw new AppError('Only the class\'s homeroom teacher or an admin can record the daily attendance register', 403);
 };
 
 // GET /attendance?classId=&date=  -> roster for that class with any existing attendance for that date
@@ -50,7 +61,7 @@ const recordBulk = asyncHandler(async (req, res, next) => {
   }
   if (!(await Class.findById(classId))) return next(new AppError('Class not found', 400));
 
-  await assertClassAccess(req, classId);
+  await assertHomeroomAccess(req, classId);
 
   const results = await Promise.all(records.map((r) => Attendance.findOneAndUpdate(
     { studentId: r.studentId, attendanceDate: date },

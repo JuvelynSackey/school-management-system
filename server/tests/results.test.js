@@ -17,11 +17,16 @@ afterEach(clearTestDb);
 
 // Wires up a class + subject + term + teacher-assignment + one student, and
 // returns everything a test needs to drive the results workflow end to end.
+// The teacher is also made the class's homeroom teacher — the common case,
+// and what every pre-existing test in this file assumes ("the teacher" has
+// full authority over the class: attendance, submit, every subject) —
+// tests for the subject-specialist-only boundary set up their own second
+// teacher explicitly (see 'Class Teacher vs Subject Specialist access').
 const setupClassroom = async (schoolId) => {
-  const classRow = await fixtures.createClass(models, schoolId);
+  const { teacher, user: teacherUser, password: teacherPassword } = await fixtures.createTeacher(models, schoolId);
+  const classRow = await fixtures.createClass(models, schoolId, { classTeacherId: teacher.id });
   const subject = await fixtures.createSubject(models, schoolId);
   const term = await fixtures.createTerm(models, schoolId);
-  const { teacher, user: teacherUser, password: teacherPassword } = await fixtures.createTeacher(models, schoolId);
   await fixtures.assignSubjectToClass(models, schoolId, { classId: classRow.id, subjectId: subject.id, academicTermId: term.id });
   await fixtures.assignTeacherToClass(models, schoolId, { teacherId: teacher.id, subjectId: subject.id, classId: classRow.id });
   const { student } = await fixtures.createStudent(models, schoolId, { classId: classRow.id });
@@ -152,5 +157,86 @@ describe('Results workflow state machine', () => {
     const resubmit = await request(app).post(`/api/result-sheets/${sheet.id}/submit`).set(fixtures.authHeader(teacherToken));
     expect(resubmit.status).toBe(200);
     expect(resubmit.body.data.status).toBe('Submitted');
+  });
+});
+
+describe('Class Teacher vs Subject Specialist access (score entry)', () => {
+  // A class with TWO subjects and TWO teachers: the homeroom teacher is
+  // only explicitly assigned to Subject A; a second, subject-only teacher
+  // is assigned to Subject B and nothing else.
+  const setupTwoTeacherClassroom = async (schoolId) => {
+    const { teacher: homeroomTeacher, user: homeroomUser, password: homeroomPassword } = await fixtures.createTeacher(models, schoolId);
+    const classRow = await fixtures.createClass(models, schoolId, { classTeacherId: homeroomTeacher.id });
+    const subjectA = await fixtures.createSubject(models, schoolId, { name: 'Subject A' });
+    const subjectB = await fixtures.createSubject(models, schoolId, { name: 'Subject B' });
+    const term = await fixtures.createTerm(models, schoolId);
+    await fixtures.assignSubjectToClass(models, schoolId, { classId: classRow.id, subjectId: subjectA.id, academicTermId: term.id });
+    await fixtures.assignSubjectToClass(models, schoolId, { classId: classRow.id, subjectId: subjectB.id, academicTermId: term.id });
+    await fixtures.assignTeacherToClass(models, schoolId, { teacherId: homeroomTeacher.id, subjectId: subjectA.id, classId: classRow.id });
+
+    const { teacher: subjectTeacher, user: subjectUser, password: subjectPassword } = await fixtures.createTeacher(models, schoolId);
+    await fixtures.assignTeacherToClass(models, schoolId, { teacherId: subjectTeacher.id, subjectId: subjectB.id, classId: classRow.id });
+
+    const { student } = await fixtures.createStudent(models, schoolId, { classId: classRow.id });
+    return {
+      classRow, subjectA, subjectB, term, student, homeroomUser, homeroomPassword, subjectUser, subjectPassword,
+    };
+  };
+
+  test('a subject specialist can enter scores for their own assigned subject', async () => {
+    const school = await fixtures.createSchool(models);
+    const {
+      classRow, subjectB, term, student, subjectUser, subjectPassword,
+    } = await setupTwoTeacherClassroom(school._id);
+    const token = await fixtures.login(app, school.slug, subjectUser.email, subjectPassword);
+
+    const res = await request(app).post('/api/results/bulk').set(fixtures.authHeader(token)).send({
+      classId: classRow.id, subjectId: subjectB.id, academicTermId: term.id,
+      records: [{ studentId: student.id, classScore: 30, examScore: 30 }],
+    });
+    expect(res.status).toBe(200);
+  });
+
+  test('a subject specialist cannot enter scores for a subject they are not assigned to teach, even in a class they teach', async () => {
+    const school = await fixtures.createSchool(models);
+    const {
+      classRow, subjectA, term, student, subjectUser, subjectPassword,
+    } = await setupTwoTeacherClassroom(school._id);
+    const token = await fixtures.login(app, school.slug, subjectUser.email, subjectPassword);
+
+    // subjectUser is assigned to Subject B, not Subject A.
+    const res = await request(app).post('/api/results/bulk').set(fixtures.authHeader(token)).send({
+      classId: classRow.id, subjectId: subjectA.id, academicTermId: term.id,
+      records: [{ studentId: student.id, classScore: 30, examScore: 30 }],
+    });
+    expect(res.status).toBe(403);
+  });
+
+  test('a subject specialist cannot view the roster for a subject they are not assigned to teach', async () => {
+    const school = await fixtures.createSchool(models);
+    const {
+      classRow, subjectA, term, subjectUser, subjectPassword,
+    } = await setupTwoTeacherClassroom(school._id);
+    const token = await fixtures.login(app, school.slug, subjectUser.email, subjectPassword);
+
+    const res = await request(app).get('/api/results/roster').query({
+      classId: classRow.id, subjectId: subjectA.id, academicTermId: term.id,
+    }).set(fixtures.authHeader(token));
+    expect(res.status).toBe(403);
+  });
+
+  test('the homeroom teacher gets Master Entry — can enter scores for a subject they have no explicit TeacherSubjectAssignment for', async () => {
+    const school = await fixtures.createSchool(models);
+    const {
+      classRow, subjectB, term, student, homeroomUser, homeroomPassword,
+    } = await setupTwoTeacherClassroom(school._id);
+    const token = await fixtures.login(app, school.slug, homeroomUser.email, homeroomPassword);
+
+    // homeroomUser is only explicitly assigned to Subject A, not Subject B.
+    const res = await request(app).post('/api/results/bulk').set(fixtures.authHeader(token)).send({
+      classId: classRow.id, subjectId: subjectB.id, academicTermId: term.id,
+      records: [{ studentId: student.id, classScore: 35, examScore: 35 }],
+    });
+    expect(res.status).toBe(200);
   });
 });

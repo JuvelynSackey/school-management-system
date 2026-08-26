@@ -10,6 +10,7 @@ const router = express.Router();
 router.use(authenticate);
 
 router.get('/', controller.list);
+router.get('/:id/my-access', authorize('admin', 'teacher'), controller.getMyAccess);
 router.get('/:id', controller.getById);
 router.post('/', authorize('admin'), classValidator, validate, controller.create);
 router.put('/:id', authorize('admin'), classValidator, validate, controller.update);

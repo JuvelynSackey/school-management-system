@@ -7,6 +7,7 @@ import { listTerms } from '../../api/terms.api';
 import { getResultsRoster, recordResults, amendResult } from '../../api/results.api';
 import { listResultSheets, submitResultSheet } from '../../api/resultSheets.api';
 import { getGradingScheme } from '../../api/gradingScheme.api';
+import { getMyClassAccess } from '../../api/classes.api';
 import { computeGrade } from '../../utils/grading';
 import { useAuth } from '../../context/AuthContext';
 import { useOffline } from '../../context/OfflineContext';
@@ -15,6 +16,7 @@ import {
 } from '../../utils/offlineStore';
 import Modal from '../../components/common/Modal';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
+import HomeroomBadge from '../../components/common/HomeroomBadge';
 
 const rosterCacheKey = (classId, subjectId, academicTermId) => `roster:${classId}:${subjectId}:${academicTermId}`;
 
@@ -120,6 +122,7 @@ export default function ResultsEntry({ initialClassId = '', initialSubjectId = '
   const [showingCached, setShowingCached] = useState(false);
   const [ackedAnomalies, setAckedAnomalies] = useState(new Set());
   const [confirmingSave, setConfirmingSave] = useState(false);
+  const [access, setAccess] = useState(null);
   const appliedInitialSubjectRef = useRef(false);
 
   const classStats = useMemo(() => computeClassStats(roster), [roster]);
@@ -177,8 +180,13 @@ export default function ResultsEntry({ initialClassId = '', initialSubjectId = '
       const preselected = isFirstLoad && initialSubjectId && subs.some((s) => String(s.id) === initialSubjectId);
       return preselected ? initialSubjectId : (subs.length ? String(subs[0].id) : '');
     };
-    listSubjectsForClass(classId).then((links) => {
-      const subs = links.map((l) => l.subject);
+    Promise.all([
+      listSubjectsForClass(classId),
+      isAdmin ? Promise.resolve({ isHomeroom: true, subjectIds: [] }) : getMyClassAccess(classId),
+    ]).then(([links, myAccess]) => {
+      const allSubs = links.map((l) => l.subject);
+      const subs = myAccess.isHomeroom ? allSubs : allSubs.filter((s) => myAccess.subjectIds.includes(s.id));
+      setAccess(myAccess);
       setSubjects(subs);
       setCache(`subjects:${classId}`, subs);
       setSubjectId(pickSubjectId(subs));
@@ -354,6 +362,7 @@ export default function ResultsEntry({ initialClassId = '', initialSubjectId = '
           <select value={academicTermId} onChange={(e) => setAcademicTermId(e.target.value)}>
             {terms.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
+          {!isAdmin && access && <HomeroomBadge isHomeroom={access.isHomeroom} />}
         </div>
 
         {sheet && (

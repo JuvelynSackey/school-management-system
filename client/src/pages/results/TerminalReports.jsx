@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { listClasses } from '../../api/classes.api';
+import { listClasses, getMyClassAccess } from '../../api/classes.api';
 import { listTerms } from '../../api/terms.api';
 import {
   generateTerminalReports, listTerminalReports, submitTerminalReport,
@@ -15,6 +15,7 @@ import { suggestRemark } from '../../api/ai.api';
 import { useAuth } from '../../context/AuthContext';
 import Modal from '../../components/common/Modal';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
+import HomeroomBadge from '../../components/common/HomeroomBadge';
 
 const RATING_SCALE = ['Excellent', 'Very Good', 'Good', 'Fair', 'Needs Improvement'];
 
@@ -49,6 +50,7 @@ export default function TerminalReports() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [lockingAll, setLockingAll] = useState(false);
   const [headteacherDefaultName, setHeadteacherDefaultName] = useState('');
+  const [access, setAccess] = useState(null);
 
   useEffect(() => {
     listClasses().then((rows) => { setClasses(rows); if (rows.length) setClassId(String(rows[0].id)); }).catch(() => {});
@@ -59,6 +61,15 @@ export default function TerminalReports() {
       else if (rows.length) setAcademicTermId(String(rows[0].id));
     }).catch(() => {});
   }, []);
+
+  // Remarks + personal-attribute ratings are a homeroom-teacher action —
+  // ManageReportModal uses this to gate its Submit step for subject
+  // specialists, who can still view reports for their classes.
+  useEffect(() => {
+    if (!classId) return;
+    if (isAdmin) { setAccess({ isHomeroom: true, subjectIds: [] }); return; }
+    getMyClassAccess(classId).then(setAccess).catch(() => setAccess({ isHomeroom: false, subjectIds: [] }));
+  }, [classId, isAdmin]);
 
   // The school's configured headteacher name (School Settings) outranks the
   // logged-in admin's own name as the lock-form default — whoever is doing
@@ -165,6 +176,7 @@ export default function TerminalReports() {
           <button type="button" className="btn-primary" onClick={handleGenerate} disabled={isGenerating}>
             {isGenerating ? 'Generating...' : 'Generate / Recalculate'}
           </button>
+          {!isAdmin && access && <HomeroomBadge isHomeroom={access.isHomeroom} />}
         </div>
 
         {error && <div className="alert-error">{error}</div>}
@@ -206,6 +218,7 @@ export default function TerminalReports() {
         <ManageReportModal
           report={managing}
           isAdmin={isAdmin}
+          isHomeroom={Boolean(access?.isHomeroom)}
           userFullName={user?.fullName}
           headteacherDefaultName={headteacherDefaultName}
           onClose={() => setManaging(null)}
@@ -472,8 +485,9 @@ function ReviewSheetModal({ sheet, onClose, onChanged }) {
 }
 
 function ManageReportModal({
-  report, isAdmin, userFullName, headteacherDefaultName, onClose, onChanged,
+  report, isAdmin, isHomeroom, userFullName, headteacherDefaultName, onClose, onChanged,
 }) {
+  const canManageRemarks = isAdmin || isHomeroom;
   const [teacherRemark, setTeacherRemark] = useState(report.teacherRemark || '');
   const [teacherSignatureName, setTeacherSignatureName] = useState(report.teacherSignatureName || userFullName || '');
   const [headteacherRemark, setHeadteacherRemark] = useState(report.headteacherRemark || '');
@@ -602,6 +616,10 @@ function ManageReportModal({
   };
 
   const readOnly = report.status === 'Locked' || report.status === 'Published';
+  // Even a Draft/Rejected report is locked for THIS section when the
+  // logged-in teacher is a subject specialist, not the class's homeroom
+  // teacher — remarks and personal-attribute ratings are a homeroom action.
+  const remarksLocked = readOnly || !canManageRemarks;
 
   return (
     <Modal title={`${report.student?.firstName} ${report.student?.lastName} — ${report.status}`} onClose={onClose}>
@@ -609,12 +627,17 @@ function ManageReportModal({
       {report.status === 'Rejected' && report.rejectionReason && (
         <p className="muted" style={{ marginBottom: 12 }}>Reason: {report.rejectionReason}</p>
       )}
+      {!readOnly && !canManageRemarks && (
+        <p className="muted" style={{ marginBottom: 12 }}>
+          View-only — only this class&apos;s homeroom teacher or an admin can submit remarks and personal attribute ratings.
+        </p>
+      )}
 
       <label className="field">
         <span>Teacher's Remark</span>
-        <textarea rows={2} value={teacherRemark} onChange={(e) => setTeacherRemark(e.target.value)} disabled={readOnly} />
+        <textarea rows={2} value={teacherRemark} onChange={(e) => setTeacherRemark(e.target.value)} disabled={remarksLocked} />
       </label>
-      {!readOnly && (
+      {!remarksLocked && (
         <div style={{ marginBottom: 12 }}>
           <button type="button" className="btn-secondary" onClick={handleSuggestRemark} disabled={isSuggesting}>
             {isSuggesting ? 'Generating…' : remarkSuggestions ? '✨ Regenerate' : '✨ Suggest Remark'}
@@ -647,7 +670,7 @@ function ManageReportModal({
       )}
       <label className="field">
         <span>Teacher Signature Name</span>
-        <input value={teacherSignatureName} onChange={(e) => setTeacherSignatureName(e.target.value)} disabled={readOnly} />
+        <input value={teacherSignatureName} onChange={(e) => setTeacherSignatureName(e.target.value)} disabled={remarksLocked} />
       </label>
 
       {attributes.length > 0 && (
@@ -659,7 +682,7 @@ function ManageReportModal({
               <select
                 value={ratings[attr.id] || ''}
                 onChange={(e) => setRatings((r) => ({ ...r, [attr.id]: e.target.value }))}
-                disabled={readOnly}
+                disabled={remarksLocked}
               >
                 <option value="">—</option>
                 {RATING_SCALE.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -669,7 +692,7 @@ function ManageReportModal({
         </>
       )}
 
-      {!readOnly && (
+      {!remarksLocked && (
         <button type="button" className="btn-secondary" onClick={handleSubmit} disabled={isSaving} style={{ marginBottom: 16 }}>
           {isSaving ? 'Saving...' : 'Submit'}
         </button>

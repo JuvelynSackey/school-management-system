@@ -1,15 +1,20 @@
 import { useEffect, useState } from 'react';
-import { listClasses } from '../../api/classes.api';
+import { listClasses, getMyClassAccess } from '../../api/classes.api';
 import { listTerms } from '../../api/terms.api';
 import { getRoster, recordAttendance, getClassSummary } from '../../api/attendance.api';
+import { useAuth } from '../../context/AuthContext';
+import HomeroomBadge from '../../components/common/HomeroomBadge';
 
 const STATUSES = ['Present', 'Absent', 'Late', 'Excused'];
 const today = () => new Date().toISOString().slice(0, 10);
 
 export default function AttendanceRecord() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [classes, setClasses] = useState([]);
   const [terms, setTerms] = useState([]);
   const [classId, setClassId] = useState('');
+  const [access, setAccess] = useState(null);
   const [date, setDate] = useState(today());
   const [roster, setRoster] = useState([]);
   const [summary, setSummary] = useState([]);
@@ -27,6 +32,17 @@ export default function AttendanceRecord() {
     listTerms().then(setTerms).catch(() => setTerms([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // The daily register is a homeroom-teacher action — a subject specialist
+  // can still view it (loadRoster/loadSummary stay unrestricted), just not
+  // record it. isAdmin always gets full write access.
+  useEffect(() => {
+    if (!classId) return;
+    if (isAdmin) { setAccess({ isHomeroom: true, subjectIds: [] }); return; }
+    getMyClassAccess(classId).then(setAccess).catch(() => setAccess({ isHomeroom: false, subjectIds: [] }));
+  }, [classId, isAdmin]);
+
+  const canRecord = isAdmin || Boolean(access?.isHomeroom);
 
   const loadRoster = async () => {
     if (!classId || !date) return;
@@ -106,11 +122,17 @@ export default function AttendanceRecord() {
           {view === 'record' && (
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           )}
+          {!isAdmin && access && <HomeroomBadge isHomeroom={access.isHomeroom} />}
         </div>
 
         {error && <div className="alert-error">{error}</div>}
         {message && <div className="alert-error" style={{ background: 'var(--accent-bg)', color: 'var(--accent)' }}>{message}</div>}
         {isLoading && <p className="muted">Loading...</p>}
+        {!isLoading && view === 'record' && !canRecord && (
+          <p className="muted" style={{ marginBottom: 12 }}>
+            View-only — only this class&apos;s homeroom teacher or an admin can record the daily register.
+          </p>
+        )}
 
         {!isLoading && view === 'record' && (
           <>
@@ -132,6 +154,7 @@ export default function AttendanceRecord() {
                             className={r.status === s ? 'btn-primary' : 'btn-secondary'}
                             style={{ padding: '5px 10px', fontSize: 12 }}
                             onClick={() => setStatus(r.studentId, s)}
+                            disabled={!canRecord}
                           >
                             {s}
                           </button>
@@ -143,7 +166,7 @@ export default function AttendanceRecord() {
                 {roster.length === 0 && <tr><td colSpan={3} className="muted">No students in this class.</td></tr>}
               </tbody>
             </table>
-            {roster.length > 0 && (
+            {roster.length > 0 && canRecord && (
               <div style={{ marginTop: 16 }}>
                 <button type="button" className="btn-primary" onClick={handleSave} disabled={isSaving}>
                   {isSaving ? 'Saving...' : 'Save Attendance'}

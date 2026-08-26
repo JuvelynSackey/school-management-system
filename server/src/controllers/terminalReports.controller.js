@@ -1,7 +1,7 @@
 const { TerminalReport, Student, Class, AcademicTerm, Result, ClassSubject, ResultSheet, SchoolSettings, School, PersonalAttribute } = require('../models');
 const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/AppError');
-const { getTeacherClassIds } = require('../services/teacherScope.service');
+const { getTeacherClassIds, isHomeroomTeacher } = require('../services/teacherScope.service');
 const { getParentStudentIds } = require('../services/parentScope.service');
 const { findOrCreate } = require('../utils/findOrCreate');
 const { computeAggregatesForStudent, recalculateClassPositions } = require('../services/terminalReports.service');
@@ -61,6 +61,16 @@ const assertClassAccess = async (req, classId) => {
     return;
   }
   throw new AppError('You do not have permission to perform this action', 403);
+};
+
+// Teacher's remark + personal-attribute ratings are a homeroom-teacher
+// action, not a per-subject one -- any subject teacher assigned to the
+// class can still view/generate/list reports (assertClassAccess above),
+// just not submit these.
+const assertHomeroomAccess = async (req, classId) => {
+  if (req.user.role === 'admin') return;
+  if (req.user.role === 'teacher' && await isHomeroomTeacher(req.user.id, classId)) return;
+  throw new AppError('Only the class\'s homeroom teacher or an admin can submit remarks and personal attribute ratings', 403);
 };
 
 // POST /terminal-reports/generate { classId, academicTermId }
@@ -127,7 +137,7 @@ const assertAllSubjectsApproved = async (classId, academicTermId, next) => {
 const submit = asyncHandler(async (req, res, next) => {
   const report = await findReportOr404(req.params.id, next);
   if (!report) return;
-  await assertClassAccess(req, report.classId);
+  await assertHomeroomAccess(req, report.classId);
   if (!['Draft', 'Rejected'].includes(report.status)) {
     return next(new AppError('Only draft or rejected reports can be submitted', 400));
   }

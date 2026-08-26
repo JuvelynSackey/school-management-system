@@ -147,3 +147,43 @@ describe('tenant isolation', () => {
     expect(res.body.data[0].name).toBe('Basic 6');
   });
 });
+
+describe('GET /classes/:id/my-access — Class Teacher vs Subject Specialist scoping', () => {
+  test('the homeroom teacher gets isHomeroom: true, regardless of subject assignments', async () => {
+    const school = await fixtures.createSchool(models);
+    const { teacher, user, password } = await fixtures.createTeacher(models, school._id);
+    const classRow = await fixtures.createClass(models, school._id, { classTeacherId: teacher.id });
+    const token = await fixtures.login(app, school.slug, user.email, password);
+
+    const res = await request(app).get(`/api/classes/${classRow.id}/my-access`).set(fixtures.authHeader(token));
+    expect(res.status).toBe(200);
+    expect(res.body.data.isHomeroom).toBe(true);
+  });
+
+  test('a subject-only teacher gets isHomeroom: false and just their own assigned subjectIds', async () => {
+    const school = await fixtures.createSchool(models);
+    const classRow = await fixtures.createClass(models, school._id);
+    const subjectA = await fixtures.createSubject(models, school._id);
+    const subjectB = await fixtures.createSubject(models, school._id);
+    const { teacher, user, password } = await fixtures.createTeacher(models, school._id);
+    await fixtures.assignTeacherToClass(models, school._id, { teacherId: teacher.id, subjectId: subjectA.id, classId: classRow.id });
+    const token = await fixtures.login(app, school.slug, user.email, password);
+
+    const res = await request(app).get(`/api/classes/${classRow.id}/my-access`).set(fixtures.authHeader(token));
+    expect(res.status).toBe(200);
+    expect(res.body.data.isHomeroom).toBe(false);
+    expect(res.body.data.subjectIds).toEqual([subjectA.id]);
+    expect(res.body.data.subjectIds).not.toContain(subjectB.id);
+  });
+
+  test('an admin gets isHomeroom: true implicitly', async () => {
+    const school = await fixtures.createSchool(models);
+    const classRow = await fixtures.createClass(models, school._id);
+    const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin10@classes-test.local' });
+    const token = await fixtures.login(app, school.slug, 'admin10@classes-test.local', password);
+
+    const res = await request(app).get(`/api/classes/${classRow.id}/my-access`).set(fixtures.authHeader(token));
+    expect(res.status).toBe(200);
+    expect(res.body.data.isHomeroom).toBe(true);
+  });
+});

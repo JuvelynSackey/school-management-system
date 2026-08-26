@@ -5,7 +5,7 @@ const { computeGradeWithScheme, getSchemeForSchool } = require('../services/grad
 const anomalyDetection = require('../services/anomalyDetection.service');
 const performanceInsights = require('../services/performanceInsights.service');
 const aiService = require('../services/ai.service');
-const { getTeacherClassIds } = require('../services/teacherScope.service');
+const { getTeacherClassIds, isHomeroomTeacher, hasSubjectAssignment } = require('../services/teacherScope.service');
 const { getParentStudentIds } = require('../services/parentScope.service');
 const { recalculateSubjectPositions, computeAggregatesForStudent, recalculateClassPositions } = require('../services/terminalReports.service');
 const { getSchoolAdminEmails } = require('../services/guardianRecipients.service');
@@ -14,16 +14,19 @@ const notifications = require('../services/notifications.service');
 
 const safeDispatch = (args) => notifications.dispatch(args).catch((err) => console.error('[notifications] dispatch failed:', err.message));
 
-const assertClassAccess = async (req, classId) => {
+// Score entry is subject-scoped, not just class-scoped: a plain subject
+// teacher may only act on the exact (classId, subjectId) pairs they're
+// assigned to. The class's homeroom teacher gets "Master Entry" instead —
+// full access across every subject in their own class, matching how a
+// Ghanaian Form Tutor actually operates day to day.
+const assertSubjectAccess = async (req, classId, subjectId) => {
   if (req.user.role === 'admin') return;
-  if (req.user.role === 'teacher') {
-    const { classIds } = await getTeacherClassIds(req.user.id);
-    if (!classIds.includes(String(classId))) {
-      throw new AppError('You are not assigned to this class', 403);
-    }
-    return;
+  if (req.user.role !== 'teacher') {
+    throw new AppError('You do not have permission to perform this action', 403);
   }
-  throw new AppError('You do not have permission to perform this action', 403);
+  if (await isHomeroomTeacher(req.user.id, classId)) return;
+  if (await hasSubjectAssignment(req.user.id, classId, subjectId)) return;
+  throw new AppError('You are not assigned to teach this subject in this class', 403);
 };
 
 // GET /results/roster?classId=&subjectId=&academicTermId=
@@ -33,7 +36,7 @@ const getRoster = asyncHandler(async (req, res, next) => {
     return next(new AppError('classId, subjectId, and academicTermId are required', 400));
   }
 
-  await assertClassAccess(req, classId);
+  await assertSubjectAccess(req, classId, subjectId);
 
   const students = await Student.find({ classId, status: 'active' })
     .select('firstName lastName admissionNo')
@@ -83,7 +86,7 @@ const getAnomalies = asyncHandler(async (req, res, next) => {
   if (!classId || !subjectId || !academicTermId) {
     return next(new AppError('classId, subjectId, and academicTermId are required', 400));
   }
-  await assertClassAccess(req, classId);
+  await assertSubjectAccess(req, classId, subjectId);
 
   const scheme = await getSchemeForSchool(req.user.schoolId);
   const flags = await anomalyDetection.detectAnomalies({
@@ -113,7 +116,7 @@ const recordBulk = asyncHandler(async (req, res, next) => {
   const subjectDoc = await Subject.findById(subjectId);
   if (!subjectDoc) return next(new AppError('Subject not found', 400));
 
-  await assertClassAccess(req, classId);
+  await assertSubjectAccess(req, classId, subjectId);
 
   const sheet = await ResultSheet.findOne({ classId, subjectId, academicTermId });
   if (sheet && (sheet.status === 'Submitted' || sheet.status === 'Approved')) {

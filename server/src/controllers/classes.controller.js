@@ -1,9 +1,10 @@
 const models = require('../models');
-const { Class, ClassSubject } = models;
+const { Class, ClassSubject, Teacher, TeacherSubjectAssignment } = models;
 const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/AppError');
 const { deleteWithCascade } = require('../services/cascadeDelete.service');
 const { LEVEL_ORDER_BY_GRADE, STAGE_BY_GRADE_LEVEL, UNRANKED_LEVEL_ORDER } = require('../constants/gradeLevels');
+const { isHomeroomTeacher } = require('../services/teacherScope.service');
 
 // gradeLevel present -> stage is force-derived from it (the two can never
 // disagree). gradeLevel absent/cleared -> stage passes through untouched,
@@ -33,6 +34,33 @@ const getById = asyncHandler(async (req, res, next) => {
   data.subjects = links.map((l) => l.subject).filter(Boolean);
 
   res.json({ success: true, data });
+});
+
+// GET /classes/:id/my-access -- for the logged-in teacher, what they can do
+// in this one class: homeroom (Master Entry: every subject, attendance,
+// remarks) or just their own assigned subjects. Drives the frontend's
+// subject-picker filtering and Homeroom/Subject-Specialist badge. Admins
+// get isHomeroom: true implicitly -- nothing to filter for them.
+const getMyAccess = asyncHandler(async (req, res, next) => {
+  const classRow = await Class.findById(req.params.id, { _id: 1 });
+  if (!classRow) return next(new AppError('Class not found', 404));
+
+  if (req.user.role === 'admin') {
+    return res.json({ success: true, data: { isHomeroom: true, subjectIds: [] } });
+  }
+  if (req.user.role !== 'teacher') {
+    return next(new AppError('You do not have permission to perform this action', 403));
+  }
+
+  const [isHomeroom, teacher] = await Promise.all([
+    isHomeroomTeacher(req.user.id, classRow.id),
+    Teacher.findOne({ userId: req.user.id }),
+  ]);
+  const assignments = teacher
+    ? await TeacherSubjectAssignment.find({ teacherId: teacher.id, classId: classRow.id }, { subjectId: 1 })
+    : [];
+
+  res.json({ success: true, data: { isHomeroom, subjectIds: assignments.map((a) => a.subjectId.toString()) } });
 });
 
 const create = asyncHandler(async (req, res) => {
@@ -86,4 +114,6 @@ const remove = asyncHandler(async (req, res, next) => {
   res.json({ success: true, data: null });
 });
 
-module.exports = { list, getById, create, update, remove };
+module.exports = {
+  list, getById, getMyAccess, create, update, remove,
+};
