@@ -8,5 +8,6 @@ const router = express.Router();
 router.use(authenticate, authorize('admin'));
 
 router.get('/summary', controller.getSummary);
+router.get('/health-score', controller.getHealthScore);
 
 module.exports = router;

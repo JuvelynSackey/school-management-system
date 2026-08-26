@@ -4,7 +4,20 @@ const aiService = require('../services/ai.service');
 const aiQuery = require('../services/aiQuery.service');
 const auditLog = require('../services/auditLog.service');
 
-const UNSUPPORTED_MESSAGE = 'I can only answer questions about fee arrears, subject average scores, and at-risk students right now — try rephrasing, or ask one of those.';
+const UNSUPPORTED_MESSAGE = 'I can only answer questions about fee arrears, subject average scores, at-risk students, subject pass rates, class performance ranking, and unsubmitted marksheets right now — try rephrasing, or ask one of those.';
+
+// A short, deterministic next-step suggestion per intent — never AI-written,
+// so it can never invent an action the data doesn't support. Only shown
+// when there's actually something to act on (empty rows means nothing to
+// recommend).
+const RECOMMENDATION_BY_INTENT = {
+  fee_arrears_by_class: 'Consider sending fee reminders to the families listed above.',
+  subject_average_scores: 'Consider reviewing teaching support or scheduling extra help for the lowest-scoring subjects.',
+  at_risk_students: 'Open each student\'s profile — their specific flags there each include a tailored recommendation.',
+  subjects_below_pass_rate: 'Consider extra tutoring sessions or a curriculum review for these subjects.',
+  class_performance_ranking: 'Consider sharing teaching approaches from the top class with others, and checking in on the lowest.',
+  teachers_unsubmitted_marksheets: 'Follow up with these teachers so their result sheets are submitted before the review deadline.',
+};
 
 // POST /ai/query { question }  (admin only)
 // JesManage Intelligence, Stage 6 Phase 5. Read-only, always: nothing in
@@ -32,7 +45,7 @@ const runQuery = asyncHandler(async (req, res, next) => {
   const { intent, params } = interpretation;
 
   if (intent === 'unsupported') {
-    return res.json({ success: true, data: { answer: UNSUPPORTED_MESSAGE, rows: [], intent } });
+    return res.json({ success: true, data: { answer: UNSUPPORTED_MESSAGE, rows: [], intent, recommendation: null } });
   }
 
   let rows;
@@ -50,13 +63,48 @@ const runQuery = asyncHandler(async (req, res, next) => {
     if (notFound) {
       return res.json({
         success: true,
-        data: { answer: `I couldn't find a term matching "${params.academicTermHint}".`, rows: [], intent },
+        data: {
+          answer: `I couldn't find a term matching "${params.academicTermHint}".`, rows: [], intent, recommendation: null,
+        },
       });
     }
     rows = await aiQuery.runSubjectAverageQuery(academicTermId);
   } else if (intent === 'at_risk_students') {
     const { academicTermId } = await aiQuery.resolveTermHint(null);
     rows = await aiQuery.runAtRiskStudentsQuery(academicTermId, req.user.schoolId);
+  } else if (intent === 'subjects_below_pass_rate') {
+    const { academicTermId, notFound } = await aiQuery.resolveTermHint(params.academicTermHint);
+    if (notFound) {
+      return res.json({
+        success: true,
+        data: {
+          answer: `I couldn't find a term matching "${params.academicTermHint}".`, rows: [], intent, recommendation: null,
+        },
+      });
+    }
+    rows = await aiQuery.runSubjectsBelowPassRateQuery(req.user.schoolId, academicTermId, params.threshold);
+  } else if (intent === 'class_performance_ranking') {
+    const { academicTermId, notFound } = await aiQuery.resolveTermHint(params.academicTermHint);
+    if (notFound) {
+      return res.json({
+        success: true,
+        data: {
+          answer: `I couldn't find a term matching "${params.academicTermHint}".`, rows: [], intent, recommendation: null,
+        },
+      });
+    }
+    rows = await aiQuery.runClassPerformanceRankingQuery(req.user.schoolId, academicTermId);
+  } else if (intent === 'teachers_unsubmitted_marksheets') {
+    const { academicTermId, notFound } = await aiQuery.resolveTermHint(params.academicTermHint);
+    if (notFound) {
+      return res.json({
+        success: true,
+        data: {
+          answer: `I couldn't find a term matching "${params.academicTermHint}".`, rows: [], intent, recommendation: null,
+        },
+      });
+    }
+    rows = await aiQuery.runTeachersUnsubmittedMarksheetsQuery(academicTermId);
   }
 
   let answer = null;
@@ -69,11 +117,13 @@ const runQuery = asyncHandler(async (req, res, next) => {
     answer = answer ? `${hintNote} ${answer}` : hintNote;
   }
 
+  const recommendation = rows.length > 0 ? (RECOMMENDATION_BY_INTENT[intent] || null) : null;
+
   await auditLog.record({
     req, action: 'ai.adminQuery', entityType: 'Query', description: `Admin asked: "${question}"`, metadata: { intent },
   });
 
-  res.json({ success: true, data: { answer, rows, intent } });
+  res.json({ success: true, data: { answer, rows, intent, recommendation } });
 });
 
 module.exports = { runQuery };

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getIntelligenceSummary } from '../../api/intelligence.api';
+import { getIntelligenceSummary, getHealthScore } from '../../api/intelligence.api';
 import { listTerms } from '../../api/terms.api';
 import { AtRiskStudentsPanel } from '../dashboard/Dashboard';
 
@@ -15,10 +15,65 @@ function MetricBadge({ label, value, tone }) {
   );
 }
 
+const HEALTH_COMPONENT_LABELS = {
+  academic: 'Academic Average', attendance: 'Attendance Rate', feeCollection: 'Fee Collection Rate', reportApproval: 'Report Approval Rate',
+};
+
+const scoreTone = (score) => {
+  if (score === null) return 'neutral';
+  if (score >= 75) return 'success';
+  if (score >= 50) return 'warning';
+  return 'danger';
+};
+
+function HealthScoreBadge({ health }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!health) return null;
+  const { score, components, weights } = health;
+
+  return (
+    <div className="panel" style={{ marginBottom: 20 }}>
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left',
+        }}
+      >
+        <div>
+          <h2 style={{ margin: 0 }}>School Health Score</h2>
+          <p className="muted" style={{ margin: '4px 0 0', fontSize: 12.5 }}>Academic 40% · Attendance 30% · Fee Collection 15% · Report Approval 15%</p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span className={`badge badge-${scoreTone(score)}`} style={{ fontSize: 18, padding: '6px 16px' }}>
+            {score === null ? 'No data yet' : `${score} / 100`}
+          </span>
+          <span aria-hidden="true">{expanded ? '▾' : '▸'}</span>
+        </div>
+      </button>
+
+      {expanded && (
+        <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {Object.entries(components).map(([key, value]) => (
+            <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: 13.5 }}>{HEALTH_COMPONENT_LABELS[key]} <span className="muted">({Math.round(weights[key] * 100)}% weight)</span></span>
+              <span style={{ fontWeight: 600 }}>{value === null ? 'No data yet' : `${value}%`}</span>
+            </div>
+          ))}
+          <p className="muted" style={{ fontSize: 11.5, marginTop: 4 }}>
+            A component with no data yet is excluded, and its weight is redistributed among the others — it never drags the score toward zero.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Intelligence() {
   const [terms, setTerms] = useState([]);
   const [academicTermId, setAcademicTermId] = useState('');
   const [summary, setSummary] = useState(null);
+  const [health, setHealth] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -38,6 +93,7 @@ export default function Intelligence() {
       .then(setSummary)
       .catch((err) => setError(err.response?.data?.message || 'Failed to load Intelligence summary.'))
       .finally(() => setIsLoading(false));
+    getHealthScore({ academicTermId }).then(setHealth).catch(() => setHealth(null));
   }, [academicTermId]);
 
   return (
@@ -57,6 +113,8 @@ export default function Intelligence() {
 
       {summary && !isLoading && (
         <>
+          <HealthScoreBadge health={health} />
+
           <div className="stat-card-row" style={{ marginBottom: 20 }}>
             <MetricBadge label="At-Risk Students" value={summary.atRiskCount} tone="warning" />
             <MetricBadge label="Improving Performers" value={summary.improvingCount} tone="success" />

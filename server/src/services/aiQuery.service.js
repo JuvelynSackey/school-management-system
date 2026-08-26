@@ -12,6 +12,8 @@ const {
 const { getOutstandingBalanceForStudentTerm } = require('./fees.service');
 const earlyWarning = require('./earlyWarning.service');
 const { getSchemeForSchool } = require('./grading.service');
+const { classAverages, subjectPassRates, round1 } = require('./academicAnalytics.service');
+const { getTeachersWithUnsubmittedMarksheets } = require('./teacherSubmissionStatus.service');
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -97,6 +99,49 @@ const runAtRiskStudentsQuery = async (academicTermId, schoolId) => {
   return flagged;
 };
 
+// "which subjects have pass rates below 50%" — reuses the exact same
+// per-subject pass-rate aggregate the Intelligence page's "Subjects Needing
+// Attention" card already computes, so the two never quietly disagree.
+const runSubjectsBelowPassRateQuery = async (schoolId, academicTermId, threshold) => {
+  const cutoff = threshold ?? 50;
+  const rates = await subjectPassRates(schoolId, academicTermId);
+  return rates
+    .filter((r) => r.passRate < cutoff)
+    .sort((a, b) => a.passRate - b.passRate);
+};
+
+// "which class performed best" — reuses the same classAverages aggregate
+// the /analytics page and /intelligence's "Class Performance" card use.
+const runClassPerformanceRankingQuery = async (schoolId, academicTermId) => {
+  const rows = await classAverages(schoolId, academicTermId);
+  const classes = await Class.find({ _id: { $in: rows.map((r) => r._id) } }, { name: 1, section: 1 });
+  const classById = new Map(classes.map((c) => [c.id, c]));
+
+  return rows
+    .map((r) => {
+      const key = r._id.toString();
+      const cls = classById.get(key);
+      return {
+        classId: key,
+        className: cls ? `${cls.name} ${cls.section || ''}`.trim() : 'Unknown',
+        average: round1(r.average),
+        resultCount: r.count,
+      };
+    })
+    .sort((a, b) => b.average - a.average);
+};
+
+// "which teachers have unsubmitted marksheets" — reuses the exact same
+// definition the admin dashboard's Action Center count uses.
+const runTeachersUnsubmittedMarksheetsQuery = async (academicTermId) => getTeachersWithUnsubmittedMarksheets(academicTermId);
+
 module.exports = {
-  resolveClassHint, resolveTermHint, runFeeArrearsQuery, runSubjectAverageQuery, runAtRiskStudentsQuery,
+  resolveClassHint,
+  resolveTermHint,
+  runFeeArrearsQuery,
+  runSubjectAverageQuery,
+  runAtRiskStudentsQuery,
+  runSubjectsBelowPassRateQuery,
+  runClassPerformanceRankingQuery,
+  runTeachersUnsubmittedMarksheetsQuery,
 };

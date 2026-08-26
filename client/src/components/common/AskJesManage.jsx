@@ -11,8 +11,9 @@ const FLAG_LABELS = {
 
 const EXAMPLE_QUESTIONS = [
   'Which students owe more than 200 in fees?',
-  'Which subjects had the lowest average scores this term?',
-  'Which students need attention this term?',
+  'Which subjects have pass rates below 50%?',
+  'Which class performed best this term?',
+  'Which teachers have unsubmitted marksheets?',
 ];
 
 function ResultsTable({ intent, rows }) {
@@ -52,6 +53,45 @@ function ResultsTable({ intent, rows }) {
               <td>{r.name}</td>
               <td>{r.className || '—'}</td>
               <td>{r.flagTypes.map((f) => FLAG_LABELS[f] || f).join(', ')}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  }
+  if (intent === 'subjects_below_pass_rate') {
+    return (
+      <table>
+        <thead><tr><th>Subject</th><th>Pass Rate</th><th>Average</th></tr></thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.subjectId}><td>{r.subjectName}</td><td>{r.passRate}%</td><td>{r.average}%</td></tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  }
+  if (intent === 'class_performance_ranking') {
+    return (
+      <table>
+        <thead><tr><th>Class</th><th>Average</th><th>Results</th></tr></thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.classId}><td>{r.className}</td><td>{r.average}%</td><td>{r.resultCount}</td></tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  }
+  if (intent === 'teachers_unsubmitted_marksheets') {
+    return (
+      <table>
+        <thead><tr><th>Teacher</th><th>Pending</th></tr></thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.teacherId}>
+              <td>{r.name}</td>
+              <td>{r.pending.map((p) => `${p.className} — ${p.subjectName}`).join(', ')}</td>
             </tr>
           ))}
         </tbody>
@@ -143,6 +183,9 @@ export default function AskJesManage({ onClose, initialQuestion }) {
         <div style={{ marginTop: 14 }}>
           {result.answer && <p style={{ fontSize: 14, marginBottom: 10 }}>🧠 {result.answer}</p>}
           <ResultsTable intent={result.intent} rows={result.rows} />
+          {result.recommendation && (
+            <p className="alert-warning" style={{ fontSize: 13, marginTop: 10 }}>💡 {result.recommendation}</p>
+          )}
         </div>
       )}
     </Modal>

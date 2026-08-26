@@ -493,7 +493,15 @@ const generateInterventionSynthesis = async (flaggedStudents) => {
 // below is individually type-checked and allowlisted before anything reads
 // it, so a malformed or adversarial model response degrades to "unsupported"
 // rather than ever being passed through as a query.
-const SUPPORTED_INTENTS = ['fee_arrears_by_class', 'subject_average_scores', 'at_risk_students', 'unsupported'];
+const SUPPORTED_INTENTS = [
+  'fee_arrears_by_class',
+  'subject_average_scores',
+  'at_risk_students',
+  'subjects_below_pass_rate',
+  'class_performance_ranking',
+  'teachers_unsubmitted_marksheets',
+  'unsupported',
+];
 
 const buildQueryInterpretationPrompt = (question) => {
   const lines = [
@@ -501,6 +509,13 @@ const buildQueryInterpretationPrompt = (question) => {
     'fixed set of supported query intents. You do not answer the question',
     'yourself and you do not write any database query — you only classify',
     'intent and extract parameters.',
+    '',
+    'For any "academicTermHint" parameter below: use null whenever the',
+    'question refers to the CURRENT/default term — including phrases like',
+    '"this term", "currently", "right now", or no time reference at all.',
+    'Only set an actual string when the question names a SPECIFIC other',
+    'term (e.g. "in Term 1", "last term", "2025/2026 Term 2"). Never pass',
+    'through words like "this term" as the hint string itself.',
     '',
     'Supported intents, and the parameters each one accepts:',
     '- "fee_arrears_by_class": students with an outstanding fee balance.',
@@ -510,6 +525,15 @@ const buildQueryInterpretationPrompt = (question) => {
     '- "at_risk_students": students flagged by low attendance, a declining',
     '  trend, or multiple failing subjects this term.',
     '  params: {}',
+    '- "subjects_below_pass_rate": subjects where the pass rate is below a',
+    '  threshold (e.g. "subjects with pass rates below 50%").',
+    '  params: { "academicTermHint": string or null, "threshold": number or null }',
+    '- "class_performance_ranking": classes ranked by average score, for a',
+    '  term (e.g. "which class performed best").',
+    '  params: { "academicTermHint": string or null }',
+    '- "teachers_unsubmitted_marksheets": teachers who have not yet submitted',
+    '  one or more of their assigned class/subject result sheets this term.',
+    '  params: { "academicTermHint": string or null }',
     '- "unsupported": the question does not clearly match any of the above.',
     '  params: {}',
     '',
@@ -533,6 +557,18 @@ const parseIntentResponse = (text) => {
     return { intent: 'unsupported', params: {} };
   }
 
+  // Belt-and-suspenders alongside the prompt's own instruction: never trust
+  // the model to reliably turn "this term"/"currently" into null on its
+  // own — coerce known current-term synonyms here too, so a resolveTermHint
+  // lookup can never spuriously fail to match a real term name.
+  const CURRENT_TERM_SYNONYMS = ['this term', 'current term', 'currently', 'now', 'right now', 'today'];
+  const normalizeTermHint = (hint) => {
+    if (typeof hint !== 'string') return null;
+    const trimmed = hint.trim().slice(0, 100);
+    if (CURRENT_TERM_SYNONYMS.includes(trimmed.toLowerCase())) return null;
+    return trimmed || null;
+  };
+
   const raw = (parsed.params && typeof parsed.params === 'object') ? parsed.params : {};
   let params = {};
   if (parsed.intent === 'fee_arrears_by_class') {
@@ -541,7 +577,14 @@ const parseIntentResponse = (text) => {
       minBalance: typeof raw.minBalance === 'number' && raw.minBalance >= 0 ? raw.minBalance : null,
     };
   } else if (parsed.intent === 'subject_average_scores') {
-    params = { academicTermHint: typeof raw.academicTermHint === 'string' ? raw.academicTermHint.slice(0, 100) : null };
+    params = { academicTermHint: normalizeTermHint(raw.academicTermHint) };
+  } else if (parsed.intent === 'subjects_below_pass_rate') {
+    params = {
+      academicTermHint: normalizeTermHint(raw.academicTermHint),
+      threshold: typeof raw.threshold === 'number' && raw.threshold >= 0 && raw.threshold <= 100 ? raw.threshold : null,
+    };
+  } else if (parsed.intent === 'class_performance_ranking' || parsed.intent === 'teachers_unsubmitted_marksheets') {
+    params = { academicTermHint: normalizeTermHint(raw.academicTermHint) };
   }
   // at_risk_students and unsupported take no params — params stays {}
 

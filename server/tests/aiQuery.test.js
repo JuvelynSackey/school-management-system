@@ -203,5 +203,108 @@ describe('Natural-Language Admin Assistant', () => {
       const logs = await runWithSchool(school._id, async () => AuditLog.find({ action: 'ai.adminQuery' }));
       expect(logs.length).toBe(1);
     });
+
+    test('subjects_below_pass_rate flags a subject where under half the class is passing, with a recommendation', async () => {
+      const school = await fixtures.createSchool(models);
+      const classRow = await fixtures.createClass(models, school._id);
+      const weakSubject = await fixtures.createSubject(models, school._id, { name: 'Weak Subject' });
+      const term = await fixtures.createTerm(models, school._id, { isCurrent: true });
+      const { student: s1 } = await fixtures.createStudent(models, school._id, { classId: classRow.id });
+      const { student: s2 } = await fixtures.createStudent(models, school._id, { classId: classRow.id });
+
+      const { Result } = models;
+      const create = (fields) => runWithSchool(school._id, async () => Result.create({ schoolId: school._id, ...fields }));
+      await create({
+        studentId: s1.id, subjectId: weakSubject.id, classId: classRow.id, academicTermId: term.id, classScore: 10, examScore: 10, totalScore: 20,
+      });
+      await create({
+        studentId: s2.id, subjectId: weakSubject.id, classId: classRow.id, academicTermId: term.id, classScore: 15, examScore: 15, totalScore: 30,
+      });
+      const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin9@query-test.local' });
+      const token = await fixtures.login(app, school.slug, 'admin9@query-test.local', password);
+
+      mockAI('{"intent":"subjects_below_pass_rate","params":{"academicTermHint":null,"threshold":null}}');
+
+      const res = await request(app).post('/api/ai/query').set(fixtures.authHeader(token)).send({ question: 'Which subjects have pass rates below 50%?' });
+      expect(res.status).toBe(200);
+      expect(res.body.data.rows).toEqual([expect.objectContaining({ subjectName: 'Weak Subject', passRate: 0 })]);
+      expect(res.body.data.recommendation).toEqual(expect.any(String));
+    });
+
+    test('class_performance_ranking ranks the highest-average class first, no recommendation when nothing to show', async () => {
+      const school = await fixtures.createSchool(models);
+      const classA = await fixtures.createClass(models, school._id, { name: 'Class A' });
+      const classB = await fixtures.createClass(models, school._id, { name: 'Class B' });
+      const subject = await fixtures.createSubject(models, school._id);
+      const term = await fixtures.createTerm(models, school._id, { isCurrent: true });
+      const { student: sA } = await fixtures.createStudent(models, school._id, { classId: classA.id });
+      const { student: sB } = await fixtures.createStudent(models, school._id, { classId: classB.id });
+      const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin10@query-test.local' });
+      const token = await fixtures.login(app, school.slug, 'admin10@query-test.local', password);
+
+      const { Result } = models;
+      const create = (fields) => runWithSchool(school._id, async () => Result.create({ schoolId: school._id, ...fields }));
+      await create({
+        studentId: sA.id, subjectId: subject.id, classId: classA.id, academicTermId: term.id, classScore: 45, examScore: 45, totalScore: 90,
+      });
+      await create({
+        studentId: sB.id, subjectId: subject.id, classId: classB.id, academicTermId: term.id, classScore: 20, examScore: 20, totalScore: 40,
+      });
+
+      mockAI('{"intent":"class_performance_ranking","params":{"academicTermHint":null}}');
+
+      const res = await request(app).post('/api/ai/query').set(fixtures.authHeader(token)).send({ question: 'Which class performed best?' });
+      expect(res.status).toBe(200);
+      expect(res.body.data.rows[0].className).toBe('Class A');
+      expect(res.body.data.rows[0].average).toBe(90);
+      expect(res.body.data.rows[1].className).toBe('Class B');
+
+      mockAI('{"intent":"class_performance_ranking","params":{"academicTermHint":"nonexistent term"}}');
+      const empty = await request(app).post('/api/ai/query').set(fixtures.authHeader(token)).send({ question: 'best class in Nonexistent Term' });
+      expect(empty.body.data.rows).toEqual([]);
+      expect(empty.body.data.recommendation).toBeNull();
+    });
+
+    test('an academicTermHint of "this term" resolves to the current term instead of a spurious "not found"', async () => {
+      const school = await fixtures.createSchool(models);
+      const classRow = await fixtures.createClass(models, school._id);
+      const subject = await fixtures.createSubject(models, school._id);
+      const term = await fixtures.createTerm(models, school._id, { isCurrent: true });
+      const { student } = await fixtures.createStudent(models, school._id, { classId: classRow.id });
+      const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin12@query-test.local' });
+      const token = await fixtures.login(app, school.slug, 'admin12@query-test.local', password);
+
+      const { Result } = models;
+      await runWithSchool(school._id, async () => Result.create({
+        schoolId: school._id, studentId: student.id, subjectId: subject.id, classId: classRow.id, academicTermId: term.id, classScore: 40, examScore: 40,
+      }));
+
+      mockAI('{"intent":"subject_average_scores","params":{"academicTermHint":"this term"}}');
+
+      const res = await request(app).post('/api/ai/query').set(fixtures.authHeader(token)).send({ question: 'lowest scores this term' });
+      expect(res.status).toBe(200);
+      expect(res.body.data.answer).not.toContain('couldn\'t find a term');
+      expect(res.body.data.rows).toHaveLength(1);
+    });
+
+    test('teachers_unsubmitted_marksheets reuses the dashboard\'s own definition', async () => {
+      const school = await fixtures.createSchool(models);
+      const classRow = await fixtures.createClass(models, school._id);
+      const subject = await fixtures.createSubject(models, school._id);
+      const term = await fixtures.createTerm(models, school._id, { isCurrent: true });
+      const { teacher } = await fixtures.createTeacher(models, school._id, { email: 'unsubmitted@query-test.local' });
+      await fixtures.assignTeacherToClass(models, school._id, { teacherId: teacher.id, subjectId: subject.id, classId: classRow.id });
+      const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin11@query-test.local' });
+      const token = await fixtures.login(app, school.slug, 'admin11@query-test.local', password);
+
+      mockAI('{"intent":"teachers_unsubmitted_marksheets","params":{"academicTermHint":null}}');
+
+      const res = await request(app).post('/api/ai/query').set(fixtures.authHeader(token)).send({ question: 'Which teachers have unsubmitted marksheets?' });
+      expect(res.status).toBe(200);
+      expect(res.body.data.rows).toEqual([
+        expect.objectContaining({ teacherId: teacher.id, name: `${teacher.firstName} ${teacher.lastName}` }),
+      ]);
+      expect(res.body.data.recommendation).toEqual(expect.any(String));
+    });
   });
 });
