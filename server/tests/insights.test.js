@@ -220,6 +220,72 @@ describe('Academic Progress History', () => {
     ]);
   });
 
+  test('includes class-position history for admin/teacher, ordered by term', async () => {
+    const school = await fixtures.createSchool(models);
+    const classRow = await fixtures.createClass(models, school._id);
+    const subject = await fixtures.createSubject(models, school._id);
+    const termOne = await fixtures.createTerm(models, school._id, { termNumber: 1, isCurrent: false, startDate: new Date('2025-01-10'), name: 'Term 1' });
+    const termTwo = await fixtures.createTerm(models, school._id, { termNumber: 2, isCurrent: true, startDate: new Date('2025-05-10'), name: 'Term 2' });
+    const { student } = await fixtures.createStudent(models, school._id, { classId: classRow.id });
+    const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin8@history-test.local' });
+    const token = await fixtures.login(app, school.slug, 'admin8@history-test.local', password);
+
+    await createResult(school._id, {
+      studentId: student.id, subjectId: subject.id, classId: classRow.id, academicTermId: termOne.id, classScore: 30, examScore: 30, totalScore: 60,
+    });
+    await createResult(school._id, {
+      studentId: student.id, subjectId: subject.id, classId: classRow.id, academicTermId: termTwo.id, classScore: 40, examScore: 40, totalScore: 80,
+    });
+    const { TerminalReport } = models;
+    await runWithSchool(school._id, async () => TerminalReport.create({
+      schoolId: school._id, studentId: student.id, classId: classRow.id, academicTermId: termOne.id, classPosition: 5, status: 'Draft',
+    }));
+    await runWithSchool(school._id, async () => TerminalReport.create({
+      schoolId: school._id, studentId: student.id, classId: classRow.id, academicTermId: termTwo.id, classPosition: 2, status: 'Published',
+    }));
+
+    const res = await request(app).get(`/api/results/academic-history/${student.id}`).set(fixtures.authHeader(token));
+    expect(res.status).toBe(200);
+    expect(res.body.data.positionHistory).toEqual([
+      { term: 'Term 1', classPosition: 5 },
+      { term: 'Term 2', classPosition: 2 },
+    ]);
+  });
+
+  test('a student only sees class-position history from a Published report, not a Draft one', async () => {
+    const school = await fixtures.createSchool(models);
+    const classRow = await fixtures.createClass(models, school._id);
+    const subject = await fixtures.createSubject(models, school._id);
+    const termOne = await fixtures.createTerm(models, school._id, { termNumber: 1, isCurrent: false, startDate: new Date('2025-01-10'), name: 'Term 1' });
+    const termTwo = await fixtures.createTerm(models, school._id, { termNumber: 2, isCurrent: true, startDate: new Date('2025-05-10'), name: 'Term 2' });
+    const { user, student, password } = await fixtures.createStudent(models, school._id, { classId: classRow.id });
+
+    await createResult(school._id, {
+      studentId: student.id, subjectId: subject.id, classId: classRow.id, academicTermId: termOne.id, classScore: 30, examScore: 30, totalScore: 60,
+    });
+    await createResult(school._id, {
+      studentId: student.id, subjectId: subject.id, classId: classRow.id, academicTermId: termTwo.id, classScore: 40, examScore: 40, totalScore: 80,
+    });
+    const { ResultSheet, TerminalReport } = models;
+    await runWithSchool(school._id, async () => ResultSheet.create({
+      schoolId: school._id, classId: classRow.id, subjectId: subject.id, academicTermId: termOne.id, status: 'Approved',
+    }));
+    await runWithSchool(school._id, async () => ResultSheet.create({
+      schoolId: school._id, classId: classRow.id, subjectId: subject.id, academicTermId: termTwo.id, status: 'Approved',
+    }));
+    await runWithSchool(school._id, async () => TerminalReport.create({
+      schoolId: school._id, studentId: student.id, classId: classRow.id, academicTermId: termOne.id, classPosition: 5, status: 'Draft',
+    }));
+    await runWithSchool(school._id, async () => TerminalReport.create({
+      schoolId: school._id, studentId: student.id, classId: classRow.id, academicTermId: termTwo.id, classPosition: 2, status: 'Published',
+    }));
+
+    const token = await fixtures.login(app, school.slug, user.email, password);
+    const res = await request(app).get(`/api/results/academic-history/${student.id}`).set(fixtures.authHeader(token));
+    expect(res.status).toBe(200);
+    expect(res.body.data.positionHistory).toEqual([{ term: 'Term 2', classPosition: 2 }]);
+  });
+
   test('a student with no results at all gets an empty, harmless response', async () => {
     const school = await fixtures.createSchool(models);
     const classRow = await fixtures.createClass(models, school._id);
@@ -231,6 +297,7 @@ describe('Academic Progress History', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.overallHistory).toEqual([]);
     expect(res.body.data.subjectHistory).toEqual([]);
+    expect(res.body.data.positionHistory).toEqual([]);
   });
 
   test('a student only sees scores from an Approved sheet in their own history, not a Draft one', async () => {

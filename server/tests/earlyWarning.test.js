@@ -59,6 +59,8 @@ describe('Early-Warning Intelligence', () => {
     expect(ids).not.toContain(fineStudent.id);
     const flagged = res.body.data.students.find((s) => s.studentId === strugglingStudent.id);
     expect(flagged.academicFlags.map((f) => f.type)).toEqual(['low_attendance']);
+    expect(flagged.academicFlags[0].recommendation).toEqual(expect.any(String));
+    expect(flagged.academicFlags[0].recommendation.length).toBeGreaterThan(0);
   });
 
   test('too few attendance records is not enough signal to flag, even if every one is an absence', async () => {

@@ -400,8 +400,16 @@ const getAcademicHistory = asyncHandler(async (req, res, next) => {
     results = await filterToApprovedOnly(results);
   }
 
+  // Class-position history follows the same publish boundary as the report
+  // card itself — a position only appears here once a student/parent could
+  // also see it on their published report card, never a Draft/Submitted one.
+  let terminalReports = await TerminalReport.find({ studentId }).populate('academicTerm', 'name startDate');
+  if (req.user.role === 'student' || req.user.role === 'parent') {
+    terminalReports = terminalReports.filter((tr) => tr.status === 'Published');
+  }
+
   const scheme = await getSchemeForSchool(req.user.schoolId);
-  const history = performanceInsights.computeAcademicHistory({ results, scheme });
+  const history = performanceInsights.computeAcademicHistory({ results, scheme, terminalReports });
 
   res.json({ success: true, data: history });
 });

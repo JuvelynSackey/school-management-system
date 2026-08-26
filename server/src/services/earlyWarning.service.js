@@ -23,6 +23,7 @@ const detectAttendanceFlag = async (studentId, academicTermId) => {
   return {
     type: 'low_attendance',
     message: `Attended ${Math.round(percent)}% of recorded school days this term (${attended}/${records.length}).`,
+    recommendation: 'Contact the parent/guardian to understand the cause and agree on a plan to improve attendance.',
   };
 };
 
@@ -39,6 +40,7 @@ const detectAcademicDeclineFlag = async (studentId, scheme) => {
   return {
     type: 'academic_decline',
     message: `Downward trend across their last ${trend.termsCompared} terms (${trend.deltaPercent}% vs. the previous term).`,
+    recommendation: 'Review recent test/exam scores with the student\'s subject teachers and consider a short check-in to identify what changed.',
   };
 };
 
@@ -53,6 +55,7 @@ const detectFailingSubjectsFlag = async (studentId, academicTermId, scheme) => {
   return {
     type: 'failing_multiple_subjects',
     message: `Below ${FAILING_PERCENT_CUTOFF}% in ${failing.length} subject${failing.length === 1 ? '' : 's'} this term: ${failing.map((r) => r.subject?.name || 'Unknown').join(', ')}.`,
+    recommendation: `Arrange extra support or a tutoring session focused on ${failing.length === 1 ? failing[0].subject?.name || 'the subject above' : 'the subjects above'}.`,
   };
 };
 

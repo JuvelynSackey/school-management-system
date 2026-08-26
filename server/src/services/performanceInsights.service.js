@@ -72,7 +72,7 @@ const computeInsights = ({ results, scheme }) => {
 // and is excluded) — this just returns the full history instead of
 // collapsing it into a single trend number, for the Academic Progress
 // History card on StudentProfile.
-const computeAcademicHistory = ({ results, scheme }) => {
+const computeAcademicHistory = ({ results, scheme, terminalReports = [] }) => {
   const maxTotal = (scheme?.classScoreMax ?? 50) + (scheme?.examScoreMax ?? 50);
   const pct = (score) => (maxTotal > 0 ? Math.round((score / maxTotal) * 100) : null);
 
@@ -112,7 +112,20 @@ const computeAcademicHistory = ({ results, scheme }) => {
     }))
     .sort((a, b) => a.subject.localeCompare(b.subject));
 
-  return { overallHistory, subjectHistory };
+  // Position history reuses the same term ordering derived from Result
+  // data above, rather than re-deriving it from terminalReports, so a term
+  // with a published report but (for whatever reason) no Result docs never
+  // introduces an out-of-order or orphaned point on the chart.
+  const positionByTerm = new Map();
+  terminalReports.forEach((tr) => {
+    const termId = tr.academicTerm?.id;
+    if (termId && tr.classPosition != null) positionByTerm.set(termId, tr.classPosition);
+  });
+  const positionHistory = orderedTerms
+    .filter((t) => positionByTerm.has(t.termId))
+    .map((t) => ({ term: t.termName, classPosition: positionByTerm.get(t.termId) }));
+
+  return { overallHistory, subjectHistory, positionHistory };
 };
 
 module.exports = { computeInsights, computeAcademicHistory };

@@ -356,6 +356,9 @@ export function AtRiskStudentsPanel({ index, data: externalData }) {
                     <div key={f.type}>
                       <span className="badge badge-warning">{FLAG_LABELS[f.type] || f.type}</span>
                       <p className="muted" style={{ fontSize: 11.5, margin: '3px 0 0', whiteSpace: 'normal' }}>{f.message}</p>
+                      {f.recommendation && (
+                        <p style={{ fontSize: 11.5, margin: '3px 0 0', whiteSpace: 'normal', color: 'var(--accent)' }}>💡 {f.recommendation}</p>
+                      )}
                     </div>
                   ))}
                 </div>
