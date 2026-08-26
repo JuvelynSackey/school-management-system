@@ -1,11 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import useApiResource from '../../hooks/useApiResource';
-import { listTeachers, createTeacher, updateTeacher, deleteTeacher } from '../../api/teachers.api';
+import { listTeachers, createTeacher, updateTeacher } from '../../api/teachers.api';
+import { listClasses } from '../../api/classes.api';
+import { listSubjectsForClass } from '../../api/subjects.api';
 import Modal from '../../components/common/Modal';
 
 const emptyForm = {
   email: '', staffNo: '', firstName: '', lastName: '', gender: '', phone: '', hireDate: '', qualification: '',
 };
+
+const emptyAssignmentRow = () => ({ classId: '', subjectId: '' });
 
 export default function TeacherList() {
   const { data: teachers, isLoading, error, reload } = useApiResource(listTeachers);
@@ -14,8 +18,40 @@ export default function TeacherList() {
   const [formError, setFormError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [createdCredentials, setCreatedCredentials] = useState(null);
+  const [classes, setClasses] = useState([]);
+  const [homeroomClassId, setHomeroomClassId] = useState('');
+  const [assignmentRows, setAssignmentRows] = useState([]);
+  const [subjectsByClassId, setSubjectsByClassId] = useState({});
 
-  const openNew = () => { setForm(emptyForm); setFormError(''); setEditing('new'); };
+  useEffect(() => { listClasses().then(setClasses).catch(() => setClasses([])); }, []);
+
+  const loadSubjectsForClass = (classId) => {
+    if (!classId || subjectsByClassId[classId]) return;
+    listSubjectsForClass(classId)
+      .then((links) => setSubjectsByClassId((prev) => ({ ...prev, [classId]: links.map((l) => l.subject) })))
+      .catch(() => setSubjectsByClassId((prev) => ({ ...prev, [classId]: [] })));
+  };
+
+  const updateAssignmentRow = (index, field, value) => {
+    setAssignmentRows((prev) => prev.map((row, i) => {
+      if (i !== index) return row;
+      // Changing the class invalidates whatever subject was picked for the
+      // old class — a subject id from one class's curriculum is meaningless
+      // once the row points at a different class.
+      const next = { ...row, [field]: value };
+      if (field === 'classId') next.subjectId = '';
+      return next;
+    }));
+    if (field === 'classId') loadSubjectsForClass(value);
+  };
+
+  const openNew = () => {
+    setForm(emptyForm);
+    setFormError('');
+    setHomeroomClassId('');
+    setAssignmentRows([]);
+    setEditing('new');
+  };
   const openEdit = (teacher) => {
     setForm({
       email: teacher.user?.email || '',
@@ -39,7 +75,14 @@ export default function TeacherList() {
     setFormError('');
     try {
       if (editing === 'new') {
-        const created = await createTeacher(form);
+        const subjectAssignments = assignmentRows
+          .filter((row) => row.classId && row.subjectId)
+          .map((row) => ({ classId: row.classId, subjectId: row.subjectId }));
+        const created = await createTeacher({
+          ...form,
+          homeroomClassId: homeroomClassId || null,
+          subjectAssignments,
+        });
         close();
         setCreatedCredentials({ email: created.user.email, password: created.tempPassword });
       } else {
@@ -58,12 +101,6 @@ export default function TeacherList() {
   const handleToggleStatus = async (teacher) => {
     const status = teacher.status === 'active' ? 'inactive' : 'active';
     await updateTeacher(teacher.id, { status });
-    reload();
-  };
-
-  const handleDelete = async (teacher) => {
-    if (!window.confirm(`Delete teacher "${teacher.firstName} ${teacher.lastName}"? This also removes their login.`)) return;
-    await deleteTeacher(teacher.id);
     reload();
   };
 
@@ -100,7 +137,6 @@ export default function TeacherList() {
                       <button type="button" className="link-btn" onClick={() => handleToggleStatus(teacher)}>
                         {teacher.status === 'active' ? 'Deactivate' : 'Activate'}
                       </button>
-                      <button type="button" className="link-btn danger" onClick={() => handleDelete(teacher)}>Delete</button>
                     </div>
                   </td>
                 </tr>
@@ -153,6 +189,56 @@ export default function TeacherList() {
               <span>Qualification</span>
               <input value={form.qualification} onChange={(e) => setForm({ ...form, qualification: e.target.value })} />
             </label>
+
+            {editing === 'new' && (
+              <>
+                <label className="field">
+                  <span>Homeroom Class (optional)</span>
+                  <select value={homeroomClassId} onChange={(e) => setHomeroomClassId(e.target.value)}>
+                    <option value="">— None —</option>
+                    {classes.map((c) => <option key={c.id} value={c.id}>{c.name} {c.section}</option>)}
+                  </select>
+                  <small className="muted">Makes this teacher the Class Teacher (Form Tutor) — full access to that class&apos;s attendance, remarks, and every subject.</small>
+                </label>
+
+                <div className="field">
+                  <span>Subject Assignments (optional)</span>
+                  {assignmentRows.map((row, index) => (
+                    // eslint-disable-next-line react/no-array-index-key
+                    <div key={index} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                      <select
+                        value={row.classId}
+                        onChange={(e) => updateAssignmentRow(index, 'classId', e.target.value)}
+                        style={{ flex: 1 }}
+                      >
+                        <option value="">Select class...</option>
+                        {classes.map((c) => <option key={c.id} value={c.id}>{c.name} {c.section}</option>)}
+                      </select>
+                      <select
+                        value={row.subjectId}
+                        onChange={(e) => updateAssignmentRow(index, 'subjectId', e.target.value)}
+                        disabled={!row.classId}
+                        style={{ flex: 1 }}
+                      >
+                        <option value="">Select subject...</option>
+                        {(subjectsByClassId[row.classId] || []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      </select>
+                      <button
+                        type="button"
+                        className="link-btn danger"
+                        onClick={() => setAssignmentRows((prev) => prev.filter((_, i) => i !== index))}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                  <button type="button" className="btn-secondary" onClick={() => setAssignmentRows((prev) => [...prev, emptyAssignmentRow()])}>
+                    + Add Subject Assignment
+                  </button>
+                </div>
+              </>
+            )}
+
             <div className="modal-actions">
               <button type="button" className="btn-secondary" onClick={close}>Cancel</button>
               <button type="submit" className="btn-primary" disabled={isSaving}>{isSaving ? 'Saving...' : 'Save'}</button>

@@ -30,8 +30,8 @@ describe('statistical outlier detection (>2.5 sigma)', () => {
     const school = await fixtures.createSchool(models);
     const classRow = await fixtures.createClass(models, school._id);
     const subject = await fixtures.createSubject(models, school._id);
-    const currentTerm = await fixtures.createTerm(models, school._id, { name: 'Term 3' });
-    const priorTerms = await Promise.all([1, 2].map((n) => fixtures.createTerm(models, school._id, { name: `Prior ${n}` })));
+    const currentTerm = await fixtures.createTerm(models, school._id, { name: 'Term 3', termNumber: 3 });
+    const priorTerms = await Promise.all([1, 2].map((n) => fixtures.createTerm(models, school._id, { name: `Prior ${n}`, termNumber: n })));
     const { student } = await fixtures.createStudent(models, school._id, { classId: classRow.id });
 
     await seedSteadyHistory(models, school, student, subject, classRow, priorTerms, [60, 40]);
@@ -73,8 +73,8 @@ describe('statistical outlier detection (>2.5 sigma)', () => {
     const school = await fixtures.createSchool(models);
     const classRow = await fixtures.createClass(models, school._id);
     const subject = await fixtures.createSubject(models, school._id);
-    const currentTerm = await fixtures.createTerm(models, school._id, { name: 'Term 3' });
-    const priorTerms = await Promise.all([1, 2, 3].map((n) => fixtures.createTerm(models, school._id, { name: `Prior ${n}` })));
+    const currentTerm = await fixtures.createTerm(models, school._id, { name: 'Term 4', termNumber: 4 });
+    const priorTerms = await Promise.all([1, 2, 3].map((n) => fixtures.createTerm(models, school._id, { name: `Prior ${n}`, termNumber: n })));
     const { student } = await fixtures.createStudent(models, school._id, { classId: classRow.id });
 
     // Steady 60/58/62 history: mean 60, sample stdDev 2 — a score of 20 is
@@ -101,8 +101,8 @@ describe('statistical outlier detection (>2.5 sigma)', () => {
     const school = await fixtures.createSchool(models);
     const classRow = await fixtures.createClass(models, school._id);
     const subject = await fixtures.createSubject(models, school._id);
-    const currentTerm = await fixtures.createTerm(models, school._id, { name: 'Term 3' });
-    const priorTerms = await Promise.all([1, 2, 3].map((n) => fixtures.createTerm(models, school._id, { name: `Prior ${n}` })));
+    const currentTerm = await fixtures.createTerm(models, school._id, { name: 'Term 4', termNumber: 4 });
+    const priorTerms = await Promise.all([1, 2, 3].map((n) => fixtures.createTerm(models, school._id, { name: `Prior ${n}`, termNumber: n })));
     const { student } = await fixtures.createStudent(models, school._id, { classId: classRow.id });
 
     await seedSteadyHistory(models, school, student, subject, classRow, priorTerms, [60, 58, 62]);
@@ -130,8 +130,8 @@ describe('statistical outlier detection (>2.5 sigma)', () => {
     const school = await fixtures.createSchool(models);
     const classRow = await fixtures.createClass(models, school._id);
     const subject = await fixtures.createSubject(models, school._id);
-    const currentTerm = await fixtures.createTerm(models, school._id, { name: 'Term 2' });
-    const priorTerm = await fixtures.createTerm(models, school._id, { name: 'Prior 1' });
+    const currentTerm = await fixtures.createTerm(models, school._id, { name: 'Term 2', termNumber: 2 });
+    const priorTerm = await fixtures.createTerm(models, school._id, { name: 'Prior 1', termNumber: 1 });
     const { student } = await fixtures.createStudent(models, school._id, { classId: classRow.id });
 
     await runWithSchool(school._id, () => models.Result.create({

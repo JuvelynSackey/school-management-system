@@ -9,6 +9,10 @@ const createValidator = [
   body('phone').optional({ nullable: true }).trim(),
   body('hireDate').optional({ nullable: true, checkFalsy: true }).isISO8601(),
   body('qualification').optional({ nullable: true }).trim(),
+  body('homeroomClassId').optional({ nullable: true, checkFalsy: true }).isMongoId(),
+  body('subjectAssignments').optional({ nullable: true }).isArray().withMessage('subjectAssignments must be an array'),
+  body('subjectAssignments.*.classId').isMongoId().withMessage('Each subject assignment needs a valid classId'),
+  body('subjectAssignments.*.subjectId').isMongoId().withMessage('Each subject assignment needs a valid subjectId'),
 ];
 
 const updateValidator = [

@@ -1,6 +1,8 @@
 const bcrypt = require('bcryptjs');
 const models = require('../models');
-const { mongoose, Teacher, User } = models;
+const {
+  mongoose, Teacher, User, Class, Subject, TeacherSubjectAssignment,
+} = models;
 const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/AppError');
 const { generateTempPassword } = require('../utils/password');
@@ -19,10 +21,42 @@ const getById = asyncHandler(async (req, res, next) => {
 });
 
 const create = asyncHandler(async (req, res, next) => {
-  const { email, staffNo, firstName, lastName, gender, phone, hireDate, qualification } = req.body;
+  const {
+    email, staffNo, firstName, lastName, gender, phone, hireDate, qualification,
+    homeroomClassId, subjectAssignments,
+  } = req.body;
 
   const existing = await User.findOne({ email });
   if (existing) return next(new AppError('A user with this email already exists', 400));
+
+  // De-dupe (classId, subjectId) pairs before anything else touches the DB —
+  // the TeacherSubjectAssignment unique index only applies when
+  // academicTermId is a real ObjectId, so a null-term duplicate (what every
+  // assignment made here uses) wouldn't be caught by the DB itself.
+  const seenPairs = new Set();
+  const uniqueAssignments = (Array.isArray(subjectAssignments) ? subjectAssignments : []).filter((a) => {
+    const key = `${a.classId}:${a.subjectId}`;
+    if (seenPairs.has(key)) return false;
+    seenPairs.add(key);
+    return true;
+  });
+
+  // Validate referenced classes/subjects up front so a bad id fails fast
+  // with a clear 400 instead of aborting mid-transaction.
+  if (homeroomClassId && !(await Class.findById(homeroomClassId))) {
+    return next(new AppError('Homeroom class not found', 400));
+  }
+  if (uniqueAssignments.length > 0) {
+    const classIds = [...new Set(uniqueAssignments.map((a) => a.classId))];
+    const subjectIds = [...new Set(uniqueAssignments.map((a) => a.subjectId))];
+    const [classCount, subjectCount] = await Promise.all([
+      Class.countDocuments({ _id: { $in: classIds } }),
+      Subject.countDocuments({ _id: { $in: subjectIds } }),
+    ]);
+    if (classCount !== classIds.length || subjectCount !== subjectIds.length) {
+      return next(new AppError('One or more assigned classes/subjects were not found', 400));
+    }
+  }
 
   const tempPassword = generateTempPassword();
   const passwordHash = await bcrypt.hash(tempPassword, 10);
@@ -51,13 +85,31 @@ const create = asyncHandler(async (req, res, next) => {
         qualification: qualification || null,
         status: 'active',
       }], { session });
+
+      if (homeroomClassId) {
+        await Class.updateOne({ _id: homeroomClassId }, { $set: { classTeacherId: teacher._id } }, { session });
+      }
+      if (uniqueAssignments.length > 0) {
+        await TeacherSubjectAssignment.insertMany(
+          uniqueAssignments.map((a) => ({
+            teacherId: teacher._id, classId: a.classId, subjectId: a.subjectId, academicTermId: null,
+          })),
+          { session },
+        );
+      }
     });
   } finally {
     await session.endSession();
   }
 
   await auditLog.record({
-    req, action: 'teacher.create', entityType: 'Teacher', entityId: teacher.id, description: `Created teacher: ${firstName} ${lastName} (${staffNo})`,
+    req,
+    action: 'teacher.create',
+    entityType: 'Teacher',
+    entityId: teacher.id,
+    description: `Created teacher: ${firstName} ${lastName} (${staffNo})`
+      + (homeroomClassId ? ', assigned as homeroom teacher' : '')
+      + (uniqueAssignments.length > 0 ? `, with ${uniqueAssignments.length} subject assignment(s)` : ''),
   });
 
   res.status(201).json({
@@ -103,6 +155,20 @@ const update = asyncHandler(async (req, res, next) => {
 const remove = asyncHandler(async (req, res, next) => {
   const teacher = await Teacher.findById(req.params.id);
   if (!teacher) return next(new AppError('Teacher not found', 404));
+
+  // Historical Results/ResultSheets survive a delete either way (their
+  // recordedBy/submittedBy just gets set to null — see
+  // cascadeDelete.service.js), but a teacher still actively assigned as a
+  // homeroom or subject teacher shouldn't be deletable in one click:
+  // reassigning first, then deactivating, is the safe offboarding path.
+  const [homeroomCount, assignmentCount] = await Promise.all([
+    Class.countDocuments({ classTeacherId: teacher.id }),
+    TeacherSubjectAssignment.countDocuments({ teacherId: teacher.id }),
+  ]);
+  if (homeroomCount > 0 || assignmentCount > 0) {
+    return next(new AppError('Cannot delete teacher with active class or subject assignments. Please reassign their classes and deactivate the account instead.', 400));
+  }
+
   await auditLog.record({
     req, action: 'teacher.remove', entityType: 'Teacher', entityId: teacher.id, description: `Deleted teacher: ${teacher.firstName} ${teacher.lastName}`,
   });
