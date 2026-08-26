@@ -44,9 +44,9 @@ const replaceSafetyNotes = async (studentId, notes, session) => {
 // by the "New Student" form (students.controller.js) and the admissions
 // "Enroll" action (admissions.controller.js) so there's exactly one place
 // this logic lives. Caller is responsible for existence/uniqueness checks
-// (email, classId, houseId) before calling this.
+// (email, classId) before calling this.
 const createStudentAccount = async ({
-  email, admissionNo, firstName, lastName, gender, dateOfBirth, classId, houseId,
+  email, admissionNo, firstName, lastName, gender, dateOfBirth, classId,
   address, admissionDate, category, programme, guardians, safetyNotes,
 }) => {
   const tempPassword = generateTempPassword();
@@ -72,7 +72,6 @@ const createStudentAccount = async ({
         gender: gender || null,
         dateOfBirth: dateOfBirth || null,
         classId: classId || null,
-        houseId: houseId || null,
         address: address || null,
         admissionDate: admissionDate || null,
         category: category || null,

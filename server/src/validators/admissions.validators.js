@@ -37,7 +37,6 @@ const enrollValidator = [
   body('email').isEmail().withMessage('A valid email is required'),
   body('admissionNo').trim().notEmpty().withMessage('Admission number is required'),
   body('classId').optional({ nullable: true }).isMongoId(),
-  body('houseId').optional({ nullable: true }).isMongoId(),
   body('admissionDate').optional({ nullable: true, checkFalsy: true }).isISO8601(),
 ];
 

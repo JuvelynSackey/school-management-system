@@ -1,6 +1,6 @@
 const models = require('../models');
 const {
-  Admission, Class, Student, User, House,
+  Admission, Class, Student, User,
 } = models;
 const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/AppError');
@@ -121,14 +121,14 @@ const reject = asyncHandler(async (req, res, next) => {
   res.json({ success: true, data: admission });
 });
 
-// POST /admissions/:id/enroll { email, admissionNo, classId, houseId, admissionDate }
+// POST /admissions/:id/enroll { email, admissionNo, classId, admissionDate }
 const enroll = asyncHandler(async (req, res, next) => {
   const admission = await findAdmissionOr404(req.params.id, next);
   if (!admission) return;
   if (admission.status !== 'Approved') return next(new AppError('Only approved applications can be enrolled', 400));
 
   const {
-    email, admissionNo, classId, houseId, admissionDate,
+    email, admissionNo, classId, admissionDate,
   } = req.body;
 
   const existing = await User.findOne({ email });
@@ -136,7 +136,6 @@ const enroll = asyncHandler(async (req, res, next) => {
 
   const resolvedClassId = classId || admission.desiredClassId;
   if (resolvedClassId && !(await Class.findById(resolvedClassId))) return next(new AppError('Class not found', 400));
-  if (houseId && !(await House.findById(houseId))) return next(new AppError('House not found', 400));
 
   const { student, tempPassword } = await createStudentAccount({
     email,
@@ -146,7 +145,6 @@ const enroll = asyncHandler(async (req, res, next) => {
     gender: admission.gender,
     dateOfBirth: admission.dateOfBirth,
     classId: resolvedClassId,
-    houseId,
     address: admission.address,
     admissionDate,
     guardians: admission.guardians,

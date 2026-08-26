@@ -6,7 +6,6 @@ import {
   rejectAdmission, enrollAdmission, deleteAdmission, getSuggestedAdmissionNo,
 } from '../../api/admissions.api';
 import { listClasses } from '../../api/classes.api';
-import { listHouses } from '../../api/houses.api';
 import { lookupGuardianByPhone } from '../../api/guardians.api';
 import Modal from '../../components/common/Modal';
 
@@ -32,7 +31,6 @@ export default function AdmissionsList() {
   const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState('');
   const [classes, setClasses] = useState([]);
-  const [houses, setHouses] = useState([]);
 
   const params = statusFilter ? { status: statusFilter } : {};
   const { data: admissions, isLoading, error, reload } = useApiResource(
@@ -58,7 +56,6 @@ export default function AdmissionsList() {
 
   useEffect(() => {
     listClasses().then(setClasses).catch(() => setClasses([]));
-    listHouses().then(setHouses).catch(() => setHouses([]));
   }, []);
 
   const openNew = () => { setForm(emptyForm()); setFormError(''); setEditing('new'); };
@@ -185,7 +182,6 @@ export default function AdmissionsList() {
       email: '',
       admissionNo: suggested,
       classId: admission.desiredClassId || '',
-      houseId: '',
       admissionDate: today(),
     });
   };
@@ -198,7 +194,6 @@ export default function AdmissionsList() {
       const payload = {
         ...enrollForm,
         classId: enrollForm.classId || null,
-        houseId: enrollForm.houseId || null,
         admissionDate: enrollForm.admissionDate || null,
       };
       const result = await enrollAdmission(enrolling.id, payload);
@@ -413,13 +408,6 @@ export default function AdmissionsList() {
               <select value={enrollForm.classId} onChange={(e) => setEnrollForm({ ...enrollForm, classId: e.target.value })}>
                 <option value="">Unassigned</option>
                 {classes.map((c) => <option key={c.id} value={c.id}>{c.name} {c.section}</option>)}
-              </select>
-            </label>
-            <label className="field">
-              <span>House</span>
-              <select value={enrollForm.houseId} onChange={(e) => setEnrollForm({ ...enrollForm, houseId: e.target.value })}>
-                <option value="">Unassigned</option>
-                {houses.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
               </select>
             </label>
             <label className="field">

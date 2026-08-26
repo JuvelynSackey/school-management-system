@@ -11,7 +11,6 @@ const studentSchema = new mongoose.Schema({
   gender: { type: String, default: null },
   dateOfBirth: { type: String, default: null },
   classId: { type: mongoose.Schema.Types.ObjectId, ref: 'Class', default: null },
-  houseId: { type: mongoose.Schema.Types.ObjectId, ref: 'House', default: null },
   address: { type: String, default: null },
   admissionDate: { type: String, default: null },
   category: { type: String, enum: ['Day', 'Boarding', null], default: null },
@@ -43,7 +42,6 @@ studentSchema.index({ schoolId: 1, waecIndexNumber: 1 }, {
 });
 studentSchema.virtual('user', { ref: 'User', localField: 'userId', foreignField: '_id', justOne: true });
 studentSchema.virtual('class', { ref: 'Class', localField: 'classId', foreignField: '_id', justOne: true });
-studentSchema.virtual('house', { ref: 'House', localField: 'houseId', foreignField: '_id', justOne: true });
 studentSchema.virtual('safetyNotes', { ref: 'StudentSafetyNote', localField: '_id', foreignField: 'studentId' });
 studentSchema.virtual('attendanceRecords', { ref: 'Attendance', localField: '_id', foreignField: 'studentId' });
 studentSchema.virtual('results', { ref: 'Result', localField: '_id', foreignField: 'studentId' });

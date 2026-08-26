@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const models = require('../models');
 const {
-  mongoose, Student, User, StudentGuardian, Class, House, School, SchoolSettings, AcademicTerm, ClassSubject, Subject,
+  mongoose, Student, User, StudentGuardian, Class, School, SchoolSettings, AcademicTerm, ClassSubject, Subject,
 } = models;
 const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/AppError');
@@ -23,7 +23,6 @@ const getTeacherClassIds = async (userId) => (await getTeacherClassIdsShared(use
 const populateFull = (query) => query
   .populate('user', 'email status')
   .populate('class', 'name section')
-  .populate('house', 'name colorHex')
   .populate('safetyNotes', 'type note');
 
 // Guardian<->Student is many-to-many via StudentGuardian; attach it manually
@@ -73,7 +72,6 @@ const list = asyncHandler(async (req, res) => {
   const students = await Student.find(where)
     .populate('user', 'email status')
     .populate('class', 'name section')
-    .populate('house', 'name colorHex')
     .sort({ firstName: 1 });
   res.json({ success: true, data: students });
 });
@@ -119,17 +117,16 @@ const getMe = asyncHandler(async (req, res, next) => {
 
 const create = asyncHandler(async (req, res, next) => {
   const {
-    email, admissionNo, firstName, lastName, gender, dateOfBirth, classId, houseId,
+    email, admissionNo, firstName, lastName, gender, dateOfBirth, classId,
     address, admissionDate, category, programme, guardians, safetyNotes,
   } = req.body;
 
   const existing = await User.findOne({ email });
   if (existing) return next(new AppError('A user with this email already exists', 400));
   if (classId && !(await Class.findById(classId))) return next(new AppError('Class not found', 400));
-  if (houseId && !(await House.findById(houseId))) return next(new AppError('House not found', 400));
 
   const { student, tempPassword } = await createStudentAccount({
-    email, admissionNo, firstName, lastName, gender, dateOfBirth, classId, houseId, address, admissionDate, category, programme, guardians, safetyNotes,
+    email, admissionNo, firstName, lastName, gender, dateOfBirth, classId, address, admissionDate, category, programme, guardians, safetyNotes,
   });
 
   const full = await populateFull(Student.findById(student.id));
@@ -149,7 +146,7 @@ const update = asyncHandler(async (req, res, next) => {
   if (!student) return next(new AppError('Student not found', 404));
 
   const {
-    admissionNo, firstName, lastName, gender, dateOfBirth, classId, houseId,
+    admissionNo, firstName, lastName, gender, dateOfBirth, classId,
     address, admissionDate, category, programme, status, waecIndexNumber, guardians, safetyNotes,
   } = req.body;
 
@@ -159,7 +156,6 @@ const update = asyncHandler(async (req, res, next) => {
   }
 
   if (classId && !(await Class.findById(classId))) return next(new AppError('Class not found', 400));
-  if (houseId && !(await House.findById(houseId))) return next(new AppError('House not found', 400));
 
   const previousStatus = student.status;
 
@@ -172,7 +168,6 @@ const update = asyncHandler(async (req, res, next) => {
       student.gender = gender === undefined ? student.gender : gender;
       student.dateOfBirth = dateOfBirth === undefined ? student.dateOfBirth : dateOfBirth;
       student.classId = classId === undefined ? student.classId : (classId || null);
-      student.houseId = houseId === undefined ? student.houseId : (houseId || null);
       student.address = address === undefined ? student.address : address;
       student.admissionDate = admissionDate === undefined ? student.admissionDate : admissionDate;
       student.category = category === undefined ? student.category : (category || null);

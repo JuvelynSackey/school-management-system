@@ -5,7 +5,6 @@ import {
   listStudents, createStudent, updateStudent, deleteStudent, downloadIdCardsPdf, getWaecExportPreview, downloadWaecExport,
 } from '../../api/students.api';
 import { listClasses } from '../../api/classes.api';
-import { listHouses } from '../../api/houses.api';
 import { lookupGuardianByPhone } from '../../api/guardians.api';
 import { useAuth } from '../../context/AuthContext';
 import Modal from '../../components/common/Modal';
@@ -34,7 +33,7 @@ const emptyGuardian = (contactPriority) => ({
 });
 
 const emptyForm = () => ({
-  email: '', admissionNo: '', firstName: '', lastName: '', gender: '', dateOfBirth: '', classId: '', houseId: '',
+  email: '', admissionNo: '', firstName: '', lastName: '', gender: '', dateOfBirth: '', classId: '',
   address: '', admissionDate: '', category: '', programme: '', waecIndexNumber: '',
   guardians: [emptyGuardian('primary')],
   safetyNotes: [],
@@ -47,7 +46,6 @@ export default function StudentList() {
   const [classFilter, setClassFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [classes, setClasses] = useState([]);
-  const [houses, setHouses] = useState([]);
 
   const params = {
     ...(search ? { search } : {}),
@@ -102,7 +100,6 @@ export default function StudentList() {
 
   useEffect(() => {
     listClasses().then(setClasses).catch(() => setClasses([]));
-    listHouses().then(setHouses).catch(() => setHouses([]));
   }, []);
 
   const openNew = () => { setForm(emptyForm()); setFormError(''); setEditing('new'); };
@@ -124,7 +121,6 @@ export default function StudentList() {
       gender: student.gender || '',
       dateOfBirth: student.dateOfBirth || '',
       classId: student.classId || '',
-      houseId: student.houseId || '',
       address: student.address || '',
       admissionDate: student.admissionDate || '',
       category: student.category || '',
@@ -187,7 +183,6 @@ export default function StudentList() {
       const payload = {
         ...form,
         classId: form.classId || null,
-        houseId: form.houseId || null,
         guardians: form.guardians
           .filter((g) => g.phone.trim())
           .map((g) => ({
@@ -275,21 +270,13 @@ export default function StudentList() {
         {!isLoading && !error && (
           <table>
             <thead>
-              <tr><th>Name</th><th>Admission No.</th><th>House</th><th>Class</th><th>Status</th><th /></tr>
+              <tr><th>Name</th><th>Admission No.</th><th>Class</th><th>Status</th><th /></tr>
             </thead>
             <tbody>
               {students.map((student) => (
                 <tr key={student.id}>
                   <td>{student.firstName} {student.lastName}</td>
                   <td>{student.admissionNo}</td>
-                  <td>
-                    {student.house ? (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: student.house.colorHex || '#ccc' }} />
-                        {student.house.name}
-                      </span>
-                    ) : '—'}
-                  </td>
                   <td>{student.class ? `${student.class.name} ${student.class.section || ''}` : '—'}</td>
                   <td>
                     {canEdit ? (
@@ -314,7 +301,7 @@ export default function StudentList() {
                   </td>
                 </tr>
               ))}
-              {students.length === 0 && <tr><td colSpan={6} className="muted">No students found.</td></tr>}
+              {students.length === 0 && <tr><td colSpan={5} className="muted">No students found.</td></tr>}
             </tbody>
           </table>
         )}
@@ -359,13 +346,6 @@ export default function StudentList() {
               <select value={form.classId} onChange={(e) => setForm({ ...form, classId: e.target.value })}>
                 <option value="">Unassigned</option>
                 {classes.map((c) => <option key={c.id} value={c.id}>{c.name} {c.section}</option>)}
-              </select>
-            </label>
-            <label className="field">
-              <span>House</span>
-              <select value={form.houseId} onChange={(e) => setForm({ ...form, houseId: e.target.value })}>
-                <option value="">Unassigned</option>
-                {houses.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
               </select>
             </label>
             <label className="field">

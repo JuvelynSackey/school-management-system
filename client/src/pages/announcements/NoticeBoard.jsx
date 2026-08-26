@@ -3,7 +3,9 @@ import { getMyNoticeBoard, markAnnouncementRead } from '../../api/announcements.
 
 const targetLabel = (a) => {
   if (a.targetType === 'school') return 'Whole School';
-  if (a.targetType === 'class') return a.targetClass ? `${a.targetClass.name} ${a.targetClass.section || ''}` : 'Class';
+  if (a.targetType === 'class' || a.targetType === 'specific_classes') return a.targetClass ? `${a.targetClass.name} ${a.targetClass.section || ''}` : 'Your Class';
+  if (a.targetType === 'all_teachers') return 'All Teachers';
+  if (a.targetType === 'all_parents') return 'All Parents';
   return 'Just for you';
 };
 

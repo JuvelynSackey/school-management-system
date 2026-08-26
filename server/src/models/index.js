@@ -15,7 +15,6 @@ const Result = require('./result.model');
 const ResultSheet = require('./resultSheet.model');
 const Fee = require('./fee.model');
 const Payment = require('./payment.model');
-const House = require('./house.model');
 const Guardian = require('./guardian.model');
 const StudentGuardian = require('./studentGuardian.model');
 const StudentSafetyNote = require('./studentSafetyNote.model');
@@ -49,7 +48,6 @@ module.exports = {
   ResultSheet,
   Fee,
   Payment,
-  House,
   Guardian,
   StudentGuardian,
   StudentSafetyNote,

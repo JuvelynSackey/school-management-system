@@ -1,13 +1,6 @@
 require('dotenv').config();
 const bcrypt = require('bcryptjs');
-const { mongoose, User, AcademicTerm, House, Subject } = require('../src/models');
-
-const DEFAULT_HOUSES = [
-  { name: 'Red House', colorHex: '#DC2626' },
-  { name: 'Blue House', colorHex: '#2563EB' },
-  { name: 'Green House', colorHex: '#16A34A' },
-  { name: 'Yellow House', colorHex: '#CA8A04' },
-];
+const { mongoose, User, AcademicTerm, Subject } = require('../src/models');
 
 // NaCCA subject lists per stage. Names are deduplicated at seed time since a
 // few (e.g. "Numeracy", "Creative Arts") repeat across stages verbatim.
@@ -55,16 +48,6 @@ async function seedTerm() {
   console.log('Default academic term created: 2025/2026 Term 1 (current).');
 }
 
-async function seedHouses() {
-  for (const house of DEFAULT_HOUSES) {
-    const existing = await House.findOne({ name: house.name });
-    if (!existing) {
-      await House.create(house);
-      console.log(`House created: ${house.name}`);
-    }
-  }
-}
-
 async function seedSubjects() {
   const names = new Set(Object.values(NACCA_SUBJECTS_BY_STAGE).flat());
   for (const name of names) {
@@ -80,7 +63,6 @@ async function main() {
   await mongoose.connect(process.env.MONGODB_URI);
   await seedAdmin();
   await seedTerm();
-  await seedHouses();
   await seedSubjects();
   await mongoose.disconnect();
 }

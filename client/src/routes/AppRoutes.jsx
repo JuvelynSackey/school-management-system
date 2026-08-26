@@ -13,7 +13,6 @@ import Dashboard from '../pages/dashboard/Dashboard';
 import TermList from '../pages/terms/TermList';
 import ClassList from '../pages/classes/ClassList';
 import SubjectList from '../pages/subjects/SubjectList';
-import HouseList from '../pages/houses/HouseList';
 import TeacherList from '../pages/teachers/TeacherList';
 import StudentList from '../pages/students/StudentList';
 import AdmissionsList from '../pages/admissions/AdmissionsList';
@@ -22,6 +21,10 @@ import MyProfile from '../pages/students/MyProfile';
 import Attendance from '../pages/attendance/Attendance';
 import Results from '../pages/results/Results';
 import Fees from '../pages/fees/Fees';
+import FeeStructuresPage from '../pages/fees/FeeStructuresPage';
+import FeedingChargesPage from '../pages/fees/FeedingChargesPage';
+import ArrearsPage from '../pages/fees/ArrearsPage';
+import TerminalReports from '../pages/results/TerminalReports';
 import ReportsHub from '../pages/reports/ReportsHub';
 import SchoolSettings from '../pages/settings/SchoolSettings';
 import AuditLogPage from '../pages/audit/AuditLogPage';
@@ -62,19 +65,22 @@ export default function AppRoutes() {
             <Route path="/terms" element={<TermList />} />
             <Route path="/classes" element={<ClassList />} />
             <Route path="/subjects" element={<SubjectList />} />
-            <Route path="/houses" element={<HouseList />} />
             <Route path="/teachers" element={<TeacherList />} />
             <Route path="/reports" element={<ReportsHub />} />
             <Route path="/id-cards" element={<IDCards />} />
             <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/school-settings" element={<SchoolSettings />} />
             <Route path="/audit-log" element={<AuditLogPage />} />
+            <Route path="/fee-structures" element={<FeeStructuresPage />} />
+            <Route path="/arrears" element={<ArrearsPage />} />
           </Route>
 
           <Route element={<RoleRoute roles={['admin', 'teacher']} />}>
             <Route path="/students" element={<StudentList />} />
             <Route path="/assessment-sheets" element={<AssessmentSheetsPage />} />
             <Route path="/parents" element={<Parents />} />
+            <Route path="/feeding-charges" element={<FeedingChargesPage />} />
+            <Route path="/terminal-reports" element={<TerminalReports />} />
           </Route>
 
           <Route element={<RoleRoute roles={['admin', 'teacher', 'parent']} />}>

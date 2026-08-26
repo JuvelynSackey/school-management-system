@@ -2,6 +2,7 @@ const app = require('./app');
 const config = require('./config');
 const { connect } = require('./config/database');
 const backupScheduler = require('./services/backupScheduler');
+const announcementScheduler = require('./services/announcementScheduler');
 
 async function start() {
   try {
@@ -13,6 +14,7 @@ async function start() {
   }
 
   backupScheduler.start();
+  announcementScheduler.start();
 
   app.listen(config.port, () => {
     console.log(`Server listening on http://localhost:${config.port}`);

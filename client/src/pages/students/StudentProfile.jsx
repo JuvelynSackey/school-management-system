@@ -116,14 +116,7 @@ export function StudentProfileView({
     <>
       <div className="panel">
         <StudentPhoto student={student} canUpload={canManageGuardianLogins} onUploaded={onPhotoUploaded} />
-        <h2>
-          {student.firstName} {student.lastName}
-          {student.house && (
-            <span className="badge" style={{ marginLeft: 10, background: `${student.house.colorHex}22`, color: student.house.colorHex }}>
-              {student.house.name}
-            </span>
-          )}
-        </h2>
+        <h2>{student.firstName} {student.lastName}</h2>
         <table className="details-table">
           <tbody>
             <tr><th>Admission No.</th><td>{student.admissionNo}</td></tr>

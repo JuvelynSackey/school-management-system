@@ -6,9 +6,29 @@ const announcementSchema = new mongoose.Schema({
   schoolId: { type: mongoose.Schema.Types.ObjectId, ref: 'School', index: true },
   message: { type: String, required: true, maxlength: 1000 },
   category: { type: String, required: true, enum: ['general', 'fee_reminder'], default: 'general' },
-  targetType: { type: String, required: true, enum: ['school', 'class', 'student'] },
+  // 'school'/'class'/'student' are the original single-target shapes (still
+  // used by e.g. the fee-reminder flow) and are unchanged. The
+  // 'specific_*'/'all_*' values are additive — each has its own array field
+  // below rather than overloading targetClassId/targetStudentId, so the
+  // original three keep meaning exactly what they always did.
+  targetType: {
+    type: String,
+    required: true,
+    enum: ['school', 'class', 'student', 'all_teachers', 'all_parents', 'specific_teachers', 'specific_students', 'specific_parents', 'specific_classes'],
+  },
   targetClassId: { type: mongoose.Schema.Types.ObjectId, ref: 'Class', default: null },
   targetStudentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Student', default: null },
+  targetClassIds: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Class' }], default: [] },
+  targetTeacherIds: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Teacher' }], default: [] },
+  targetStudentIds: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Student' }], default: [] },
+  targetGuardianIds: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Guardian' }], default: [] },
+  // null scheduledFor (the default) means "send immediately" — sentAt is set
+  // at creation time in that case. A future scheduledFor leaves sentAt null
+  // until announcementScheduler.js's cron job dispatches it; notice-board
+  // queries only ever match sentAt: { $ne: null } so a pending scheduled
+  // announcement never appears early.
+  scheduledFor: { type: Date, default: null },
+  sentAt: { type: Date, default: null },
   deliveryStatus: { type: String, required: true, enum: ['logged', 'sent'], default: 'logged' },
   channels: {
     type: [String], enum: ['in_app', 'email', 'sms', 'whatsapp'], default: ['in_app'],

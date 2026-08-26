@@ -67,13 +67,6 @@ export const NAV_ICONS = {
       <path d="M6 3h9a2 2 0 012 2v16l-6.5-3L4 21V5a2 2 0 012-2z" />
     </svg>
   ),
-  houses: (
-    <svg {...props}>
-      <path d="M4 11l8-7 8 7" />
-      <path d="M6 9.5V20a1 1 0 001 1h10a1 1 0 001-1V9.5" />
-      <path d="M10 21v-6h4v6" />
-    </svg>
-  ),
   terms: (
     <svg {...props}>
       <rect x="3" y="4.5" width="18" height="16" rx="2.5" />
@@ -112,6 +105,30 @@ export const NAV_ICONS = {
       <rect x="2.5" y="6" width="19" height="13" rx="2.5" />
       <path d="M2.5 10h19" />
       <circle cx="17" cy="14.5" r="1.4" fill="currentColor" stroke="none" />
+    </svg>
+  ),
+  feeStructures: (
+    <svg {...props}>
+      <path d="M12.5 2.5H4a1.5 1.5 0 00-1.5 1.5v8.5a1.5 1.5 0 00.44 1.06l8 8a1.5 1.5 0 002.12 0l8-8a1.5 1.5 0 000-2.12l-8-8a1.5 1.5 0 00-1.06-.44z" />
+      <circle cx="7.5" cy="7.5" r="1.2" fill="currentColor" stroke="none" />
+    </svg>
+  ),
+  feedingCharges: (
+    <svg {...props}>
+      <circle cx="12" cy="12" r="8" />
+      <circle cx="12" cy="12" r="3.5" />
+    </svg>
+  ),
+  arrears: (
+    <svg {...props}>
+      <path d="M12 3l10 18H2L12 3z" />
+      <path d="M12 10v4M12 17v.01" />
+    </svg>
+  ),
+  terminalReports: (
+    <svg {...props}>
+      <circle cx="12" cy="8" r="5" />
+      <path d="M9 12.5L7 21l5-3 5 3-2-8.5" />
     </svg>
   ),
   announcements: (

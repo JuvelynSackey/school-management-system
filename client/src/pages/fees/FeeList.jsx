@@ -7,9 +7,6 @@ import { listTerms } from '../../api/terms.api';
 import { createAnnouncement } from '../../api/announcements.api';
 import { formatCurrency } from '../../utils/currency';
 import Modal from '../../components/common/Modal';
-import FeeStructures from './FeeStructures';
-import DailyFeedingPanel from './DailyFeedingPanel';
-import ArrearsPanel from './ArrearsPanel';
 
 const PAYMENT_METHODS = ['Cash', 'Bank Transfer', 'Mobile Money', 'Card', 'Cheque', 'Other'];
 const CATEGORIES = ['Tuition', 'Feeding', 'ClassActivity', 'PTA', 'Other'];
@@ -27,7 +24,6 @@ const emptyForm = { studentId: '', academicTermId: '', feeType: '', category: 'T
 const emptyPayment = { amountPaid: '', paymentDate: new Date().toISOString().slice(0, 10), paymentMethod: 'Cash', referenceNo: '', notes: '' };
 
 export default function FeeList() {
-  const [view, setView] = useState('fees'); // 'fees' | 'structures' | 'feeding' | 'arrears'
   const [classFilter, setClassFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [overdueOnly, setOverdueOnly] = useState(false);
@@ -147,21 +143,9 @@ export default function FeeList() {
     <div>
       <div className="toolbar">
         <h1>Fees</h1>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button type="button" className={view === 'fees' ? 'btn-primary' : 'btn-secondary'} onClick={() => { setView('fees'); reload(); }}>Fees</button>
-          <button type="button" className={view === 'structures' ? 'btn-primary' : 'btn-secondary'} onClick={() => setView('structures')}>Fee Structures</button>
-          <button type="button" className={view === 'feeding' ? 'btn-primary' : 'btn-secondary'} onClick={() => setView('feeding')}>Daily Feeding</button>
-          <button type="button" className={view === 'arrears' ? 'btn-primary' : 'btn-secondary'} onClick={() => setView('arrears')}>Arrears</button>
-        </div>
       </div>
 
-      {view === 'structures' && <FeeStructures classes={classes} terms={terms} />}
-      {view === 'feeding' && <DailyFeedingPanel classes={classes} />}
-      {view === 'arrears' && <ArrearsPanel classes={classes} />}
-
-      {view === 'fees' && (
-        <>
-          <div className="panel">
+      <div className="panel">
             <div className="toolbar" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
               <select value={classFilter} onChange={(e) => setClassFilter(e.target.value)}>
                 <option value="">All classes</option>
@@ -212,8 +196,6 @@ export default function FeeList() {
               </table>
             )}
           </div>
-        </>
-      )}
 
       {creating && (
         <Modal title="Assign Fee" onClose={closeCreate}>

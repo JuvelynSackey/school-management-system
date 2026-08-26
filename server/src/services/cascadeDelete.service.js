@@ -42,9 +42,6 @@ const rules = {
     { model: 'Admission', field: 'desiredClassId', action: 'setNull' },
     { model: 'FeedingCharge', field: 'classId', action: 'cascade' },
   ],
-  House: [
-    { model: 'Student', field: 'houseId', action: 'setNull' },
-  ],
   Guardian: [
     { model: 'StudentGuardian', field: 'guardianId', action: 'cascade' },
   ],
