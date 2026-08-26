@@ -1,6 +1,7 @@
 const {
   TeacherSubjectAssignment, ResultSheet, Teacher, Class, Subject,
 } = require('../models');
+const { UNRANKED_LEVEL_ORDER } = require('../constants/gradeLevels');
 
 // Distinct teachers with at least one assignment whose result sheet for the
 // given term is still Draft/Rejected (or doesn't exist yet). Shared by the
@@ -32,19 +33,25 @@ const getTeachersWithUnsubmittedMarksheets = async (academicTermId) => {
 
   const [teachers, classes, subjects] = await Promise.all([
     Teacher.find({ _id: { $in: teacherIds } }, { firstName: 1, lastName: 1 }),
-    Class.find({}, { name: 1, section: 1 }),
+    Class.find({}, { name: 1, section: 1, levelOrder: 1 }),
     Subject.find({}, { name: 1 }),
   ]);
-  const classById = new Map(classes.map((c) => [c.id, `${c.name} ${c.section || ''}`.trim()]));
+  const classById = new Map(classes.map((c) => [c.id, {
+    label: `${c.name} ${c.section || ''}`.trim(), levelOrder: c.levelOrder ?? UNRANKED_LEVEL_ORDER,
+  }]));
   const subjectById = new Map(subjects.map((s) => [s.id, s.name]));
 
   return teachers.map((t) => ({
     teacherId: t.id,
     name: `${t.firstName} ${t.lastName}`,
-    pending: (pendingByTeacher.get(t.id) || []).map((p) => ({
-      className: classById.get(p.classId) || 'Unknown class',
-      subjectName: subjectById.get(p.subjectId) || 'Unknown subject',
-    })),
+    pending: (pendingByTeacher.get(t.id) || [])
+      .map((p) => ({
+        className: classById.get(p.classId)?.label || 'Unknown class',
+        levelOrder: classById.get(p.classId)?.levelOrder ?? UNRANKED_LEVEL_ORDER,
+        subjectName: subjectById.get(p.subjectId) || 'Unknown subject',
+      }))
+      .sort((a, b) => a.levelOrder - b.levelOrder)
+      .map(({ levelOrder, ...rest }) => rest),
   }));
 };
 

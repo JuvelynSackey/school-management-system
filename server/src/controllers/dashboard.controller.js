@@ -58,7 +58,9 @@ const getAdminDashboard = async () => {
     .populate({ path: 'fee', populate: { path: 'student', select: 'firstName lastName' } });
 
   // --- Class enrolment breakdown by stage ---
-  const allClasses = await Class.find({}, { name: 1, section: 1, stage: 1, classTeacherId: 1 })
+  const allClasses = await Class.find({}, {
+    name: 1, section: 1, stage: 1, classTeacherId: 1, levelOrder: 1,
+  })
     .populate('classTeacher', 'firstName lastName');
   const activeStudents = await Student.find({ status: 'active' }, { classId: 1 });
   const classById = new Map(allClasses.map((c) => [c.id, c]));
@@ -77,8 +79,9 @@ const getAdminDashboard = async () => {
       section: c.section,
       teacherName: c.classTeacher ? `${c.classTeacher.firstName} ${c.classTeacher.lastName}` : null,
       submitted: classesWithTodayAttendance.has(c.id),
+      levelOrder: c.levelOrder,
     }))
-    .sort((a, b) => Number(a.submitted) - Number(b.submitted));
+    .sort((a, b) => Number(a.submitted) - Number(b.submitted) || a.levelOrder - b.levelOrder);
 
   // --- Alerts ---
   const pendingApprovalsCount = await TerminalReport.countDocuments({ status: 'Submitted' });

@@ -7,6 +7,7 @@ const { getFeeBalance } = require('../services/fees.service');
 const {
   round1, classAverages, subjectAverages, overallPassRate, resolvePreviousTerm,
 } = require('../services/academicAnalytics.service');
+const { UNRANKED_LEVEL_ORDER } = require('../constants/gradeLevels');
 
 // GET /analytics/academic?academicTermId=
 const getAcademic = asyncHandler(async (req, res, next) => {
@@ -25,7 +26,7 @@ const getAcademic = asyncHandler(async (req, res, next) => {
   const prevClassRows = prevTerm ? await classAverages(schoolId, prevTerm.id) : [];
   const prevByClass = new Map(prevClassRows.map((r) => [r._id.toString(), r.average]));
 
-  const classes = await Class.find({ _id: { $in: classRows.map((r) => r._id) } }, { name: 1, section: 1 });
+  const classes = await Class.find({ _id: { $in: classRows.map((r) => r._id) } }, { name: 1, section: 1, levelOrder: 1 });
   const subjects = await Subject.find({ _id: { $in: subjectRows.map((r) => r._id) } }, { name: 1 });
   const classById = new Map(classes.map((c) => [c.id, c]));
   const subjectById = new Map(subjects.map((s) => [s.id, s]));
@@ -42,7 +43,8 @@ const getAcademic = asyncHandler(async (req, res, next) => {
       delta: prevAvg !== undefined ? round1(r.average - prevAvg) : null,
       resultCount: r.count,
     };
-  });
+  }).sort((a, b) => (classById.get(a.classId)?.levelOrder ?? UNRANKED_LEVEL_ORDER)
+    - (classById.get(b.classId)?.levelOrder ?? UNRANKED_LEVEL_ORDER));
 
   const subjectAveragesOut = subjectRows.map((r) => {
     const subj = subjectById.get(r._id.toString());
@@ -94,7 +96,7 @@ const getFinancial = asyncHandler(async (req, res, next) => {
   });
 
   const classIds = [...byClass.keys()].filter((id) => id !== 'unassigned');
-  const classes = await Class.find({ _id: { $in: classIds } }, { name: 1, section: 1 });
+  const classes = await Class.find({ _id: { $in: classIds } }, { name: 1, section: 1, levelOrder: 1 });
   const classById = new Map(classes.map((c) => [c.id, c]));
 
   const byClassOut = [...byClass.entries()].map(([classId, stats]) => {
@@ -105,7 +107,8 @@ const getFinancial = asyncHandler(async (req, res, next) => {
       ...stats,
       collectionRate: stats.totalDue > 0 ? round1((stats.totalPaid / stats.totalDue) * 100) : null,
     };
-  });
+  }).sort((a, b) => (classById.get(a.classId)?.levelOrder ?? UNRANKED_LEVEL_ORDER)
+    - (classById.get(b.classId)?.levelOrder ?? UNRANKED_LEVEL_ORDER));
 
   res.json({ success: true, data: { overall, byClass: byClassOut } });
 });

@@ -1,5 +1,6 @@
 const { Class, Subject, ClassSubject } = require('../models');
 const { runWithSchool } = require('../middleware/tenantContext');
+const { LEVEL_ORDER_BY_GRADE } = require('../constants/gradeLevels');
 
 // Maps a seeded class name to the existing Class.stage enum
 // (['Creche','Nursery','KG','Primary','JHS']) so seeded classes show up
@@ -40,7 +41,16 @@ const seedSchoolDefaults = async (schoolId, curriculumTemplate) => {
 
   return runWithSchool(schoolId, async () => {
     const classes = await Class.insertMany(
-      classNames.map((name) => ({ schoolId, name, stage: STAGE_FOR_CLASS(name) })),
+      classNames.map((name) => ({
+        schoolId,
+        name,
+        stage: STAGE_FOR_CLASS(name),
+        // Template names already equal the canonical gradeLevel values
+        // (e.g. 'Basic 4'), so onboarded classes come out correctly ordered
+        // with no separate admin step.
+        gradeLevel: LEVEL_ORDER_BY_GRADE[name] !== undefined ? name : null,
+        levelOrder: LEVEL_ORDER_BY_GRADE[name],
+      })),
     );
     const subjects = await Subject.insertMany(
       STANDARD_SUBJECTS.map((s) => ({ schoolId, name: s.name, code: s.code })),

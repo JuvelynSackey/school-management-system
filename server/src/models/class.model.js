@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const idTransformPlugin = require('../plugins/idTransform');
 const tenantScopePlugin = require('../plugins/tenantScope');
+const { GRADE_LEVEL_VALUES, UNRANKED_LEVEL_ORDER } = require('../constants/gradeLevels');
 
 const classSchema = new mongoose.Schema({
   schoolId: { type: mongoose.Schema.Types.ObjectId, ref: 'School', index: true },
@@ -8,6 +9,12 @@ const classSchema = new mongoose.Schema({
   section: { type: String, default: null },
   room: { type: String, default: null },
   stage: { type: String, enum: ['Creche', 'Nursery', 'KG', 'Primary', 'JHS'], default: null },
+  // gradeLevel: the precise Ghanaian hierarchy rung (see constants/gradeLevels.js),
+  // separate from the coarser `stage` grouping. levelOrder is derived from it
+  // at write time (classes.controller.js) and stored so every list-fetch can
+  // sort with a plain .sort({levelOrder:1}) instead of re-deriving per query.
+  gradeLevel: { type: String, enum: GRADE_LEVEL_VALUES, default: null },
+  levelOrder: { type: Number, default: UNRANKED_LEVEL_ORDER },
   classTeacherId: { type: mongoose.Schema.Types.ObjectId, ref: 'Teacher', default: null },
 }, { timestamps: true });
 

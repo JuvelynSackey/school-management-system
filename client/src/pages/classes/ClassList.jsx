@@ -6,10 +6,13 @@ import { listStudents, promoteStudents } from '../../api/students.api';
 import { listSubjects, listSubjectsForClass, assignSubjectToClass, unassignSubjectFromClass } from '../../api/subjects.api';
 import { listAssignmentsForClass, createAssignment, deleteAssignment } from '../../api/assignments.api';
 import Modal from '../../components/common/Modal';
+import { GRADE_LEVELS, STAGE_BY_GRADE_LEVEL, UNRANKED_LEVEL_ORDER } from '../../config/gradeLevels';
 
 const STAGES = ['Creche', 'Nursery', 'KG', 'Primary', 'JHS'];
 
-const emptyForm = { name: '', section: '', room: '', stage: '', classTeacherId: '' };
+const emptyForm = {
+  name: '', section: '', room: '', stage: '', gradeLevel: '', classTeacherId: '',
+};
 
 export default function ClassList() {
   const { data: classes, isLoading, error, reload } = useApiResource(listClasses);
@@ -32,6 +35,7 @@ export default function ClassList() {
       section: classRow.section || '',
       room: classRow.room || '',
       stage: classRow.stage || '',
+      gradeLevel: classRow.gradeLevel || '',
       classTeacherId: classRow.classTeacherId || '',
     });
     setFormError('');
@@ -78,13 +82,14 @@ export default function ClassList() {
         {!isLoading && !error && (
           <table>
             <thead>
-              <tr><th>Name</th><th>Section</th><th>Stage</th><th>Room</th><th>Class Teacher</th><th>Students</th><th /></tr>
+              <tr><th>Name</th><th>Section</th><th>Grade Level</th><th>Stage</th><th>Room</th><th>Class Teacher</th><th>Students</th><th /></tr>
             </thead>
             <tbody>
               {classes.map((classRow) => (
                 <tr key={classRow.id}>
                   <td>{classRow.name}</td>
                   <td>{classRow.section || '—'}</td>
+                  <td>{GRADE_LEVELS.find((g) => g.value === classRow.gradeLevel)?.label || '—'}</td>
                   <td>{classRow.stage || '—'}</td>
                   <td>{classRow.room || '—'}</td>
                   <td>{classRow.classTeacher ? `${classRow.classTeacher.firstName} ${classRow.classTeacher.lastName}` : '—'}</td>
@@ -99,7 +104,7 @@ export default function ClassList() {
                   </td>
                 </tr>
               ))}
-              {classes.length === 0 && <tr><td colSpan={7} className="muted">No classes yet.</td></tr>}
+              {classes.length === 0 && <tr><td colSpan={8} className="muted">No classes yet.</td></tr>}
             </tbody>
           </table>
         )}
@@ -122,11 +127,33 @@ export default function ClassList() {
               <input value={form.room} onChange={(e) => setForm({ ...form, room: e.target.value })} />
             </label>
             <label className="field">
+              <span>Grade Level</span>
+              <select
+                value={form.gradeLevel}
+                onChange={(e) => {
+                  const gradeLevel = e.target.value;
+                  setForm({
+                    ...form,
+                    gradeLevel,
+                    stage: gradeLevel ? STAGE_BY_GRADE_LEVEL[gradeLevel] : form.stage,
+                  });
+                }}
+              >
+                <option value="">— Custom (no standard grade level) —</option>
+                {GRADE_LEVELS.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
+              </select>
+            </label>
+            <label className="field">
               <span>Stage</span>
-              <select value={form.stage} onChange={(e) => setForm({ ...form, stage: e.target.value })}>
+              <select
+                value={form.stage}
+                onChange={(e) => setForm({ ...form, stage: e.target.value })}
+                disabled={Boolean(form.gradeLevel)}
+              >
                 <option value="">—</option>
                 {STAGES.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
+              {form.gradeLevel && <small className="muted">Derived automatically from Grade Level.</small>}
             </label>
             <label className="field">
               <span>Class Teacher</span>
@@ -297,6 +324,17 @@ function PromoteStudentsModal({
       setStudents(rows);
       setActions(Object.fromEntries(rows.map((s) => [s.id, 'promote'])));
     }).catch(() => setStudents([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classRow.id]);
+
+  // Pre-select the next class in the Ghanaian hierarchy as the promotion
+  // destination — still fully overridable via the dropdown below. No-ops
+  // for an unranked/custom source class or one with no "next" level (e.g.
+  // JHS 3), falling through to today's manual pick.
+  useEffect(() => {
+    if (classRow.levelOrder === undefined || classRow.levelOrder === UNRANKED_LEVEL_ORDER) return;
+    const next = allClasses.find((c) => c.levelOrder === classRow.levelOrder + 1);
+    if (next) setDestinationClassId(next.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classRow.id]);
 

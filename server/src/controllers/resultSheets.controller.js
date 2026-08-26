@@ -81,7 +81,7 @@ const getMatrix = asyncHandler(async (req, res, next) => {
     academicTermId = currentTerm.id;
   }
 
-  const classes = await Class.find({}).select('name section').sort({ name: 1 });
+  const classes = await Class.find({}).select('name section levelOrder').sort({ levelOrder: 1, name: 1 });
   const classIds = classes.map((c) => c.id);
 
   const classSubjects = await ClassSubject.find({ classId: { $in: classIds } }).populate('subject', 'name');
