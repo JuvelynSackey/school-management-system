@@ -199,7 +199,9 @@ export default function AdmissionsList() {
       const result = await enrollAdmission(enrolling.id, payload);
       closeEnroll();
       reload();
-      setCreatedCredentials({ email: enrollForm.email, admissionNo: enrollForm.admissionNo, password: result.tempPassword });
+      setCreatedCredentials({
+        email: enrollForm.email, admissionNo: enrollForm.admissionNo, password: result.tempPassword, provisionedLogins: result.provisionedLogins,
+      });
     } catch (err) {
       setEnrollError(err.response?.data?.message || 'Failed to enroll applicant.');
     } finally {
@@ -440,6 +442,20 @@ export default function AdmissionsList() {
               ? 'They can log in with either the email above or their Admission No., plus this PIN.'
               : 'No email was set — they log in with their Admission No. and this PIN.'}
           </p>
+          {createdCredentials.provisionedLogins?.length > 0 && (
+            <>
+              <h3 style={{ fontSize: 13, margin: '16px 0 8px' }}>Parent/Guardian Portal Access</h3>
+              <p className="muted" style={{ fontSize: 12.5, marginBottom: 8 }}>
+                New guardian contact(s) also got a portal login — share these too.
+              </p>
+              {createdCredentials.provisionedLogins.map((pl) => (
+                <div key={pl.guardianId} className="panel" style={{ marginBottom: 8 }}>
+                  <p style={{ margin: 0 }}><strong>{pl.fullName}</strong></p>
+                  <p style={{ margin: '4px 0 0' }}>Phone: <strong>{pl.phone}</strong> &middot; PIN: <strong>{pl.pin}</strong></p>
+                </div>
+              ))}
+            </>
+          )}
           <div className="modal-actions">
             <button type="button" className="btn-primary" onClick={() => setCreatedCredentials(null)}>Done</button>
           </div>

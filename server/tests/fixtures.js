@@ -16,11 +16,13 @@ const createSchool = async (models, { name = 'Test School', slug = `test-school-
   return school;
 };
 
-const createUser = async (models, schoolId, { role, email, password = DEFAULT_PASSWORD, fullName = `Test ${role}` }) => {
+const createUser = async (models, schoolId, {
+  role, email, phone = null, password = DEFAULT_PASSWORD, fullName = `Test ${role}`,
+}) => {
   const { User } = models;
   const passwordHash = await bcrypt.hash(password, 10);
   const user = await runWithSchool(schoolId, () => User.create({
-    schoolId, email, passwordHash, fullName, role, status: 'active',
+    schoolId, email, phone, passwordHash, fullName, role, status: 'active',
   }));
   return { user, password };
 };

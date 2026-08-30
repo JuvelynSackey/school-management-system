@@ -17,21 +17,23 @@ import AcademicHistoryPanel from '../../components/results/AcademicHistoryPanel'
 const NOTE_BADGE_CLASS = { medical: 'badge-danger', pickup: 'badge-warning', other: 'badge-neutral' };
 
 function CreateParentLoginAction({ guardian, onCreated }) {
-  const [open, setOpen] = useState(false);
+  const [useEmail, setUseEmail] = useState(false);
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [createdPin, setCreatedPin] = useState(null);
 
   if (guardian.userId) return <span className="badge badge-success">Has login</span>;
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  // Default path: one click, nothing to type -- phone + an auto-generated
+  // PIN using the phone already on file for this guardian.
+  const handleQuickCreate = async () => {
     setIsSaving(true);
     setError('');
     try {
-      const updated = await createGuardianLogin(guardian.id, form);
+      const updated = await createGuardianLogin(guardian.id, {});
       onCreated(updated);
-      setOpen(false);
+      setCreatedPin(updated.pin);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create login.');
     } finally {
@@ -39,12 +41,40 @@ function CreateParentLoginAction({ guardian, onCreated }) {
     }
   };
 
+  const handleEmailSubmit = async (e) => {
+    e.preventDefault();
+    setIsSaving(true);
+    setError('');
+    try {
+      const updated = await createGuardianLogin(guardian.id, form);
+      onCreated(updated);
+      setUseEmail(false);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to create login.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (createdPin) {
+    return (
+      <span className="muted" style={{ fontSize: 12.5 }}>
+        Login created — phone <strong>{guardian.phone}</strong>, PIN <strong>{createdPin}</strong> (won&apos;t be shown again)
+      </span>
+    );
+  }
+
   return (
     <>
-      <button type="button" className="link-btn" onClick={() => setOpen(true)}>Create Parent Login</button>
-      {open && (
-        <Modal title={`Create Login — ${guardian.fullName}`} onClose={() => setOpen(false)}>
-          <form onSubmit={handleSubmit}>
+      {error && <div className="alert-error" style={{ fontSize: 12, marginBottom: 4 }}>{error}</div>}
+      <button type="button" className="link-btn" onClick={handleQuickCreate} disabled={isSaving}>
+        {isSaving ? 'Creating...' : 'Create Parent Login (Phone + PIN)'}
+      </button>
+      {' · '}
+      <button type="button" className="link-btn" onClick={() => setUseEmail(true)}>Use email instead</button>
+      {useEmail && (
+        <Modal title={`Create Login by Email — ${guardian.fullName}`} onClose={() => setUseEmail(false)}>
+          <form onSubmit={handleEmailSubmit}>
             {error && <div className="alert-error">{error}</div>}
             <label className="field">
               <span>Email</span>
@@ -55,7 +85,7 @@ function CreateParentLoginAction({ guardian, onCreated }) {
               <input type="text" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} minLength={8} required />
             </label>
             <div className="modal-actions">
-              <button type="button" className="btn-secondary" onClick={() => setOpen(false)}>Cancel</button>
+              <button type="button" className="btn-secondary" onClick={() => setUseEmail(false)}>Cancel</button>
               <button type="submit" className="btn-primary" disabled={isSaving}>{isSaving ? 'Creating...' : 'Create Login'}</button>
             </div>
           </form>

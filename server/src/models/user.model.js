@@ -4,12 +4,13 @@ const tenantScopePlugin = require('../plugins/tenantScope');
 
 const userSchema = new mongoose.Schema({
   schoolId: { type: mongoose.Schema.Types.ObjectId, ref: 'School', index: true },
-  // Students are the one role that can go without an email — young basic-
-  // school pupils log in by Student.admissionNo instead (see auth.controller.js).
-  // Every other role still requires one.
+  // Students and parents can both go without an email — young basic-school
+  // pupils log in by Student.admissionNo, and guardians log in by phone +
+  // PIN (see auth.controller.js / guardians.controller.js). Admins and
+  // teachers still require one.
   email: {
     type: String,
-    required: function requiresEmail() { return this.role !== 'student'; },
+    required: function requiresEmail() { return !['student', 'parent'].includes(this.role); },
     default: null,
     maxlength: 150,
   },

@@ -1,13 +1,63 @@
+import { useState } from 'react';
 import useApiResource from '../../hooks/useApiResource';
-import { listGuardians } from '../../api/guardians.api';
+import { listGuardians, createGuardianLogin } from '../../api/guardians.api';
+import { useAuth } from '../../context/AuthContext';
 
 const LOGIN_STATUS_LABEL = {
   active: { label: 'Active', tone: 'success' },
   inactive: { label: 'Inactive', tone: 'warning' },
 };
 
+function CreateLoginCell({ guardian, onCreated }) {
+  const [isSaving, setIsSaving] = useState(false);
+  const [createdPin, setCreatedPin] = useState(null);
+  const [error, setError] = useState('');
+
+  if (guardian.hasLogin) {
+    return (
+      <span className={`badge badge-${LOGIN_STATUS_LABEL[guardian.loginStatus]?.tone || 'neutral'}`}>
+        {LOGIN_STATUS_LABEL[guardian.loginStatus]?.label || guardian.loginStatus}
+      </span>
+    );
+  }
+
+  if (createdPin) {
+    return <span className="muted" style={{ fontSize: 12 }}>PIN: <strong>{createdPin}</strong> (won&apos;t be shown again)</span>;
+  }
+
+  const handleCreate = async () => {
+    setIsSaving(true);
+    setError('');
+    try {
+      const updated = await createGuardianLogin(guardian.id, {});
+      onCreated(guardian.id, updated);
+      setCreatedPin(updated.pin);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to create login.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div>
+      <span className="badge badge-neutral" style={{ marginRight: 6 }}>No Login</span>
+      <button type="button" className="link-btn" onClick={handleCreate} disabled={isSaving}>
+        {isSaving ? 'Creating...' : 'Create Login'}
+      </button>
+      {error && <div className="muted" style={{ fontSize: 11.5, color: 'var(--danger)' }}>{error}</div>}
+    </div>
+  );
+}
+
 export default function Parents() {
-  const { data: guardians, isLoading, error } = useApiResource(listGuardians);
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+  const { data: guardians, isLoading, error, setData } = useApiResource(listGuardians);
+
+  const handleLoginCreated = (guardianId) => {
+    setData((prev) => prev.map((g) => (g.id === guardianId ? { ...g, hasLogin: true, loginStatus: 'active' } : g)));
+  };
 
   return (
     <div>
@@ -42,12 +92,16 @@ export default function Parents() {
                     </div>
                   </td>
                   <td>
-                    {g.hasLogin ? (
-                      <span className={`badge badge-${LOGIN_STATUS_LABEL[g.loginStatus]?.tone || 'neutral'}`}>
-                        {LOGIN_STATUS_LABEL[g.loginStatus]?.label || g.loginStatus}
-                      </span>
+                    {isAdmin ? (
+                      <CreateLoginCell guardian={g} onCreated={handleLoginCreated} />
                     ) : (
-                      <span className="badge badge-neutral">No Login</span>
+                      g.hasLogin ? (
+                        <span className={`badge badge-${LOGIN_STATUS_LABEL[g.loginStatus]?.tone || 'neutral'}`}>
+                          {LOGIN_STATUS_LABEL[g.loginStatus]?.label || g.loginStatus}
+                        </span>
+                      ) : (
+                        <span className="badge badge-neutral">No Login</span>
+                      )
                     )}
                   </td>
                 </tr>

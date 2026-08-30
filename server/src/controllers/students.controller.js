@@ -128,7 +128,7 @@ const create = asyncHandler(async (req, res, next) => {
   if (existing) return next(new AppError('A user with this email already exists', 400));
   if (classId && !(await Class.findById(classId))) return next(new AppError('Class not found', 400));
 
-  const { student, tempPassword } = await createStudentAccount({
+  const { student, tempPassword, provisionedLogins } = await createStudentAccount({
     email, admissionNo, firstName, lastName, gender, dateOfBirth, classId, address, admissionDate, category, programme, guardians, safetyNotes,
   });
 
@@ -140,7 +140,7 @@ const create = asyncHandler(async (req, res, next) => {
 
   res.status(201).json({
     success: true,
-    data: { ...(await attachGuardians(full)), tempPassword },
+    data: { ...(await attachGuardians(full)), tempPassword, provisionedLogins },
   });
 });
 

@@ -6,6 +6,7 @@ const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/AppError');
 const auditLog = require('../services/auditLog.service');
 const { getTeacherClassIds } = require('../services/teacherScope.service');
+const { generatePin } = require('../utils/password');
 
 // Guardian<->Student is many-to-many via StudentGuardian; fetch the linked
 // students manually since Mongoose has no belongsToMany populate.
@@ -83,20 +84,35 @@ const getById = asyncHandler(async (req, res, next) => {
   res.json({ success: true, data: await withStudents(guardian) });
 });
 
-// POST /guardians/:id/login { email, password } — gives an existing guardian
-// contact record a parent-role login (admin-created, per this app's convention).
+// POST /guardians/:id/login { email?, password? } — gives an existing
+// guardian contact record a parent-role login. Default (no body, or just an
+// empty object) provisions phone + an auto-generated PIN using the phone
+// already on file for this guardian -- one click, nothing to type, matching
+// how student accounts work. Passing an explicit email + password instead
+// still works, for a school that prefers that for a specific guardian.
 const createLogin = asyncHandler(async (req, res, next) => {
   const guardian = await Guardian.findById(req.params.id);
   if (!guardian) return next(new AppError('Guardian not found', 404));
   if (guardian.userId) return next(new AppError('This guardian already has a login', 400));
 
   const { email, password } = req.body;
-  const existing = await User.findOne({ email });
-  if (existing) return next(new AppError('A user with this email already exists', 400));
+  let userFields;
+  let pin = null;
 
-  const passwordHash = await bcrypt.hash(password, 10);
+  if (email) {
+    const existing = await User.findOne({ email });
+    if (existing) return next(new AppError('A user with this email already exists', 400));
+    if (!password) return next(new AppError('A password is required when creating a login by email', 400));
+    userFields = { email, passwordHash: await bcrypt.hash(password, 10) };
+  } else {
+    const existing = await User.findOne({ phone: guardian.phone });
+    if (existing) return next(new AppError('A user with this phone number already exists', 400));
+    pin = generatePin();
+    userFields = { phone: guardian.phone, passwordHash: await bcrypt.hash(pin, 10) };
+  }
+
   const user = await User.create({
-    email, passwordHash, fullName: guardian.fullName, role: 'parent', status: 'active',
+    ...userFields, fullName: guardian.fullName, role: 'parent', status: 'active',
   });
 
   guardian.userId = user.id;
@@ -106,7 +122,7 @@ const createLogin = asyncHandler(async (req, res, next) => {
     req, action: 'guardian.createLogin', entityType: 'Guardian', entityId: guardian.id, description: `Created parent login for guardian: ${guardian.fullName}`,
   });
 
-  res.status(201).json({ success: true, data: await withStudents(guardian) });
+  res.status(201).json({ success: true, data: { ...(await withStudents(guardian)), pin } });
 });
 
 module.exports = {

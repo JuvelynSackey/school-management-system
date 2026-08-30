@@ -197,7 +197,9 @@ export default function StudentList() {
       if (editing === 'new') {
         const created = await createStudent(payload);
         close();
-        setCreatedCredentials({ email: created.user.email, admissionNo: created.admissionNo, password: created.tempPassword });
+        setCreatedCredentials({
+          email: created.user.email, admissionNo: created.admissionNo, password: created.tempPassword, provisionedLogins: created.provisionedLogins,
+        });
       } else {
         const { email, ...updatable } = payload;
         await updateStudent(editing.id, updatable);
@@ -482,6 +484,20 @@ export default function StudentList() {
               ? 'They can log in with either the email above or their Admission No., plus this PIN.'
               : 'No email was set — they log in with their Admission No. and this PIN.'}
           </p>
+          {createdCredentials.provisionedLogins?.length > 0 && (
+            <>
+              <h3 style={{ fontSize: 13, margin: '16px 0 8px' }}>Parent/Guardian Portal Access</h3>
+              <p className="muted" style={{ fontSize: 12.5, marginBottom: 8 }}>
+                New guardian contact(s) also got a portal login — share these too.
+              </p>
+              {createdCredentials.provisionedLogins.map((pl) => (
+                <div key={pl.guardianId} className="panel" style={{ marginBottom: 8 }}>
+                  <p style={{ margin: 0 }}><strong>{pl.fullName}</strong></p>
+                  <p style={{ margin: '4px 0 0' }}>Phone: <strong>{pl.phone}</strong> &middot; PIN: <strong>{pl.pin}</strong></p>
+                </div>
+              ))}
+            </>
+          )}
           <div className="modal-actions">
             <button type="button" className="btn-primary" onClick={() => setCreatedCredentials(null)}>Done</button>
           </div>

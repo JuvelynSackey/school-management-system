@@ -137,7 +137,7 @@ const enroll = asyncHandler(async (req, res, next) => {
   const resolvedClassId = classId || admission.desiredClassId;
   if (resolvedClassId && !(await Class.findById(resolvedClassId))) return next(new AppError('Class not found', 400));
 
-  const { student, tempPassword } = await createStudentAccount({
+  const { student, tempPassword, provisionedLogins } = await createStudentAccount({
     email,
     admissionNo,
     firstName: admission.firstName,
@@ -164,7 +164,7 @@ const enroll = asyncHandler(async (req, res, next) => {
     metadata: { studentId: student.id },
   });
 
-  res.status(201).json({ success: true, data: { studentId: student.id, tempPassword } });
+  res.status(201).json({ success: true, data: { studentId: student.id, tempPassword, provisionedLogins } });
 });
 
 // DELETE /admissions/:id — only Applied or Rejected
