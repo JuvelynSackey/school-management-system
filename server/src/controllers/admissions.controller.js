@@ -37,7 +37,8 @@ const nextAdmissionNo = asyncHandler(async (req, res) => {
 // POST /admissions
 const create = asyncHandler(async (req, res, next) => {
   const {
-    firstName, lastName, gender, dateOfBirth, address, desiredClassId, guardians,
+    firstName, lastName, gender, dateOfBirth, address, nationality, religion,
+    hometownRegion, primaryLanguage, desiredClassId, guardians,
   } = req.body;
   if (desiredClassId && !(await Class.findById(desiredClassId))) return next(new AppError('Class not found', 400));
 
@@ -47,6 +48,10 @@ const create = asyncHandler(async (req, res, next) => {
     gender: gender || null,
     dateOfBirth: dateOfBirth || null,
     address: address || null,
+    nationality: nationality || 'Ghanaian',
+    religion: religion || null,
+    hometownRegion: hometownRegion || null,
+    primaryLanguage: primaryLanguage || null,
     desiredClassId: desiredClassId || null,
     guardians: Array.isArray(guardians) ? guardians : [],
     status: 'Applied',
@@ -64,7 +69,8 @@ const update = asyncHandler(async (req, res, next) => {
   }
 
   const {
-    firstName, lastName, gender, dateOfBirth, address, desiredClassId, guardians,
+    firstName, lastName, gender, dateOfBirth, address, nationality, religion,
+    hometownRegion, primaryLanguage, desiredClassId, guardians,
   } = req.body;
   if (desiredClassId && !(await Class.findById(desiredClassId))) return next(new AppError('Class not found', 400));
 
@@ -73,6 +79,10 @@ const update = asyncHandler(async (req, res, next) => {
   admission.gender = gender === undefined ? admission.gender : gender;
   admission.dateOfBirth = dateOfBirth === undefined ? admission.dateOfBirth : dateOfBirth;
   admission.address = address === undefined ? admission.address : address;
+  admission.nationality = nationality === undefined ? admission.nationality : (nationality || 'Ghanaian');
+  admission.religion = religion === undefined ? admission.religion : (religion || null);
+  admission.hometownRegion = hometownRegion === undefined ? admission.hometownRegion : (hometownRegion || null);
+  admission.primaryLanguage = primaryLanguage === undefined ? admission.primaryLanguage : (primaryLanguage || null);
   admission.desiredClassId = desiredClassId === undefined ? admission.desiredClassId : (desiredClassId || null);
   if (Array.isArray(guardians)) admission.guardians = guardians;
   await admission.save();
@@ -147,6 +157,10 @@ const enroll = asyncHandler(async (req, res, next) => {
     classId: resolvedClassId,
     address: admission.address,
     admissionDate,
+    nationality: admission.nationality,
+    religion: admission.religion,
+    hometownRegion: admission.hometownRegion,
+    primaryLanguage: admission.primaryLanguage,
     guardians: admission.guardians,
     safetyNotes: [],
   });

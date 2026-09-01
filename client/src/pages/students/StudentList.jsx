@@ -29,15 +29,18 @@ const STATUS_BADGE_TONE = {
 };
 
 const emptyGuardian = (contactPriority) => ({
-  contactPriority, phone: '', fullName: '', email: '', relationship: '', linkedInfo: null, lookupError: '',
+  contactPriority, phone: '', fullName: '', email: '', relationship: '', occupation: '', employer: '', whatsappNumber: '', whatsappSameAsPhone: true, linkedInfo: null, lookupError: '',
 });
 
 const emptyForm = () => ({
   email: '', admissionNo: '', firstName: '', lastName: '', gender: '', dateOfBirth: '', classId: '',
   address: '', admissionDate: '', category: '', programme: '', waecIndexNumber: '',
+  nationality: 'Ghanaian', religion: '', hometownRegion: '', primaryLanguage: '',
   guardians: [emptyGuardian('primary')],
   safetyNotes: [],
 });
+
+const GHANAIAN_LANGUAGES = ['English', 'Twi', 'Fante', 'Ewe', 'Ga', 'Dagbani', 'Dagaare', 'Hausa', 'Nzema', 'Gonja'];
 
 export default function StudentList() {
   const { user } = useAuth();
@@ -110,6 +113,10 @@ export default function StudentList() {
       fullName: g.fullName,
       email: g.email || '',
       relationship: g.relationship || '',
+      occupation: g.occupation || '',
+      employer: g.employer || '',
+      whatsappNumber: g.whatsappNumber || '',
+      whatsappSameAsPhone: !g.whatsappNumber || g.whatsappNumber === g.phone,
       linkedInfo: g,
       lookupError: '',
     }));
@@ -126,6 +133,10 @@ export default function StudentList() {
       category: student.category || '',
       programme: student.programme || '',
       waecIndexNumber: student.waecIndexNumber || '',
+      nationality: student.nationality || 'Ghanaian',
+      religion: student.religion || '',
+      hometownRegion: student.hometownRegion || '',
+      primaryLanguage: student.primaryLanguage || '',
       guardians: guardians.length ? guardians : [emptyGuardian('primary')],
       safetyNotes: (student.safetyNotes || []).map((n) => ({ type: n.type, note: n.note })),
     });
@@ -138,7 +149,16 @@ export default function StudentList() {
   const updateGuardian = (index, field, value) => {
     setForm((f) => ({
       ...f,
-      guardians: f.guardians.map((g, i) => (i === index ? { ...g, [field]: value, ...(field === 'phone' ? { linkedInfo: null, lookupError: '' } : {}) } : g)),
+      guardians: f.guardians.map((g, i) => {
+        if (i !== index) return g;
+        const next = { ...g, [field]: value };
+        if (field === 'phone') {
+          Object.assign(next, { linkedInfo: null, lookupError: '' });
+          if (g.whatsappSameAsPhone) next.whatsappNumber = value;
+        }
+        if (field === 'whatsappSameAsPhone') next.whatsappNumber = value ? g.phone : g.whatsappNumber;
+        return next;
+      }),
     }));
   };
   const addSecondaryGuardian = () => setForm((f) => ({ ...f, guardians: [...f.guardians, emptyGuardian('secondary')] }));
@@ -191,6 +211,9 @@ export default function StudentList() {
             email: g.email || null,
             relationship: g.relationship || null,
             contactPriority: g.contactPriority,
+            occupation: g.occupation || null,
+            employer: g.employer || null,
+            whatsappNumber: g.whatsappNumber || null,
           })),
         safetyNotes: form.safetyNotes.filter((n) => n.note.trim()),
       };
@@ -391,6 +414,46 @@ export default function StudentList() {
               </label>
             )}
 
+            <h3 style={{ fontSize: 14, margin: '20px 0 8px' }}>Background</h3>
+            <label className="field">
+              <span>Nationality</span>
+              <input
+                value={form.nationality}
+                onChange={(e) => setForm({ ...form, nationality: e.target.value })}
+                maxLength={100}
+              />
+            </label>
+            <label className="field">
+              <span>Religion</span>
+              <input
+                value={form.religion}
+                onChange={(e) => setForm({ ...form, religion: e.target.value })}
+                maxLength={100}
+              />
+            </label>
+            <label className="field">
+              <span>Hometown / Region</span>
+              <input
+                value={form.hometownRegion}
+                onChange={(e) => setForm({ ...form, hometownRegion: e.target.value })}
+                placeholder="e.g. Cape Coast / Central Region"
+                maxLength={150}
+              />
+            </label>
+            <label className="field">
+              <span>Primary Language Spoken at Home</span>
+              <input
+                list="ghanaian-languages"
+                value={form.primaryLanguage}
+                onChange={(e) => setForm({ ...form, primaryLanguage: e.target.value })}
+                placeholder="e.g. Twi, Fante, Ewe, Ga"
+                maxLength={100}
+              />
+              <datalist id="ghanaian-languages">
+                {GHANAIAN_LANGUAGES.map((lang) => <option key={lang} value={lang} />)}
+              </datalist>
+            </label>
+
             <h3 style={{ fontSize: 14, margin: '20px 0 8px' }}>Guardians</h3>
             {form.guardians.map((g, index) => (
               // eslint-disable-next-line react/no-array-index-key
@@ -437,8 +500,37 @@ export default function StudentList() {
                   placeholder="Relationship (e.g. Mother, Father, Aunt)"
                   value={g.relationship}
                   onChange={(e) => updateGuardian(index, 'relationship', e.target.value)}
-                  style={{ width: '100%', padding: '9px 12px', border: '1px solid var(--border)', borderRadius: 6 }}
+                  style={{ width: '100%', padding: '9px 12px', border: '1px solid var(--border)', borderRadius: 6, marginBottom: 8 }}
                 />
+                <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                  <input
+                    placeholder="Occupation"
+                    value={g.occupation}
+                    onChange={(e) => updateGuardian(index, 'occupation', e.target.value)}
+                    style={{ flex: 1, padding: '9px 12px', border: '1px solid var(--border)', borderRadius: 6 }}
+                  />
+                  <input
+                    placeholder="Employer"
+                    value={g.employer}
+                    onChange={(e) => updateGuardian(index, 'employer', e.target.value)}
+                    style={{ flex: 1, padding: '9px 12px', border: '1px solid var(--border)', borderRadius: 6 }}
+                  />
+                </div>
+                <input
+                  placeholder="WhatsApp number"
+                  value={g.whatsappNumber}
+                  onChange={(e) => updateGuardian(index, 'whatsappNumber', e.target.value)}
+                  disabled={g.whatsappSameAsPhone}
+                  style={{ width: '100%', padding: '9px 12px', border: '1px solid var(--border)', borderRadius: 6, marginBottom: 6 }}
+                />
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}>
+                  <input
+                    type="checkbox"
+                    checked={g.whatsappSameAsPhone}
+                    onChange={(e) => updateGuardian(index, 'whatsappSameAsPhone', e.target.checked)}
+                  />
+                  Same as phone number
+                </label>
               </div>
             ))}
             {canAddSecondary && (

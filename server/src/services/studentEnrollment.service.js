@@ -30,6 +30,9 @@ const linkGuardians = async (studentId, guardians, session) => {
         fullName: g.fullName || g.phone,
         email: g.email || null,
         relationship: g.relationship || null,
+        occupation: g.occupation || null,
+        employer: g.employer || null,
+        whatsappNumber: g.whatsappNumber || null,
       },
       session,
     });
@@ -77,7 +80,8 @@ const replaceSafetyNotes = async (studentId, notes, session) => {
 // (email, classId) before calling this.
 const createStudentAccount = async ({
   email, admissionNo, firstName, lastName, gender, dateOfBirth, classId,
-  address, admissionDate, category, programme, guardians, safetyNotes,
+  address, admissionDate, category, programme, nationality, religion,
+  hometownRegion, primaryLanguage, guardians, safetyNotes,
 }) => {
   // A short PIN, not the longer alphanumeric password every other role
   // gets -- a basic-school pupil is far more likely to actually be told
@@ -110,6 +114,10 @@ const createStudentAccount = async ({
         admissionDate: admissionDate || null,
         category: category || null,
         programme: programme || null,
+        nationality: nationality || 'Ghanaian',
+        religion: religion || null,
+        hometownRegion: hometownRegion || null,
+        primaryLanguage: primaryLanguage || null,
         status: 'active',
       }], { session });
 

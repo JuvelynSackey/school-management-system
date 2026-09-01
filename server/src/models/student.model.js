@@ -27,6 +27,11 @@ const studentSchema = new mongoose.Schema({
     default: 'active',
   },
   photoUrl: { type: String, default: null },
+  // Mirrors fields on the physical Ghanaian basic-school admission form.
+  nationality: { type: String, default: 'Ghanaian', maxlength: 100 },
+  religion: { type: String, default: null, maxlength: 100 },
+  hometownRegion: { type: String, default: null, maxlength: 150 },
+  primaryLanguage: { type: String, default: null, maxlength: 100 },
   // No `default: null` here on purpose — same reasoning as subject.model.js's
   // `code` field: a sparse unique index only skips documents where the field
   // is truly absent, not ones explicitly set to null, so an explicit default

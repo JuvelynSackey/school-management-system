@@ -12,6 +12,9 @@ const admissionGuardianSchema = new mongoose.Schema({
   email: { type: String, default: null },
   relationship: { type: String, default: null },
   contactPriority: { type: String, enum: ['primary', 'secondary'], default: 'primary' },
+  occupation: { type: String, default: null },
+  employer: { type: String, default: null },
+  whatsappNumber: { type: String, default: null },
 }, { _id: false });
 
 const admissionSchema = new mongoose.Schema({
@@ -21,6 +24,10 @@ const admissionSchema = new mongoose.Schema({
   gender: { type: String, default: null },
   dateOfBirth: { type: String, default: null },
   address: { type: String, default: null },
+  nationality: { type: String, default: 'Ghanaian', maxlength: 100 },
+  religion: { type: String, default: null, maxlength: 100 },
+  hometownRegion: { type: String, default: null, maxlength: 150 },
+  primaryLanguage: { type: String, default: null, maxlength: 100 },
   desiredClassId: { type: mongoose.Schema.Types.ObjectId, ref: 'Class', default: null },
   guardians: { type: [admissionGuardianSchema], default: [] },
   status: {

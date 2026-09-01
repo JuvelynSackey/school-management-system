@@ -8,6 +8,9 @@ const guardianArrayValidator = [
   body('guardians.*.relationship').optional({ nullable: true }).trim(),
   body('guardians.*.contactPriority').optional().isIn(['primary', 'secondary']),
   body('guardians.*.isPickupAuthorized').optional().isBoolean(),
+  body('guardians.*.occupation').optional({ nullable: true }).trim().isLength({ max: 150 }),
+  body('guardians.*.employer').optional({ nullable: true }).trim().isLength({ max: 150 }),
+  body('guardians.*.whatsappNumber').optional({ nullable: true }).trim().isLength({ max: 50 }),
 ];
 
 const safetyNotesArrayValidator = [
@@ -30,6 +33,10 @@ const createValidator = [
   body('admissionDate').optional({ nullable: true, checkFalsy: true }).isISO8601(),
   body('category').optional({ nullable: true, checkFalsy: true }).isIn(['Day', 'Boarding']),
   body('programme').optional({ nullable: true }).trim().isLength({ max: 100 }),
+  body('nationality').optional({ nullable: true, checkFalsy: true }).trim().isLength({ max: 100 }),
+  body('religion').optional({ nullable: true, checkFalsy: true }).trim().isLength({ max: 100 }),
+  body('hometownRegion').optional({ nullable: true, checkFalsy: true }).trim().isLength({ max: 150 }),
+  body('primaryLanguage').optional({ nullable: true, checkFalsy: true }).trim().isLength({ max: 100 }),
   ...guardianArrayValidator,
   ...safetyNotesArrayValidator,
 ];
@@ -45,6 +52,10 @@ const updateValidator = [
   body('admissionDate').optional({ nullable: true, checkFalsy: true }).isISO8601(),
   body('category').optional({ nullable: true, checkFalsy: true }).isIn(['Day', 'Boarding']),
   body('programme').optional({ nullable: true }).trim().isLength({ max: 100 }),
+  body('nationality').optional({ nullable: true, checkFalsy: true }).trim().isLength({ max: 100 }),
+  body('religion').optional({ nullable: true, checkFalsy: true }).trim().isLength({ max: 100 }),
+  body('hometownRegion').optional({ nullable: true, checkFalsy: true }).trim().isLength({ max: 150 }),
+  body('primaryLanguage').optional({ nullable: true, checkFalsy: true }).trim().isLength({ max: 100 }),
   body('status').optional().isIn(['active', 'inactive', 'archived', 'transferred', 'withdrawn', 'graduated']),
   body('waecIndexNumber').optional({ nullable: true, checkFalsy: true }).trim().isLength({ max: 20 }),
   ...guardianArrayValidator,

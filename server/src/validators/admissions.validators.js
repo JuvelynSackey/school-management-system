@@ -7,6 +7,16 @@ const guardianArrayValidator = [
   body('guardians.*.email').optional({ nullable: true, checkFalsy: true }).isEmail(),
   body('guardians.*.relationship').optional({ nullable: true }).trim(),
   body('guardians.*.contactPriority').optional().isIn(['primary', 'secondary']),
+  body('guardians.*.occupation').optional({ nullable: true }).trim().isLength({ max: 150 }),
+  body('guardians.*.employer').optional({ nullable: true }).trim().isLength({ max: 150 }),
+  body('guardians.*.whatsappNumber').optional({ nullable: true }).trim().isLength({ max: 50 }),
+];
+
+const demographicsValidator = [
+  body('nationality').optional({ nullable: true, checkFalsy: true }).trim().isLength({ max: 100 }),
+  body('religion').optional({ nullable: true, checkFalsy: true }).trim().isLength({ max: 100 }),
+  body('hometownRegion').optional({ nullable: true, checkFalsy: true }).trim().isLength({ max: 150 }),
+  body('primaryLanguage').optional({ nullable: true, checkFalsy: true }).trim().isLength({ max: 100 }),
 ];
 
 const createValidator = [
@@ -16,6 +26,7 @@ const createValidator = [
   body('dateOfBirth').optional({ nullable: true, checkFalsy: true }).isISO8601(),
   body('address').optional({ nullable: true }).trim(),
   body('desiredClassId').optional({ nullable: true }).isMongoId(),
+  ...demographicsValidator,
   ...guardianArrayValidator,
 ];
 
@@ -26,6 +37,7 @@ const updateValidator = [
   body('dateOfBirth').optional({ nullable: true, checkFalsy: true }).isISO8601(),
   body('address').optional({ nullable: true }).trim(),
   body('desiredClassId').optional({ nullable: true }).isMongoId(),
+  ...demographicsValidator,
   ...guardianArrayValidator,
 ];
 

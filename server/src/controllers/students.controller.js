@@ -118,7 +118,8 @@ const getMe = asyncHandler(async (req, res, next) => {
 const create = asyncHandler(async (req, res, next) => {
   const {
     email, admissionNo, firstName, lastName, gender, dateOfBirth, classId,
-    address, admissionDate, category, programme, guardians, safetyNotes,
+    address, admissionDate, category, programme, nationality, religion,
+    hometownRegion, primaryLanguage, guardians, safetyNotes,
   } = req.body;
 
   // email is optional for students -- a bare { email: undefined } filter
@@ -129,7 +130,8 @@ const create = asyncHandler(async (req, res, next) => {
   if (classId && !(await Class.findById(classId))) return next(new AppError('Class not found', 400));
 
   const { student, tempPassword, provisionedLogins } = await createStudentAccount({
-    email, admissionNo, firstName, lastName, gender, dateOfBirth, classId, address, admissionDate, category, programme, guardians, safetyNotes,
+    email, admissionNo, firstName, lastName, gender, dateOfBirth, classId, address, admissionDate, category, programme,
+    nationality, religion, hometownRegion, primaryLanguage, guardians, safetyNotes,
   });
 
   const full = await populateFull(Student.findById(student.id));
@@ -150,7 +152,8 @@ const update = asyncHandler(async (req, res, next) => {
 
   const {
     admissionNo, firstName, lastName, gender, dateOfBirth, classId,
-    address, admissionDate, category, programme, status, waecIndexNumber, guardians, safetyNotes,
+    address, admissionDate, category, programme, nationality, religion,
+    hometownRegion, primaryLanguage, status, waecIndexNumber, guardians, safetyNotes,
   } = req.body;
 
   if (waecIndexNumber) {
@@ -175,6 +178,10 @@ const update = asyncHandler(async (req, res, next) => {
       student.admissionDate = admissionDate === undefined ? student.admissionDate : admissionDate;
       student.category = category === undefined ? student.category : (category || null);
       student.programme = programme === undefined ? student.programme : (programme || null);
+      student.nationality = nationality === undefined ? student.nationality : (nationality || 'Ghanaian');
+      student.religion = religion === undefined ? student.religion : (religion || null);
+      student.hometownRegion = hometownRegion === undefined ? student.hometownRegion : (hometownRegion || null);
+      student.primaryLanguage = primaryLanguage === undefined ? student.primaryLanguage : (primaryLanguage || null);
       student.status = status ?? student.status;
       if (waecIndexNumber !== undefined) student.waecIndexNumber = waecIndexNumber || undefined;
       await student.save({ session });

@@ -16,6 +16,14 @@ import AcademicHistoryPanel from '../../components/results/AcademicHistoryPanel'
 
 const NOTE_BADGE_CLASS = { medical: 'badge-danger', pickup: 'badge-warning', other: 'badge-neutral' };
 
+// Ghanaian local numbers (0XXXXXXXXX) -> WhatsApp's E.164-without-plus format (233XXXXXXXXX).
+const toWhatsAppLink = (phone) => {
+  const digits = (phone || '').replace(/\D/g, '');
+  if (!digits) return null;
+  const intl = digits.startsWith('233') ? digits : digits.startsWith('0') ? `233${digits.slice(1)}` : digits;
+  return `https://wa.me/${intl}`;
+};
+
 function CreateParentLoginAction({ guardian, onCreated }) {
   const [useEmail, setUseEmail] = useState(false);
   const [form, setForm] = useState({ email: '', password: '' });
@@ -157,6 +165,10 @@ export function StudentProfileView({
             <tr><th>Date of Birth</th><td>{student.dateOfBirth || '—'}</td></tr>
             <tr><th>Address</th><td>{student.address || '—'}</td></tr>
             <tr><th>Admission Date</th><td>{student.admissionDate || '—'}</td></tr>
+            <tr><th>Nationality</th><td>{student.nationality || '—'}</td></tr>
+            <tr><th>Religion</th><td>{student.religion || '—'}</td></tr>
+            <tr><th>Hometown / Region</th><td>{student.hometownRegion || '—'}</td></tr>
+            <tr><th>Primary Language</th><td>{student.primaryLanguage || '—'}</td></tr>
             <tr><th>Status</th><td>{student.status}</td></tr>
           </tbody>
         </table>
@@ -183,7 +195,7 @@ export function StudentProfileView({
           <table>
             <thead>
               <tr>
-                <th>Name</th><th>Relationship</th><th>Phone</th><th>Email</th><th>Priority</th><th>Also parent of</th>
+                <th>Name</th><th>Relationship</th><th>Phone</th><th>WhatsApp</th><th>Email</th><th>Occupation</th><th>Priority</th><th>Also parent of</th>
                 {canManageGuardianLogins && <th>Login</th>}
               </tr>
             </thead>
@@ -193,7 +205,16 @@ export function StudentProfileView({
                   <td>{guardian.fullName}</td>
                   <td>{guardian.relationship || '—'}</td>
                   <td>{guardian.phone}</td>
+                  <td>
+                    {guardian.whatsappNumber ? (
+                      <a href={toWhatsAppLink(guardian.whatsappNumber)} target="_blank" rel="noreferrer">Chat</a>
+                    ) : '—'}
+                  </td>
                   <td>{guardian.email || '—'}</td>
+                  <td>
+                    {guardian.occupation || '—'}
+                    {guardian.employer && <div className="muted" style={{ fontSize: 12 }}>{guardian.employer}</div>}
+                  </td>
                   <td style={{ textTransform: 'capitalize' }}>{guardian.contactPriority}</td>
                   <td>{siblings.length ? siblings.map((s) => `${s.firstName} ${s.lastName}`).join(', ') : '—'}</td>
                   {canManageGuardianLogins && (
