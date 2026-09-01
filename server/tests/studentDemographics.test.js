@@ -16,7 +16,7 @@ afterAll(stopTestServer);
 afterEach(clearTestDb);
 
 describe('Student & guardian background fields (Ghanaian admission form)', () => {
-  test('POST /students persists nationality, religion, hometown/region, primary language, and guardian occupation/WhatsApp', async () => {
+  test('POST /students persists nationality, religion, hometown, region, primary language, and guardian occupation/WhatsApp', async () => {
     const school = await fixtures.createSchool(models);
     const classRow = await fixtures.createClass(models, school._id);
     const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin@demographics-test.local' });
@@ -28,7 +28,8 @@ describe('Student & guardian background fields (Ghanaian admission form)', () =>
       lastName: 'Mensah',
       classId: classRow.id,
       religion: 'Christian',
-      hometownRegion: 'Cape Coast / Central Region',
+      hometown: 'Cape Coast',
+      region: 'Central Region',
       primaryLanguage: 'Fante',
       guardians: [{
         phone: '0501112221',
@@ -42,7 +43,8 @@ describe('Student & guardian background fields (Ghanaian admission form)', () =>
     expect(res.status).toBe(201);
     expect(res.body.data.nationality).toBe('Ghanaian'); // default, not sent
     expect(res.body.data.religion).toBe('Christian');
-    expect(res.body.data.hometownRegion).toBe('Cape Coast / Central Region');
+    expect(res.body.data.hometown).toBe('Cape Coast');
+    expect(res.body.data.region).toBe('Central Region');
     expect(res.body.data.primaryLanguage).toBe('Fante');
 
     const guardian = res.body.data.guardians[0];
@@ -50,7 +52,7 @@ describe('Student & guardian background fields (Ghanaian admission form)', () =>
     expect(guardian.whatsappNumber).toBe('0501112221');
   });
 
-  test('POST /students without nationality defaults to Ghanaian; without religion/hometown/language leaves them null', async () => {
+  test('POST /students without nationality defaults to Ghanaian; without religion/hometown/region/language leaves them null', async () => {
     const school = await fixtures.createSchool(models);
     const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin2@demographics-test.local' });
     const token = await fixtures.login(app, school.slug, 'admin2@demographics-test.local', password);
@@ -62,8 +64,20 @@ describe('Student & guardian background fields (Ghanaian admission form)', () =>
     expect(res.status).toBe(201);
     expect(res.body.data.nationality).toBe('Ghanaian');
     expect(res.body.data.religion).toBeNull();
-    expect(res.body.data.hometownRegion).toBeNull();
+    expect(res.body.data.hometown).toBeNull();
+    expect(res.body.data.region).toBeNull();
     expect(res.body.data.primaryLanguage).toBeNull();
+  });
+
+  test('POST /students rejects a region value outside the 16 official Ghana regions', async () => {
+    const school = await fixtures.createSchool(models);
+    const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin2b@demographics-test.local' });
+    const token = await fixtures.login(app, school.slug, 'admin2b@demographics-test.local', password);
+
+    const res = await request(app).post('/api/students').set(fixtures.authHeader(token)).send({
+      admissionNo: 'DEMO-0002B', firstName: 'Ato', lastName: 'Mills', region: 'Ashanti',
+    });
+    expect(res.status).toBe(400);
   });
 
   test('PUT /students/:id updates background fields; omitting them leaves existing values untouched', async () => {
@@ -74,7 +88,7 @@ describe('Student & guardian background fields (Ghanaian admission form)', () =>
     const token = await fixtures.login(app, school.slug, 'admin3@demographics-test.local', password);
 
     const updateRes = await request(app).put(`/api/students/${student.id}`).set(fixtures.authHeader(token)).send({
-      nationality: 'Nigerian', religion: 'Muslim', hometownRegion: 'Kumasi / Ashanti Region', primaryLanguage: 'Twi',
+      nationality: 'Nigerian', religion: 'Muslim', hometown: 'Kumasi', region: 'Ashanti Region', primaryLanguage: 'Twi',
     });
     expect(updateRes.status).toBe(200);
     expect(updateRes.body.data.nationality).toBe('Nigerian');
@@ -87,7 +101,8 @@ describe('Student & guardian background fields (Ghanaian admission form)', () =>
     expect(untouchedRes.status).toBe(200);
     expect(untouchedRes.body.data.nationality).toBe('Nigerian');
     expect(untouchedRes.body.data.religion).toBe('Muslim');
-    expect(untouchedRes.body.data.hometownRegion).toBe('Kumasi / Ashanti Region');
+    expect(untouchedRes.body.data.hometown).toBe('Kumasi');
+    expect(untouchedRes.body.data.region).toBe('Ashanti Region');
     expect(untouchedRes.body.data.primaryLanguage).toBe('Twi');
   });
 
@@ -101,7 +116,8 @@ describe('Student & guardian background fields (Ghanaian admission form)', () =>
       firstName: 'Yaw',
       lastName: 'Owusu',
       religion: 'Traditionalist',
-      hometownRegion: 'Tamale / Northern Region',
+      hometown: 'Tamale',
+      region: 'Northern Region',
       primaryLanguage: 'Dagbani',
       desiredClassId: classRow.id,
       guardians: [{
@@ -110,7 +126,8 @@ describe('Student & guardian background fields (Ghanaian admission form)', () =>
     });
     expect(createRes.status).toBe(201);
     expect(createRes.body.data.religion).toBe('Traditionalist');
-    expect(createRes.body.data.hometownRegion).toBe('Tamale / Northern Region');
+    expect(createRes.body.data.hometown).toBe('Tamale');
+    expect(createRes.body.data.region).toBe('Northern Region');
 
     const admissionId = createRes.body.data.id;
     await request(app).post(`/api/admissions/${admissionId}/approve`).set(fixtures.authHeader(token));
@@ -122,7 +139,8 @@ describe('Student & guardian background fields (Ghanaian admission form)', () =>
 
     const student = await models.Student.findById(enrollRes.body.data.studentId).setOptions({ skipTenantScope: true });
     expect(student.religion).toBe('Traditionalist');
-    expect(student.hometownRegion).toBe('Tamale / Northern Region');
+    expect(student.hometown).toBe('Tamale');
+    expect(student.region).toBe('Northern Region');
     expect(student.primaryLanguage).toBe('Dagbani');
     expect(student.nationality).toBe('Ghanaian');
 

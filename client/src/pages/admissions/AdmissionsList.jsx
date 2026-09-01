@@ -8,6 +8,7 @@ import {
 import { listClasses } from '../../api/classes.api';
 import { lookupGuardianByPhone } from '../../api/guardians.api';
 import Modal from '../../components/common/Modal';
+import { GHANA_REGIONS } from '../../config/ghanaRegions';
 
 const STATUS_BADGE = {
   Applied: 'badge-neutral',
@@ -22,7 +23,7 @@ const emptyGuardian = (contactPriority) => ({
 
 const emptyForm = () => ({
   firstName: '', lastName: '', gender: '', dateOfBirth: '', address: '', desiredClassId: '',
-  nationality: 'Ghanaian', religion: '', hometownRegion: '', primaryLanguage: '',
+  nationality: 'Ghanaian', religion: '', hometown: '', region: '', primaryLanguage: '',
   guardians: [emptyGuardian('primary')],
 });
 
@@ -83,7 +84,8 @@ export default function AdmissionsList() {
       address: admission.address || '',
       nationality: admission.nationality || 'Ghanaian',
       religion: admission.religion || '',
-      hometownRegion: admission.hometownRegion || '',
+      hometown: admission.hometown || '',
+      region: admission.region || '',
       primaryLanguage: admission.primaryLanguage || '',
       desiredClassId: admission.desiredClassId || '',
       guardians: guardians.length ? guardians : [emptyGuardian('primary')],
@@ -348,13 +350,20 @@ export default function AdmissionsList() {
               <input value={form.religion} onChange={(e) => setForm({ ...form, religion: e.target.value })} maxLength={100} />
             </label>
             <label className="field">
-              <span>Hometown / Region</span>
+              <span>Hometown</span>
               <input
-                value={form.hometownRegion}
-                onChange={(e) => setForm({ ...form, hometownRegion: e.target.value })}
-                placeholder="e.g. Cape Coast / Central Region"
-                maxLength={150}
+                value={form.hometown}
+                onChange={(e) => setForm({ ...form, hometown: e.target.value })}
+                placeholder="e.g. Cape Coast, Mampong"
+                maxLength={100}
               />
+            </label>
+            <label className="field">
+              <span>Region</span>
+              <select value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })}>
+                <option value="">—</option>
+                {GHANA_REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
             </label>
             <label className="field">
               <span>Primary Language Spoken at Home</span>

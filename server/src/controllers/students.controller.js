@@ -120,7 +120,7 @@ const create = asyncHandler(async (req, res, next) => {
   const {
     email, admissionNo, firstName, lastName, gender, dateOfBirth, classId,
     address, admissionDate, category, programme, nationality, religion,
-    hometownRegion, primaryLanguage, guardians, safetyNotes,
+    hometown, region, primaryLanguage, guardians, safetyNotes,
   } = req.body;
 
   // email is optional for students -- a bare { email: undefined } filter
@@ -132,7 +132,7 @@ const create = asyncHandler(async (req, res, next) => {
 
   const { student, tempPassword, provisionedLogins } = await createStudentAccount({
     email, admissionNo, firstName, lastName, gender, dateOfBirth, classId, address, admissionDate, category, programme,
-    nationality, religion, hometownRegion, primaryLanguage, guardians, safetyNotes,
+    nationality, religion, hometown, region, primaryLanguage, guardians, safetyNotes,
   });
 
   const full = await populateFull(Student.findById(student.id));
@@ -154,7 +154,7 @@ const update = asyncHandler(async (req, res, next) => {
   const {
     admissionNo, firstName, lastName, gender, dateOfBirth, classId,
     address, admissionDate, category, programme, nationality, religion,
-    hometownRegion, primaryLanguage, status, waecIndexNumber, guardians, safetyNotes,
+    hometown, region, primaryLanguage, status, waecIndexNumber, guardians, safetyNotes,
   } = req.body;
 
   if (waecIndexNumber) {
@@ -181,7 +181,8 @@ const update = asyncHandler(async (req, res, next) => {
       student.programme = programme === undefined ? student.programme : (programme || null);
       student.nationality = nationality === undefined ? student.nationality : (nationality || 'Ghanaian');
       student.religion = religion === undefined ? student.religion : (religion || null);
-      student.hometownRegion = hometownRegion === undefined ? student.hometownRegion : (hometownRegion || null);
+      student.hometown = hometown === undefined ? student.hometown : (hometown || null);
+      student.region = region === undefined ? student.region : (region || null);
       student.primaryLanguage = primaryLanguage === undefined ? student.primaryLanguage : (primaryLanguage || null);
       student.status = status ?? student.status;
       if (waecIndexNumber !== undefined) student.waecIndexNumber = waecIndexNumber || undefined;

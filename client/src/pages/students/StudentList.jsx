@@ -8,6 +8,7 @@ import { listClasses } from '../../api/classes.api';
 import { lookupGuardianByPhone } from '../../api/guardians.api';
 import { useAuth } from '../../context/AuthContext';
 import Modal from '../../components/common/Modal';
+import { GHANA_REGIONS } from '../../config/ghanaRegions';
 
 const SAFETY_NOTE_TYPES = ['pickup', 'medical', 'other'];
 
@@ -35,7 +36,7 @@ const emptyGuardian = (contactPriority) => ({
 const emptyForm = () => ({
   email: '', admissionNo: '', firstName: '', lastName: '', gender: '', dateOfBirth: '', classId: '',
   address: '', admissionDate: '', category: '', programme: '', waecIndexNumber: '',
-  nationality: 'Ghanaian', religion: '', hometownRegion: '', primaryLanguage: '',
+  nationality: 'Ghanaian', religion: '', hometown: '', region: '', primaryLanguage: '',
   guardians: [emptyGuardian('primary')],
   safetyNotes: [],
 });
@@ -134,7 +135,8 @@ export default function StudentList() {
       waecIndexNumber: student.waecIndexNumber || '',
       nationality: student.nationality || 'Ghanaian',
       religion: student.religion || '',
-      hometownRegion: student.hometownRegion || '',
+      hometown: student.hometown || '',
+      region: student.region || '',
       primaryLanguage: student.primaryLanguage || '',
       guardians: guardians.length ? guardians : [emptyGuardian('primary')],
       safetyNotes: (student.safetyNotes || []).map((n) => ({ type: n.type, note: n.note })),
@@ -430,13 +432,20 @@ export default function StudentList() {
               />
             </label>
             <label className="field">
-              <span>Hometown / Region</span>
+              <span>Hometown</span>
               <input
-                value={form.hometownRegion}
-                onChange={(e) => setForm({ ...form, hometownRegion: e.target.value })}
-                placeholder="e.g. Cape Coast / Central Region"
-                maxLength={150}
+                value={form.hometown}
+                onChange={(e) => setForm({ ...form, hometown: e.target.value })}
+                placeholder="e.g. Cape Coast, Mampong"
+                maxLength={100}
               />
+            </label>
+            <label className="field">
+              <span>Region</span>
+              <select value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })}>
+                <option value="">—</option>
+                {GHANA_REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
             </label>
             <label className="field">
               <span>Primary Language Spoken at Home</span>

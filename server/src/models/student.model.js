@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const idTransformPlugin = require('../plugins/idTransform');
 const tenantScopePlugin = require('../plugins/tenantScope');
+const { GHANA_REGIONS } = require('../constants/ghanaRegions');
 
 const studentSchema = new mongoose.Schema({
   schoolId: { type: mongoose.Schema.Types.ObjectId, ref: 'School', index: true },
@@ -30,7 +31,12 @@ const studentSchema = new mongoose.Schema({
   // Mirrors fields on the physical Ghanaian basic-school admission form.
   nationality: { type: String, default: 'Ghanaian', maxlength: 100 },
   religion: { type: String, default: null, maxlength: 100 },
-  hometownRegion: { type: String, default: null, maxlength: 150 },
+  hometown: { type: String, default: null, maxlength: 100 },
+  // No default region on purpose -- defaulting every unset student to
+  // "Greater Accra Region" would silently misattribute pupils at schools
+  // in any of the other 15 regions. Left null (an honest "not set") until
+  // an admin actually picks one from the dropdown.
+  region: { type: String, enum: [...GHANA_REGIONS, null], default: null },
   primaryLanguage: { type: String, default: null, maxlength: 100 },
   // No `default: null` here on purpose — same reasoning as subject.model.js's
   // `code` field: a sparse unique index only skips documents where the field

@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const idTransformPlugin = require('../plugins/idTransform');
 const tenantScopePlugin = require('../plugins/tenantScope');
+const { GHANA_REGIONS } = require('../constants/ghanaRegions');
 
 // Guardians are embedded plain objects here (not refs into Guardian) since
 // an applicant isn't a real Student yet — real Guardian/StudentGuardian
@@ -25,7 +26,8 @@ const admissionSchema = new mongoose.Schema({
   address: { type: String, default: null },
   nationality: { type: String, default: 'Ghanaian', maxlength: 100 },
   religion: { type: String, default: null, maxlength: 100 },
-  hometownRegion: { type: String, default: null, maxlength: 150 },
+  hometown: { type: String, default: null, maxlength: 100 },
+  region: { type: String, enum: [...GHANA_REGIONS, null], default: null },
   primaryLanguage: { type: String, default: null, maxlength: 100 },
   desiredClassId: { type: mongoose.Schema.Types.ObjectId, ref: 'Class', default: null },
   guardians: { type: [admissionGuardianSchema], default: [] },

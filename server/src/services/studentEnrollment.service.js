@@ -80,7 +80,7 @@ const replaceSafetyNotes = async (studentId, notes, session) => {
 const createStudentAccount = async ({
   email, admissionNo, firstName, lastName, gender, dateOfBirth, classId,
   address, admissionDate, category, programme, nationality, religion,
-  hometownRegion, primaryLanguage, guardians, safetyNotes,
+  hometown, region, primaryLanguage, guardians, safetyNotes,
 }) => {
   // A short PIN, not the longer alphanumeric password every other role
   // gets -- a basic-school pupil is far more likely to actually be told
@@ -115,7 +115,8 @@ const createStudentAccount = async ({
         programme: programme || null,
         nationality: nationality || 'Ghanaian',
         religion: religion || null,
-        hometownRegion: hometownRegion || null,
+        hometown: hometown || null,
+        region: region || null,
         primaryLanguage: primaryLanguage || null,
         status: 'active',
       }], { session });

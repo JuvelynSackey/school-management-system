@@ -1,4 +1,5 @@
 const { body } = require('express-validator');
+const { GHANA_REGIONS } = require('../constants/ghanaRegions');
 
 const guardianArrayValidator = [
   body('guardians').optional().isArray({ max: 2 }).withMessage('At most 2 guardians (primary + secondary)'),
@@ -14,7 +15,8 @@ const guardianArrayValidator = [
 const demographicsValidator = [
   body('nationality').optional({ nullable: true, checkFalsy: true }).trim().isLength({ max: 100 }),
   body('religion').optional({ nullable: true, checkFalsy: true }).trim().isLength({ max: 100 }),
-  body('hometownRegion').optional({ nullable: true, checkFalsy: true }).trim().isLength({ max: 150 }),
+  body('hometown').optional({ nullable: true, checkFalsy: true }).trim().isLength({ max: 100 }),
+  body('region').optional({ nullable: true, checkFalsy: true }).isIn(GHANA_REGIONS),
   body('primaryLanguage').optional({ nullable: true, checkFalsy: true }).trim().isLength({ max: 100 }),
 ];
 

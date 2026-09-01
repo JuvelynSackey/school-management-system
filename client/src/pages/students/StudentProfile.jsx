@@ -167,7 +167,8 @@ export function StudentProfileView({
             <tr><th>Admission Date</th><td>{student.admissionDate || '—'}</td></tr>
             <tr><th>Nationality</th><td>{student.nationality || '—'}</td></tr>
             <tr><th>Religion</th><td>{student.religion || '—'}</td></tr>
-            <tr><th>Hometown / Region</th><td>{student.hometownRegion || '—'}</td></tr>
+            <tr><th>Hometown</th><td>{student.hometown || '—'}</td></tr>
+            <tr><th>Region</th><td>{student.region || '—'}</td></tr>
             <tr><th>Primary Language</th><td>{student.primaryLanguage || '—'}</td></tr>
             <tr><th>Status</th><td>{student.status}</td></tr>
           </tbody>

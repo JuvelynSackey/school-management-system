@@ -38,7 +38,7 @@ const nextAdmissionNo = asyncHandler(async (req, res) => {
 const create = asyncHandler(async (req, res, next) => {
   const {
     firstName, lastName, gender, dateOfBirth, address, nationality, religion,
-    hometownRegion, primaryLanguage, desiredClassId, guardians,
+    hometown, region, primaryLanguage, desiredClassId, guardians,
   } = req.body;
   if (desiredClassId && !(await Class.findById(desiredClassId))) return next(new AppError('Class not found', 400));
 
@@ -50,7 +50,8 @@ const create = asyncHandler(async (req, res, next) => {
     address: address || null,
     nationality: nationality || 'Ghanaian',
     religion: religion || null,
-    hometownRegion: hometownRegion || null,
+    hometown: hometown || null,
+    region: region || null,
     primaryLanguage: primaryLanguage || null,
     desiredClassId: desiredClassId || null,
     guardians: Array.isArray(guardians) ? guardians : [],
@@ -70,7 +71,7 @@ const update = asyncHandler(async (req, res, next) => {
 
   const {
     firstName, lastName, gender, dateOfBirth, address, nationality, religion,
-    hometownRegion, primaryLanguage, desiredClassId, guardians,
+    hometown, region, primaryLanguage, desiredClassId, guardians,
   } = req.body;
   if (desiredClassId && !(await Class.findById(desiredClassId))) return next(new AppError('Class not found', 400));
 
@@ -81,7 +82,8 @@ const update = asyncHandler(async (req, res, next) => {
   admission.address = address === undefined ? admission.address : address;
   admission.nationality = nationality === undefined ? admission.nationality : (nationality || 'Ghanaian');
   admission.religion = religion === undefined ? admission.religion : (religion || null);
-  admission.hometownRegion = hometownRegion === undefined ? admission.hometownRegion : (hometownRegion || null);
+  admission.hometown = hometown === undefined ? admission.hometown : (hometown || null);
+  admission.region = region === undefined ? admission.region : (region || null);
   admission.primaryLanguage = primaryLanguage === undefined ? admission.primaryLanguage : (primaryLanguage || null);
   admission.desiredClassId = desiredClassId === undefined ? admission.desiredClassId : (desiredClassId || null);
   if (Array.isArray(guardians)) admission.guardians = guardians;
@@ -159,7 +161,8 @@ const enroll = asyncHandler(async (req, res, next) => {
     admissionDate,
     nationality: admission.nationality,
     religion: admission.religion,
-    hometownRegion: admission.hometownRegion,
+    hometown: admission.hometown,
+    region: admission.region,
     primaryLanguage: admission.primaryLanguage,
     guardians: admission.guardians,
     safetyNotes: [],
