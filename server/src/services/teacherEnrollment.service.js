@@ -8,12 +8,12 @@ const { generateTempPassword } = require('../utils/password');
 // Creates the full account for a new teacher -- User + Teacher + optional
 // homeroom assignment + optional subject assignments, in one transaction.
 // Shared by the single "New Teacher" form (teachers.controller.js) and the
-// CSV bulk-import path (bulkImport.service.js) so there's exactly one place
+// CSV migration path (migration.service.js) so there's exactly one place
 // this logic lives, same pattern as studentEnrollment.service.js.
 //
 // `password` is optional -- omit it (the normal single-teacher-form path)
-// for an auto-generated temp password; the bulk importer passes an explicit
-// one through when the source data specifies a shared password.
+// for an auto-generated temp password; the migration importer passes an
+// explicit one through when the source data specifies a shared password.
 const createTeacherAccount = async ({
   email, staffNo, firstName, lastName, gender, phone, hireDate, qualification,
   homeroomClassId, subjectAssignments, password,

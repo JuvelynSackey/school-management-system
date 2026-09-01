@@ -27,7 +27,7 @@ import ArrearsPage from '../pages/fees/ArrearsPage';
 import TerminalReports from '../pages/results/TerminalReports';
 import ReportsHub from '../pages/reports/ReportsHub';
 import SchoolSettings from '../pages/settings/SchoolSettings';
-import BulkImport from '../pages/system/BulkImport';
+import DataMigration from '../pages/system/DataMigration';
 import AuditLogPage from '../pages/audit/AuditLogPage';
 import AnalyticsPage from '../pages/analytics/AnalyticsPage';
 import AssessmentSheetsPage from '../pages/assessmentSheets/AssessmentSheetsPage';
@@ -71,7 +71,7 @@ export default function AppRoutes() {
             <Route path="/id-cards" element={<IDCards />} />
             <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/school-settings" element={<SchoolSettings />} />
-            <Route path="/bulk-import" element={<BulkImport />} />
+            <Route path="/migration" element={<DataMigration />} />
             <Route path="/audit-log" element={<AuditLogPage />} />
             <Route path="/fee-structures" element={<FeeStructuresPage />} />
             <Route path="/arrears" element={<ArrearsPage />} />

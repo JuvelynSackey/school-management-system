@@ -15,6 +15,11 @@ const resultSchema = new mongoose.Schema({
   subjectPosition: { type: Number, default: null },
   remarks: { type: String, default: null },
   recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Teacher', default: null },
+  // Set only by the historical-scores migration importer (migration.service.js)
+  // -- lets a school distinguish live-entered marks from backfilled legacy
+  // records without needing a separate collection or query path.
+  isMigrated: { type: Boolean, default: false },
+  migratedAt: { type: Date, default: null },
 }, { timestamps: true });
 
 resultSchema.index({ schoolId: 1, studentId: 1, subjectId: 1, academicTermId: 1 }, { unique: true });
