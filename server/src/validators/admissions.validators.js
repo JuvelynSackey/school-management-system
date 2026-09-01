@@ -8,7 +8,6 @@ const guardianArrayValidator = [
   body('guardians.*.relationship').optional({ nullable: true }).trim(),
   body('guardians.*.contactPriority').optional().isIn(['primary', 'secondary']),
   body('guardians.*.occupation').optional({ nullable: true }).trim().isLength({ max: 150 }),
-  body('guardians.*.employer').optional({ nullable: true }).trim().isLength({ max: 150 }),
   body('guardians.*.whatsappNumber').optional({ nullable: true }).trim().isLength({ max: 50 }),
 ];
 

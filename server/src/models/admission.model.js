@@ -13,7 +13,6 @@ const admissionGuardianSchema = new mongoose.Schema({
   relationship: { type: String, default: null },
   contactPriority: { type: String, enum: ['primary', 'secondary'], default: 'primary' },
   occupation: { type: String, default: null },
-  employer: { type: String, default: null },
   whatsappNumber: { type: String, default: null },
 }, { _id: false });
 

@@ -29,7 +29,7 @@ const STATUS_BADGE_TONE = {
 };
 
 const emptyGuardian = (contactPriority) => ({
-  contactPriority, phone: '', fullName: '', email: '', relationship: '', occupation: '', employer: '', whatsappNumber: '', whatsappSameAsPhone: true, linkedInfo: null, lookupError: '',
+  contactPriority, phone: '', fullName: '', email: '', relationship: '', occupation: '', whatsappNumber: '', whatsappSameAsPhone: true, linkedInfo: null, lookupError: '',
 });
 
 const emptyForm = () => ({
@@ -114,7 +114,6 @@ export default function StudentList() {
       email: g.email || '',
       relationship: g.relationship || '',
       occupation: g.occupation || '',
-      employer: g.employer || '',
       whatsappNumber: g.whatsappNumber || '',
       whatsappSameAsPhone: !g.whatsappNumber || g.whatsappNumber === g.phone,
       linkedInfo: g,
@@ -212,7 +211,6 @@ export default function StudentList() {
             relationship: g.relationship || null,
             contactPriority: g.contactPriority,
             occupation: g.occupation || null,
-            employer: g.employer || null,
             whatsappNumber: g.whatsappNumber || null,
           })),
         safetyNotes: form.safetyNotes.filter((n) => n.note.trim()),
@@ -502,20 +500,12 @@ export default function StudentList() {
                   onChange={(e) => updateGuardian(index, 'relationship', e.target.value)}
                   style={{ width: '100%', padding: '9px 12px', border: '1px solid var(--border)', borderRadius: 6, marginBottom: 8 }}
                 />
-                <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                  <input
-                    placeholder="Occupation"
-                    value={g.occupation}
-                    onChange={(e) => updateGuardian(index, 'occupation', e.target.value)}
-                    style={{ flex: 1, padding: '9px 12px', border: '1px solid var(--border)', borderRadius: 6 }}
-                  />
-                  <input
-                    placeholder="Employer"
-                    value={g.employer}
-                    onChange={(e) => updateGuardian(index, 'employer', e.target.value)}
-                    style={{ flex: 1, padding: '9px 12px', border: '1px solid var(--border)', borderRadius: 6 }}
-                  />
-                </div>
+                <input
+                  placeholder="Occupation"
+                  value={g.occupation}
+                  onChange={(e) => updateGuardian(index, 'occupation', e.target.value)}
+                  style={{ width: '100%', padding: '9px 12px', border: '1px solid var(--border)', borderRadius: 6, marginBottom: 8 }}
+                />
                 <input
                   placeholder="WhatsApp number"
                   value={g.whatsappNumber}

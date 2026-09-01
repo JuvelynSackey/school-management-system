@@ -16,7 +16,7 @@ afterAll(stopTestServer);
 afterEach(clearTestDb);
 
 describe('Student & guardian background fields (Ghanaian admission form)', () => {
-  test('POST /students persists nationality, religion, hometown/region, primary language, and guardian occupation/employer/WhatsApp', async () => {
+  test('POST /students persists nationality, religion, hometown/region, primary language, and guardian occupation/WhatsApp', async () => {
     const school = await fixtures.createSchool(models);
     const classRow = await fixtures.createClass(models, school._id);
     const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin@demographics-test.local' });
@@ -35,7 +35,6 @@ describe('Student & guardian background fields (Ghanaian admission form)', () =>
         fullName: 'Mrs Mensah',
         contactPriority: 'primary',
         occupation: 'Trader',
-        employer: 'Self-employed',
         whatsappNumber: '0501112221',
       }],
     });
@@ -48,7 +47,6 @@ describe('Student & guardian background fields (Ghanaian admission form)', () =>
 
     const guardian = res.body.data.guardians[0];
     expect(guardian.occupation).toBe('Trader');
-    expect(guardian.employer).toBe('Self-employed');
     expect(guardian.whatsappNumber).toBe('0501112221');
   });
 
@@ -93,7 +91,7 @@ describe('Student & guardian background fields (Ghanaian admission form)', () =>
     expect(untouchedRes.body.data.primaryLanguage).toBe('Twi');
   });
 
-  test('POST /admissions persists background fields, and enrolling carries them (plus guardian occupation/employer/WhatsApp) onto the created student', async () => {
+  test('POST /admissions persists background fields, and enrolling carries them (plus guardian occupation/WhatsApp) onto the created student', async () => {
     const school = await fixtures.createSchool(models);
     const classRow = await fixtures.createClass(models, school._id);
     const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin4@demographics-test.local' });
@@ -107,7 +105,7 @@ describe('Student & guardian background fields (Ghanaian admission form)', () =>
       primaryLanguage: 'Dagbani',
       desiredClassId: classRow.id,
       guardians: [{
-        phone: '0501112223', fullName: 'Mr Owusu', contactPriority: 'primary', occupation: 'Farmer', employer: 'Self-employed', whatsappNumber: '0501112223',
+        phone: '0501112223', fullName: 'Mr Owusu', contactPriority: 'primary', occupation: 'Farmer', whatsappNumber: '0501112223',
       }],
     });
     expect(createRes.status).toBe(201);
@@ -130,7 +128,6 @@ describe('Student & guardian background fields (Ghanaian admission form)', () =>
 
     const guardian = await models.Guardian.findOne({ phone: '0501112223' }).setOptions({ skipTenantScope: true });
     expect(guardian.occupation).toBe('Farmer');
-    expect(guardian.employer).toBe('Self-employed');
     expect(guardian.whatsappNumber).toBe('0501112223');
   });
 });

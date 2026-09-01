@@ -211,10 +211,7 @@ export function StudentProfileView({
                     ) : '—'}
                   </td>
                   <td>{guardian.email || '—'}</td>
-                  <td>
-                    {guardian.occupation || '—'}
-                    {guardian.employer && <div className="muted" style={{ fontSize: 12 }}>{guardian.employer}</div>}
-                  </td>
+                  <td>{guardian.occupation || '—'}</td>
                   <td style={{ textTransform: 'capitalize' }}>{guardian.contactPriority}</td>
                   <td>{siblings.length ? siblings.map((s) => `${s.firstName} ${s.lastName}`).join(', ') : '—'}</td>
                   {canManageGuardianLogins && (

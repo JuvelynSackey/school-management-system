@@ -31,7 +31,6 @@ const linkGuardians = async (studentId, guardians, session) => {
         email: g.email || null,
         relationship: g.relationship || null,
         occupation: g.occupation || null,
-        employer: g.employer || null,
         whatsappNumber: g.whatsappNumber || null,
       },
       session,

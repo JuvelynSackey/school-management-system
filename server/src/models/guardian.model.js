@@ -10,7 +10,6 @@ const guardianSchema = new mongoose.Schema({
   relationship: { type: String, default: null },
   address: { type: String, default: null },
   occupation: { type: String, default: null, maxlength: 150 },
-  employer: { type: String, default: null, maxlength: 150 },
   whatsappNumber: { type: String, default: null, maxlength: 50 },
   // No `default: null` on purpose, same reasoning as Subject.code — a
   // partial-filter unique index must see the field as genuinely absent for
