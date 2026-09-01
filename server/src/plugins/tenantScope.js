@@ -1,11 +1,9 @@
 const { getCurrentSchoolId } = require('../middleware/tenantContext');
 
-// NOT YET ATTACHED to any schema (Phase 1, stage 1 — see the multi-tenant
-// plan). Written now so the mechanism exists and can be reviewed, but
-// `schema.plugin(tenantScopePlugin)` is only added to each model once the
-// data migration (stage 2) and auth wiring (stage 3) are in place —
-// attaching it earlier would make every query/save throw immediately,
-// since nothing yet populates a schoolId to read from context.
+// Attached to every tenant-scoped model's schema via `schema.plugin(tenantScopePlugin)`.
+// Auto-injects the current request's schoolId (from AsyncLocalStorage, set up in
+// authenticate.js's runWithSchool) into every query, and throws rather than running
+// unscoped if no schoolId is in context — fail-closed, never silently cross-tenant.
 
 const SCOPED_QUERY_OPS = [
   'find', 'findOne', 'findOneAndUpdate', 'findOneAndDelete',
