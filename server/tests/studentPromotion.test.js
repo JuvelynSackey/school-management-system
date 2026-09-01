@@ -1,6 +1,7 @@
 const request = require('supertest');
 const { startTestServer, stopTestServer, clearTestDb } = require('./testServer');
 const { runWithSchool } = require('../src/middleware/tenantContext');
+const { TERMINAL_LEVEL_ORDER } = require('../src/constants/gradeLevels');
 
 let app;
 let models;
@@ -174,6 +175,50 @@ describe('POST /students/promote', () => {
       promotions: [{ studentId: student.id, action: 'repeat' }],
     });
     expect(res.status).toBe(403);
+  });
+
+  test('rejects a "promote" action out of JHS 3 -- it is a terminal class, pupils exit via BECE', async () => {
+    const school = await fixtures.createSchool(models);
+    const jhs3 = await fixtures.createClass(models, school._id, { name: 'JHS 3', gradeLevel: 'JHS 3', levelOrder: TERMINAL_LEVEL_ORDER });
+    const otherClass = await fixtures.createClass(models, school._id, { name: 'Some Other Class' });
+    const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin2@promo-test.local' });
+    const token = await fixtures.login(app, school.slug, 'admin2@promo-test.local', password);
+    const { student } = await fixtures.createStudent(models, school._id, { classId: jhs3.id });
+
+    const res = await request(app).post('/api/students/promote').set(fixtures.authHeader(token)).send({
+      sourceClassId: jhs3.id,
+      destinationClassId: otherClass.id,
+      promotions: [{ studentId: student.id, action: 'promote' }],
+    });
+    expect(res.status).toBe(400);
+
+    const { Student } = models;
+    const unchanged = await runWithSchool(school._id, async () => Student.findById(student.id));
+    expect(unchanged.classId.toString()).toBe(jhs3.id);
+    expect(unchanged.status).toBe('active');
+  });
+
+  test('"graduate" and "repeat" still work from JHS 3, with no destinationClassId required', async () => {
+    const school = await fixtures.createSchool(models);
+    const jhs3 = await fixtures.createClass(models, school._id, { name: 'JHS 3', gradeLevel: 'JHS 3', levelOrder: TERMINAL_LEVEL_ORDER });
+    const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin3@promo-test.local' });
+    const token = await fixtures.login(app, school.slug, 'admin3@promo-test.local', password);
+    const { student: graduate } = await fixtures.createStudent(models, school._id, { classId: jhs3.id });
+    const { student: repeater } = await fixtures.createStudent(models, school._id, { classId: jhs3.id });
+
+    const res = await request(app).post('/api/students/promote').set(fixtures.authHeader(token)).send({
+      sourceClassId: jhs3.id,
+      promotions: [
+        { studentId: graduate.id, action: 'graduate' },
+        { studentId: repeater.id, action: 'repeat' },
+      ],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.data.applied).toEqual({ promote: 0, repeat: 1, graduate: 1 });
+
+    const { Student } = models;
+    const graduateDoc = await runWithSchool(school._id, async () => Student.findById(graduate.id));
+    expect(graduateDoc.status).toBe('graduated');
   });
 
   test('records a single audit log entry summarizing the batch', async () => {

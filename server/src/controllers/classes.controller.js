@@ -65,7 +65,7 @@ const getMyAccess = asyncHandler(async (req, res, next) => {
 
 const create = asyncHandler(async (req, res) => {
   const {
-    name, section, room, stage, gradeLevel, classTeacherId,
+    name, section, room, stage, gradeLevel, classTeacherId, showPositions,
   } = req.body;
   const graded = resolveGradeFields(gradeLevel || null, stage || null);
   const classRow = await Class.create({
@@ -76,6 +76,7 @@ const create = asyncHandler(async (req, res) => {
     gradeLevel: graded.gradeLevel,
     levelOrder: graded.levelOrder,
     classTeacherId: classTeacherId || null,
+    showPositions: showPositions === undefined ? true : showPositions,
   });
   res.status(201).json({ success: true, data: classRow });
 });
@@ -85,12 +86,13 @@ const update = asyncHandler(async (req, res, next) => {
   if (!classRow) return next(new AppError('Class not found', 404));
 
   const {
-    name, section, room, stage, gradeLevel, classTeacherId,
+    name, section, room, stage, gradeLevel, classTeacherId, showPositions,
   } = req.body;
   classRow.name = name ?? classRow.name;
   classRow.section = section === undefined ? classRow.section : section;
   classRow.room = room === undefined ? classRow.room : room;
   classRow.classTeacherId = classTeacherId === undefined ? classRow.classTeacherId : classTeacherId;
+  classRow.showPositions = showPositions === undefined ? classRow.showPositions : showPositions;
 
   if (gradeLevel === undefined) {
     // Not part of this request at all -- only an independently-sent stage

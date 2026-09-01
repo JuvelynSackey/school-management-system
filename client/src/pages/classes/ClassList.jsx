@@ -6,12 +6,14 @@ import { listStudents, promoteStudents } from '../../api/students.api';
 import { listSubjects, listSubjectsForClass, assignSubjectToClass, unassignSubjectFromClass } from '../../api/subjects.api';
 import { listAssignmentsForClass, createAssignment, deleteAssignment } from '../../api/assignments.api';
 import Modal from '../../components/common/Modal';
-import { GRADE_LEVELS, STAGE_BY_GRADE_LEVEL, UNRANKED_LEVEL_ORDER } from '../../config/gradeLevels';
+import {
+  GRADE_LEVELS, STAGE_BY_GRADE_LEVEL, UNRANKED_LEVEL_ORDER, TERMINAL_LEVEL_ORDER,
+} from '../../config/gradeLevels';
 
 const STAGES = ['Creche', 'Nursery', 'KG', 'Primary', 'JHS'];
 
 const emptyForm = {
-  name: '', section: '', room: '', stage: '', gradeLevel: '', classTeacherId: '',
+  name: '', section: '', room: '', stage: '', gradeLevel: '', classTeacherId: '', showPositions: true,
 };
 
 export default function ClassList() {
@@ -37,6 +39,7 @@ export default function ClassList() {
       stage: classRow.stage || '',
       gradeLevel: classRow.gradeLevel || '',
       classTeacherId: classRow.classTeacherId || '',
+      showPositions: classRow.showPositions !== false,
     });
     setFormError('');
     setEditing(classRow);
@@ -164,6 +167,19 @@ export default function ClassList() {
                 ))}
               </select>
             </label>
+            <label className="field" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <input
+                type="checkbox"
+                checked={form.showPositions}
+                onChange={(e) => setForm({ ...form, showPositions: e.target.checked })}
+              />
+              <span>Include Student Class Positions on Report Cards</span>
+            </label>
+            {!form.showPositions && (
+              <small className="muted" style={{ display: 'block', marginTop: -12, marginBottom: 12 }}>
+                Typical for Nursery/KG/Lower Primary, which favour qualitative assessment over ranking.
+              </small>
+            )}
             <div className="modal-actions">
               <button type="button" className="btn-secondary" onClick={close}>Cancel</button>
               <button type="submit" className="btn-primary" disabled={isSaving}>{isSaving ? 'Saving...' : 'Save'}</button>
@@ -319,10 +335,16 @@ function PromoteStudentsModal({
   const [error, setError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  // JHS 3 (Basic 9) is the terminal rung of the basic-school ladder -- pupils
+  // exit via BECE into SHS/TVET, not a promotion within this app.
+  const isTerminal = classRow.levelOrder === TERMINAL_LEVEL_ORDER;
+  const availableActions = isTerminal ? PROMOTION_ACTIONS.filter((a) => a.value !== 'promote') : PROMOTION_ACTIONS;
+  const defaultAction = isTerminal ? 'graduate' : 'promote';
+
   useEffect(() => {
     listStudents({ classId: classRow.id, status: 'active' }).then((rows) => {
       setStudents(rows);
-      setActions(Object.fromEntries(rows.map((s) => [s.id, 'promote'])));
+      setActions(Object.fromEntries(rows.map((s) => [s.id, defaultAction])));
     }).catch(() => setStudents([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classRow.id]);
@@ -341,7 +363,7 @@ function PromoteStudentsModal({
   const otherClasses = allClasses.filter((c) => c.id !== classRow.id);
 
   const counts = (students || []).reduce((acc, s) => {
-    const a = actions[s.id] || 'promote';
+    const a = actions[s.id] || defaultAction;
     acc[a] = (acc[a] || 0) + 1;
     return acc;
   }, {});
@@ -350,7 +372,7 @@ function PromoteStudentsModal({
     e.preventDefault();
     if (!students || students.length === 0) return;
 
-    const needsDestination = students.some((s) => (actions[s.id] || 'promote') === 'promote');
+    const needsDestination = students.some((s) => (actions[s.id] || defaultAction) === 'promote');
     if (needsDestination && !destinationClassId) {
       setError('Choose a destination class for students being promoted.');
       return;
@@ -370,7 +392,7 @@ function PromoteStudentsModal({
       await promoteStudents({
         sourceClassId: classRow.id,
         destinationClassId: destinationClassId || undefined,
-        promotions: students.map((s) => ({ studentId: s.id, action: actions[s.id] || 'promote' })),
+        promotions: students.map((s) => ({ studentId: s.id, action: actions[s.id] || defaultAction })),
       });
       onDone();
     } catch (err) {
@@ -385,13 +407,19 @@ function PromoteStudentsModal({
       {error && <div className="alert-error">{error}</div>}
       {students === null ? <p className="muted">Loading...</p> : (
         <form onSubmit={handleSubmit}>
-          <label className="field">
-            <span>Destination Class (for promoted students)</span>
-            <select value={destinationClassId} onChange={(e) => setDestinationClassId(e.target.value)}>
-              <option value="">Select destination class...</option>
-              {otherClasses.map((c) => <option key={c.id} value={c.id}>{c.name} {c.section || ''}</option>)}
-            </select>
-          </label>
+          {isTerminal ? (
+            <p className="muted" style={{ fontSize: 13, marginBottom: 16 }}>
+              JHS 3 is a terminal class — pupils exit the basic-school system via BECE into SHS/TVET, not a promotion here. Graduate students who are moving on, or mark them Repeat if they&apos;re staying in JHS 3.
+            </p>
+          ) : (
+            <label className="field">
+              <span>Destination Class (for promoted students)</span>
+              <select value={destinationClassId} onChange={(e) => setDestinationClassId(e.target.value)}>
+                <option value="">Select destination class...</option>
+                {otherClasses.map((c) => <option key={c.id} value={c.id}>{c.name} {c.section || ''}</option>)}
+              </select>
+            </label>
+          )}
 
           {students.length === 0 ? (
             <p className="muted">No active students in this class.</p>
@@ -403,8 +431,8 @@ function PromoteStudentsModal({
                   <tr key={s.id}>
                     <td>{s.firstName} {s.lastName}</td>
                     <td>
-                      <select value={actions[s.id] || 'promote'} onChange={(e) => setActions({ ...actions, [s.id]: e.target.value })}>
-                        {PROMOTION_ACTIONS.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
+                      <select value={actions[s.id] || defaultAction} onChange={(e) => setActions({ ...actions, [s.id]: e.target.value })}>
+                        {availableActions.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
                       </select>
                     </td>
                   </tr>

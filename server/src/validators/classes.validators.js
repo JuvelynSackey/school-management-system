@@ -8,6 +8,7 @@ const classValidator = [
   body('stage').optional({ nullable: true, checkFalsy: true }).isIn(['Creche', 'Nursery', 'KG', 'Primary', 'JHS']),
   body('gradeLevel').optional({ nullable: true, checkFalsy: true }).isIn(GRADE_LEVEL_VALUES),
   body('classTeacherId').optional({ nullable: true }).isMongoId().withMessage('Class teacher must be a valid teacher id'),
+  body('showPositions').optional().isBoolean(),
 ];
 
 module.exports = { classValidator };

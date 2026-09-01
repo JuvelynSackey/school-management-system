@@ -56,7 +56,7 @@ const verifyReport = asyncHandler(async (req, res) => {
 
   const report = await runWithSchool(school._id, () => TerminalReport.findById(req.params.id)
     .populate('student', 'firstName lastName admissionNo')
-    .populate('class', 'name section')
+    .populate('class', 'name section showPositions')
     .populate('academicTerm', 'name academicYear')
     .catch(() => null));
 
@@ -78,7 +78,7 @@ const verifyReport = asyncHandler(async (req, res) => {
       className: report.class ? `${report.class.name} ${report.class.section || ''}`.trim() : null,
       term: report.academicTerm?.name || null,
       averageScore: report.averageScore,
-      classPosition: report.classPosition,
+      classPosition: report.class?.showPositions === false ? null : report.classPosition,
       status: report.status,
     },
   });

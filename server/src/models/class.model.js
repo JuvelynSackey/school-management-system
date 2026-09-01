@@ -16,6 +16,12 @@ const classSchema = new mongoose.Schema({
   gradeLevel: { type: String, enum: GRADE_LEVEL_VALUES, default: null },
   levelOrder: { type: Number, default: UNRANKED_LEVEL_ORDER },
   classTeacherId: { type: mongoose.Schema.Types.ObjectId, ref: 'Teacher', default: null },
+  // Lower Primary/KG/Nursery in Ghana typically use qualitative assessment
+  // rather than competitive ranking -- controls whether class rank is shown
+  // on this class's report cards (PDF + the public verify page + the admin
+  // terminal-reports list). Rank is still always computed/stored on
+  // TerminalReport.classPosition regardless -- this only gates display.
+  showPositions: { type: Boolean, default: true },
 }, { timestamps: true });
 
 // Matches MySQL's NULL-distinct unique semantics: only enforced when a

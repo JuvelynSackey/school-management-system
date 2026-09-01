@@ -17,6 +17,7 @@ const { renderHtmlToPdfBuffer } = require('../services/pdf.service');
 const { buildIdCardsHtml } = require('../services/idCardTemplate.service');
 const { validateCandidates, buildWaecCsv } = require('../services/waecExport.service');
 const auditLog = require('../services/auditLog.service');
+const { TERMINAL_LEVEL_ORDER } = require('../constants/gradeLevels');
 
 const getTeacherClassIds = async (userId) => (await getTeacherClassIdsShared(userId)).classIds;
 
@@ -235,6 +236,13 @@ const promote = asyncHandler(async (req, res, next) => {
   if (!sourceClass) return next(new AppError('Source class not found', 404));
 
   const wantsPromote = promotions.some((p) => p.action === 'promote');
+  // JHS 3 (Basic 9) is the terminal rung of the basic-school ladder -- pupils
+  // exit via BECE into SHS/TVET, not a promotion within this app. Reject the
+  // whole batch rather than silently downgrading 'promote' to something
+  // else, since that would apply an action the admin never actually chose.
+  if (wantsPromote && sourceClass.levelOrder === TERMINAL_LEVEL_ORDER) {
+    return next(new AppError('JHS 3 is a terminal class -- students exit via BECE, not promotion. Use Graduate or Repeat instead.', 400));
+  }
   let destinationClass = null;
   if (wantsPromote) {
     if (!destinationClassId) return next(new AppError('destinationClassId is required when promoting any student', 400));

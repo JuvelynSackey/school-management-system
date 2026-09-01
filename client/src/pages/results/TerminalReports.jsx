@@ -148,6 +148,11 @@ export default function TerminalReports() {
     }
   };
 
+  // Lower Primary/KG/Nursery in Ghana typically use qualitative assessment
+  // rather than competitive class ranking -- see Class.showPositions.
+  const selectedClass = classes.find((c) => String(c.id) === classId);
+  const showPositions = selectedClass?.showPositions !== false;
+
   return (
     <div>
       <div className="toolbar">
@@ -192,7 +197,7 @@ export default function TerminalReports() {
             <thead>
               <tr>
                 <th><input type="checkbox" checked={reports.length > 0 && selectedIds.length === reports.length} onChange={toggleSelectAll} /></th>
-                <th>Admission No.</th><th>Name</th><th>Total</th><th>Average</th><th>Position</th><th>Status</th><th />
+                <th>Admission No.</th><th>Name</th><th>Total</th><th>Average</th>{showPositions && <th>Position</th>}<th>Status</th><th />
               </tr>
             </thead>
             <tbody>
@@ -203,12 +208,12 @@ export default function TerminalReports() {
                   <td>{r.student?.firstName} {r.student?.lastName}</td>
                   <td>{r.totalMarksObtained ?? '—'}</td>
                   <td>{r.averageScore ? `${Number(r.averageScore).toFixed(2)}%` : '—'}</td>
-                  <td>{r.classPosition ?? '—'}</td>
+                  {showPositions && <td>{r.classPosition ?? '—'}</td>}
                   <td>{statusBadge(r.status)}</td>
                   <td><button type="button" className="link-btn" onClick={() => setManaging(r)}>Manage</button></td>
                 </tr>
               ))}
-              {reports.length === 0 && <tr><td colSpan={8} className="muted">No terminal reports yet — click Generate.</td></tr>}
+              {reports.length === 0 && <tr><td colSpan={showPositions ? 8 : 7} className="muted">No terminal reports yet — click Generate.</td></tr>}
             </tbody>
           </table>
         )}

@@ -27,6 +27,13 @@ const STAGE_BY_GRADE_LEVEL = Object.fromEntries(GRADE_LEVELS.map((g) => [g.value
 // sorts null ascending-first, which would put them above Creche.
 const UNRANKED_LEVEL_ORDER = 999;
 
+// JHS 3 (Basic 9) is the last rung -- pupils exit the basic-school system via
+// BECE into SHS/TVET, which this app doesn't model, so there is no "next"
+// class to promote into. Derived from the list's length rather than stored
+// as a flag on Class, since this is a fixed fact of the Ghanaian basic-
+// education ladder, not a per-school setting that could drift out of sync.
+const TERMINAL_LEVEL_ORDER = GRADE_LEVELS.length - 1;
+
 module.exports = {
-  GRADE_LEVELS, GRADE_LEVEL_VALUES, LEVEL_ORDER_BY_GRADE, STAGE_BY_GRADE_LEVEL, UNRANKED_LEVEL_ORDER,
+  GRADE_LEVELS, GRADE_LEVEL_VALUES, LEVEL_ORDER_BY_GRADE, STAGE_BY_GRADE_LEVEL, UNRANKED_LEVEL_ORDER, TERMINAL_LEVEL_ORDER,
 };

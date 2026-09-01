@@ -35,6 +35,9 @@ const overallGrade = (averageScore, bands) => {
 const buildStudentPageHtml = ({ school, classRow, term, nextTerm, report, results, totalPossible, rollCount, qrCodeDataUrl, scheme, attributeNameById }) => {
   const isLocked = report.status === 'Locked';
   const watermark = !isLocked ? '<div class="watermark">DRAFT — NOT YET APPROVED</div>' : '';
+  // Lower Primary/KG/Nursery in Ghana typically use qualitative assessment
+  // rather than competitive class ranking -- see Class.showPositions.
+  const showPositions = classRow.showPositions !== false;
 
   const rows = results.map((r) => `
     <tr>
@@ -43,7 +46,7 @@ const buildStudentPageHtml = ({ school, classRow, term, nextTerm, report, result
       <td class="num">${Number(r.examScore).toFixed(1)}</td>
       <td class="num">${Number(r.totalScore).toFixed(1)}</td>
       <td class="center">${r.grade || ''}</td>
-      <td class="center">${ordinal(r.subjectPosition)}</td>
+      ${showPositions ? `<td class="center">${ordinal(r.subjectPosition)}</td>` : ''}
     </tr>
   `).join('');
 
@@ -85,10 +88,10 @@ const buildStudentPageHtml = ({ school, classRow, term, nextTerm, report, result
           </tr>
           <tr>
             <td><strong>Class:</strong> ${classRow.name} ${classRow.section || ''}</td>
-            <td><strong>Position in Class:</strong> ${ordinal(report.classPosition)} of ${rollCount}</td>
+            <td>${showPositions ? `<strong>Position in Class:</strong> ${ordinal(report.classPosition)} of ${rollCount}` : `<strong>Roll Count:</strong> ${rollCount} Pupils`}</td>
           </tr>
           <tr>
-            <td><strong>Roll Count:</strong> ${rollCount} Pupils</td>
+            ${showPositions ? `<td><strong>Roll Count:</strong> ${rollCount} Pupils</td>` : '<td></td>'}
             <td><strong>Next Term Begins:</strong> ${nextTermBegins}</td>
           </tr>
           ${(report.student.category || report.student.programme) ? `
@@ -111,7 +114,7 @@ const buildStudentPageHtml = ({ school, classRow, term, nextTerm, report, result
 
       <table class="subjects">
         <thead>
-          <tr><th>Subject</th><th>Class (${scheme.classScoreMax})</th><th>Exam (${scheme.examScoreMax})</th><th>Total</th><th>Grade</th><th>Position</th></tr>
+          <tr><th>Subject</th><th>Class (${scheme.classScoreMax})</th><th>Exam (${scheme.examScoreMax})</th><th>Total</th><th>Grade</th>${showPositions ? '<th>Position</th>' : ''}</tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
@@ -121,7 +124,7 @@ const buildStudentPageHtml = ({ school, classRow, term, nextTerm, report, result
         <div class="perf-item"><span>Total Score</span><strong>${Number(report.totalMarksObtained || 0)} / ${totalPossible}</strong></div>
         <div class="perf-item"><span>Average</span><strong>${Number(report.averageScore || 0).toFixed(2)}%</strong></div>
         <div class="perf-item"><span>Overall Grade</span><strong>${overallGrade(report.averageScore, scheme.bands)}</strong></div>
-        <div class="perf-item"><span>Class Position</span><strong>${ordinal(report.classPosition)}</strong></div>
+        ${showPositions ? `<div class="perf-item"><span>Class Position</span><strong>${ordinal(report.classPosition)}</strong></div>` : ''}
         <div class="perf-item"><span>Subjects Passed</span><strong>${subjectsPassed} / ${results.length}</strong></div>
       </div>
 

@@ -36,3 +36,8 @@ export const STAGE_BY_GRADE_LEVEL = {
 };
 
 export const UNRANKED_LEVEL_ORDER = 999;
+
+// JHS 3 (Basic 9) is the terminal rung -- pupils exit via BECE, no "next"
+// class exists to promote into. Derived from the list length so it can
+// never drift out of sync with GRADE_LEVELS above.
+export const TERMINAL_LEVEL_ORDER = GRADE_LEVELS.length - 1;

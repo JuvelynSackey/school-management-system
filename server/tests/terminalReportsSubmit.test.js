@@ -18,9 +18,9 @@ afterEach(clearTestDb);
 // A class with one subject already scored, submitted, and Approved, so a
 // Draft TerminalReport is ready to submit -- plus a homeroom teacher and a
 // separate subject-only teacher to test the write boundary from both sides.
-const setupReadyToSubmit = async (schoolId) => {
+const setupReadyToSubmit = async (schoolId, classOverrides = {}) => {
   const { teacher: homeroomTeacher, user: homeroomUser, password: homeroomPassword } = await fixtures.createTeacher(models, schoolId);
-  const classRow = await fixtures.createClass(models, schoolId, { classTeacherId: homeroomTeacher.id });
+  const classRow = await fixtures.createClass(models, schoolId, { classTeacherId: homeroomTeacher.id, ...classOverrides });
   const subject = await fixtures.createSubject(models, schoolId);
   const term = await fixtures.createTerm(models, schoolId, { isCurrent: true });
   await fixtures.assignSubjectToClass(models, schoolId, { classId: classRow.id, subjectId: subject.id, academicTermId: term.id });
@@ -95,5 +95,23 @@ describe('Terminal report submit — homeroom-teacher-only for remarks/personal-
       teacherRemark: 'Admin override.', teacherSignatureName: 'Admin',
     });
     expect(res.status).toBe(200);
+  });
+});
+
+describe('Class.showPositions — qualitative (no ranking) classes suppress class position', () => {
+  test('a class with showPositions: false returns classPosition: null from GET /terminal-reports', async () => {
+    const school = await fixtures.createSchool(models);
+    const setup = await setupReadyToSubmit(school._id, { showPositions: false });
+    const report = await bringReportToDraft(school._id, school, setup);
+
+    expect(report.classPosition).toBeNull();
+  });
+
+  test('a class with showPositions left at its true default still returns a real classPosition', async () => {
+    const school = await fixtures.createSchool(models);
+    const setup = await setupReadyToSubmit(school._id);
+    const report = await bringReportToDraft(school._id, school, setup);
+
+    expect(report.classPosition).toBe(1);
   });
 });

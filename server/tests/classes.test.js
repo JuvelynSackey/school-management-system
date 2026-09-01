@@ -148,6 +148,45 @@ describe('tenant isolation', () => {
   });
 });
 
+describe('showPositions — qualitative-assessment classes can suppress ranking', () => {
+  test('defaults to true when omitted on create', async () => {
+    const school = await fixtures.createSchool(models);
+    const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin11@classes-test.local' });
+    const token = await fixtures.login(app, school.slug, 'admin11@classes-test.local', password);
+
+    const res = await request(app).post('/api/classes').set(fixtures.authHeader(token)).send({ name: 'Basic 5' });
+    expect(res.status).toBe(201);
+    expect(res.body.data.showPositions).toBe(true);
+  });
+
+  test('can be set to false on create (e.g. a KG class)', async () => {
+    const school = await fixtures.createSchool(models);
+    const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin12@classes-test.local' });
+    const token = await fixtures.login(app, school.slug, 'admin12@classes-test.local', password);
+
+    const res = await request(app).post('/api/classes').set(fixtures.authHeader(token)).send({
+      name: 'KG 1', gradeLevel: 'KG 1', showPositions: false,
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.data.showPositions).toBe(false);
+  });
+
+  test('PUT /classes/:id can toggle showPositions; omitting it leaves the existing value untouched', async () => {
+    const school = await fixtures.createSchool(models);
+    const classRow = await fixtures.createClass(models, school._id, { name: 'Nursery 1', showPositions: true });
+    const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin13@classes-test.local' });
+    const token = await fixtures.login(app, school.slug, 'admin13@classes-test.local', password);
+
+    const toggled = await request(app).put(`/api/classes/${classRow.id}`).set(fixtures.authHeader(token)).send({ name: 'Nursery 1', showPositions: false });
+    expect(toggled.status).toBe(200);
+    expect(toggled.body.data.showPositions).toBe(false);
+
+    const untouched = await request(app).put(`/api/classes/${classRow.id}`).set(fixtures.authHeader(token)).send({ name: 'Nursery 1', room: 'Room 2' });
+    expect(untouched.status).toBe(200);
+    expect(untouched.body.data.showPositions).toBe(false);
+  });
+});
+
 describe('GET /classes/:id/my-access — Class Teacher vs Subject Specialist scoping', () => {
   test('the homeroom teacher gets isHomeroom: true, regardless of subject assignments', async () => {
     const school = await fixtures.createSchool(models);

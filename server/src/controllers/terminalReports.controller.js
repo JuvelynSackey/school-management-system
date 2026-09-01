@@ -104,10 +104,16 @@ const list = asyncHandler(async (req, res, next) => {
   if (!classId || !academicTermId) return next(new AppError('classId and academicTermId are required', 400));
   await assertClassAccess(req, classId);
 
+  const classRow = await Class.findById(classId, { showPositions: 1 });
+  if (!classRow) return next(new AppError('Class not found', 404));
+
   const reports = await TerminalReport.find({ classId, academicTermId })
     .populate('student', 'firstName lastName admissionNo category programme')
     .sort({ classPosition: 1 });
-  res.json({ success: true, data: reports });
+  const data = classRow.showPositions === false
+    ? reports.map((r) => Object.assign(r.toJSON(), { classPosition: null }))
+    : reports;
+  res.json({ success: true, data });
 });
 
 const findReportOr404 = async (id, next) => {
