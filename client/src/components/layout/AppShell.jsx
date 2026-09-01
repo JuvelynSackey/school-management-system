@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import ThemeToggle from '../common/ThemeToggle';
@@ -36,6 +36,17 @@ export default function AppShell() {
   const [collapsedGroups, setCollapsedGroups] = useState(loadCollapsedGroups);
   const [iconOnly, setIconOnly] = useState(loadIconOnly);
   const visibleNavItems = NAV_ITEMS.filter((item) => item.roles.includes(user?.role));
+
+  // React Router doesn't reset scroll position on navigation the way a
+  // traditional multi-page site does -- every route here is rendered
+  // through this one Outlet, and there's no inner scrollable container
+  // (.app-main/.page-content are both unconstrained flex; the window
+  // itself scrolls), so a route change alone is what needs to reset it.
+  // Instant, not smooth -- a page navigation should land already at the
+  // top, the way a real page load would, not animate there.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
 
   const toggleGroup = (group) => {
     setCollapsedGroups((prev) => {
