@@ -33,6 +33,7 @@ export const NAV_ITEMS = [
   { to: '/id-cards', label: 'ID Cards', roles: ['admin'], group: 'REPORTS', icon: 'idcards' },
   { to: '/analytics', label: 'Analytics', roles: ['admin'], group: 'REPORTS', icon: 'analytics' },
   { to: '/audit-log', label: 'Audit Log', roles: ['admin'], group: 'REPORTS', icon: 'audit' },
+  { to: '/bulk-import', label: 'Bulk Import', roles: ['admin'], group: 'SYSTEM', icon: 'bulkImport' },
   { to: '/school-settings', label: 'School Settings', roles: ['admin'], group: 'SYSTEM', icon: 'settings' },
   { to: '/account', label: 'My Account', roles: ['admin', 'teacher', 'student', 'parent'], group: 'SYSTEM', icon: 'account' },
 ];

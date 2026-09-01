@@ -164,6 +164,13 @@ export const NAV_ICONS = {
       <path d="M12 7v5l3.5 2" />
     </svg>
   ),
+  bulkImport: (
+    <svg {...props}>
+      <path d="M12 3v12" />
+      <path d="M7 8l5-5 5 5" />
+      <path d="M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3" />
+    </svg>
+  ),
   settings: (
     <svg {...props}>
       <circle cx="12" cy="12" r="3" />

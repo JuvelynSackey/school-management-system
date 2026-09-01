@@ -1,12 +1,11 @@
-const bcrypt = require('bcryptjs');
 const models = require('../models');
 const {
-  mongoose, Teacher, User, Class, Subject, TeacherSubjectAssignment,
+  Teacher, User, Class, TeacherSubjectAssignment,
 } = models;
 const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/AppError');
-const { generateTempPassword } = require('../utils/password');
 const { deleteWithCascade } = require('../services/cascadeDelete.service');
+const { createTeacherAccount } = require('../services/teacherEnrollment.service');
 const auditLog = require('../services/auditLog.service');
 
 const list = asyncHandler(async (req, res) => {
@@ -26,81 +25,16 @@ const create = asyncHandler(async (req, res, next) => {
     homeroomClassId, subjectAssignments,
   } = req.body;
 
-  const existing = await User.findOne({ email });
-  if (existing) return next(new AppError('A user with this email already exists', 400));
-
-  // De-dupe (classId, subjectId) pairs before anything else touches the DB —
-  // the TeacherSubjectAssignment unique index only applies when
-  // academicTermId is a real ObjectId, so a null-term duplicate (what every
-  // assignment made here uses) wouldn't be caught by the DB itself.
-  const seenPairs = new Set();
-  const uniqueAssignments = (Array.isArray(subjectAssignments) ? subjectAssignments : []).filter((a) => {
-    const key = `${a.classId}:${a.subjectId}`;
-    if (seenPairs.has(key)) return false;
-    seenPairs.add(key);
-    return true;
-  });
-
-  // Validate referenced classes/subjects up front so a bad id fails fast
-  // with a clear 400 instead of aborting mid-transaction.
-  if (homeroomClassId && !(await Class.findById(homeroomClassId))) {
-    return next(new AppError('Homeroom class not found', 400));
-  }
-  if (uniqueAssignments.length > 0) {
-    const classIds = [...new Set(uniqueAssignments.map((a) => a.classId))];
-    const subjectIds = [...new Set(uniqueAssignments.map((a) => a.subjectId))];
-    const [classCount, subjectCount] = await Promise.all([
-      Class.countDocuments({ _id: { $in: classIds } }),
-      Subject.countDocuments({ _id: { $in: subjectIds } }),
-    ]);
-    if (classCount !== classIds.length || subjectCount !== subjectIds.length) {
-      return next(new AppError('One or more assigned classes/subjects were not found', 400));
-    }
-  }
-
-  const tempPassword = generateTempPassword();
-  const passwordHash = await bcrypt.hash(tempPassword, 10);
-
-  const session = await mongoose.startSession();
-  let teacher;
-  let user;
+  let result;
   try {
-    await session.withTransaction(async () => {
-      [user] = await User.create([{
-        email,
-        passwordHash,
-        fullName: `${firstName} ${lastName}`,
-        role: 'teacher',
-        status: 'active',
-      }], { session });
-
-      [teacher] = await Teacher.create([{
-        userId: user.id,
-        staffNo,
-        firstName,
-        lastName,
-        gender: gender || null,
-        phone: phone || null,
-        hireDate: hireDate || null,
-        qualification: qualification || null,
-        status: 'active',
-      }], { session });
-
-      if (homeroomClassId) {
-        await Class.updateOne({ _id: homeroomClassId }, { $set: { classTeacherId: teacher._id } }, { session });
-      }
-      if (uniqueAssignments.length > 0) {
-        await TeacherSubjectAssignment.insertMany(
-          uniqueAssignments.map((a) => ({
-            teacherId: teacher._id, classId: a.classId, subjectId: a.subjectId, academicTermId: null,
-          })),
-          { session },
-        );
-      }
+    result = await createTeacherAccount({
+      email, staffNo, firstName, lastName, gender, phone, hireDate, qualification, homeroomClassId, subjectAssignments,
     });
-  } finally {
-    await session.endSession();
+  } catch (err) {
+    if (err instanceof AppError) return next(err);
+    throw err;
   }
+  const { teacher, user, tempPassword, homeroomAssigned, assignmentCount } = result;
 
   await auditLog.record({
     req,
@@ -108,8 +42,8 @@ const create = asyncHandler(async (req, res, next) => {
     entityType: 'Teacher',
     entityId: teacher.id,
     description: `Created teacher: ${firstName} ${lastName} (${staffNo})`
-      + (homeroomClassId ? ', assigned as homeroom teacher' : '')
-      + (uniqueAssignments.length > 0 ? `, with ${uniqueAssignments.length} subject assignment(s)` : ''),
+      + (homeroomAssigned ? ', assigned as homeroom teacher' : '')
+      + (assignmentCount > 0 ? `, with ${assignmentCount} subject assignment(s)` : ''),
   });
 
   res.status(201).json({
