@@ -22,8 +22,20 @@ const recordBulkValidator = [
   body('academicTermId').isMongoId(),
   body('records').isArray({ min: 1 }),
   body('records.*.studentId').isMongoId(),
-  body('records.*.classScore').isFloat({ min: 0, max: 1000 }).withMessage('Class score must be a non-negative number'),
+  // classScore is optional here specifically so classScoreDetails (per-
+  // component marks, summed server-side into classScore -- see
+  // result.service.js) can stand in for it when a school has class score
+  // decomposition enabled; the custom check below still requires one or
+  // the other, and the controller rejects classScoreDetails outright for a
+  // school that doesn't have decomposition enabled.
+  body('records.*.classScore').optional().isFloat({ min: 0, max: 1000 }).withMessage('Class score must be a non-negative number'),
+  body('records.*.classScoreDetails').optional().isObject().withMessage('classScoreDetails must be an object of component marks'),
   body('records.*.examScore').isFloat({ min: 0, max: 1000 }).withMessage('Exam score must be a non-negative number'),
+  body('records').custom((records) => {
+    const missing = records.find((r) => (r.classScore === undefined || r.classScore === null) && !r.classScoreDetails);
+    if (missing) throw new Error('Each record needs either classScore or classScoreDetails');
+    return true;
+  }),
 ];
 
 const amendValidator = [

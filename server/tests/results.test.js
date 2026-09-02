@@ -1,5 +1,6 @@
 const request = require('supertest');
 const { startTestServer, stopTestServer, clearTestDb } = require('./testServer');
+const { runWithSchool } = require('../src/middleware/tenantContext');
 
 let app;
 let models;
@@ -157,6 +158,121 @@ describe('Results workflow state machine', () => {
     const resubmit = await request(app).post(`/api/result-sheets/${sheet.id}/submit`).set(fixtures.authHeader(teacherToken));
     expect(resubmit.status).toBe(200);
     expect(resubmit.body.data.status).toBe('Submitted');
+  });
+});
+
+describe('Class Score Decomposition (recordBulk)', () => {
+  const enableDecomposition = (schoolId, components) => runWithSchool(schoolId, async () => models.GradingScheme.findOneAndUpdate(
+    { schoolId },
+    { $set: { classScoreMax: 50, examScoreMax: 50, classScoreConfig: { enabled: true, components } } },
+    { upsert: true, new: true },
+  ));
+
+  const STANDARD_COMPONENTS = [
+    { key: 'exercise', label: 'Class Exercises', maxMarks: 20 },
+    { key: 'assignment', label: 'Assignments', maxMarks: 15 },
+    { key: 'project', label: 'Group Project', maxMarks: 15 },
+  ];
+
+  test('classScoreDetails is summed into classScore when the school has decomposition enabled', async () => {
+    const school = await fixtures.createSchool(models);
+    const { classRow, subject, term, teacherUser, teacherPassword, student } = await setupClassroom(school._id);
+    await enableDecomposition(school._id, STANDARD_COMPONENTS);
+    const teacherToken = await fixtures.login(app, school.slug, teacherUser.email, teacherPassword);
+
+    const res = await request(app).post('/api/results/bulk').set(fixtures.authHeader(teacherToken)).send({
+      classId: classRow.id, subjectId: subject.id, academicTermId: term.id,
+      records: [{ studentId: student.id, classScoreDetails: { exercise: 18, assignment: 12, project: 14 }, examScore: 40 }],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].classScore).toBe(44);
+    expect(res.body.data[0].totalScore).toBe(84);
+    expect(res.body.data[0].classScoreDetails).toEqual({ exercise: 18, assignment: 12, project: 14 });
+  });
+
+  test('a raw classScore sent alongside classScoreDetails is ignored — the computed sum always wins', async () => {
+    const school = await fixtures.createSchool(models);
+    const { classRow, subject, term, teacherUser, teacherPassword, student } = await setupClassroom(school._id);
+    await enableDecomposition(school._id, STANDARD_COMPONENTS);
+    const teacherToken = await fixtures.login(app, school.slug, teacherUser.email, teacherPassword);
+
+    const res = await request(app).post('/api/results/bulk').set(fixtures.authHeader(teacherToken)).send({
+      classId: classRow.id, subjectId: subject.id, academicTermId: term.id,
+      records: [{ studentId: student.id, classScore: 999, classScoreDetails: { exercise: 18, assignment: 12, project: 14 }, examScore: 40 }],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].classScore).toBe(44);
+  });
+
+  test('a component value exceeding its own maxMarks is rejected with a clear message, and nothing is saved', async () => {
+    const school = await fixtures.createSchool(models);
+    const { classRow, subject, term, teacherUser, teacherPassword, student } = await setupClassroom(school._id);
+    await enableDecomposition(school._id, STANDARD_COMPONENTS);
+    const teacherToken = await fixtures.login(app, school.slug, teacherUser.email, teacherPassword);
+
+    const res = await request(app).post('/api/results/bulk').set(fixtures.authHeader(teacherToken)).send({
+      classId: classRow.id, subjectId: subject.id, academicTermId: term.id,
+      records: [{ studentId: student.id, classScoreDetails: { exercise: 25 }, examScore: 40 }],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/"Class Exercises" cannot exceed 20/);
+
+    const stored = await runWithSchool(school._id, async () => models.Result.findOne({ studentId: student.id, subjectId: subject.id, academicTermId: term.id }));
+    expect(stored).toBeNull();
+  });
+
+  test('a school without decomposition enabled still accepts a plain classScore exactly as before', async () => {
+    const school = await fixtures.createSchool(models);
+    const { classRow, subject, term, teacherUser, teacherPassword, student } = await setupClassroom(school._id);
+    const teacherToken = await fixtures.login(app, school.slug, teacherUser.email, teacherPassword);
+
+    const res = await request(app).post('/api/results/bulk').set(fixtures.authHeader(teacherToken)).send({
+      classId: classRow.id, subjectId: subject.id, academicTermId: term.id,
+      records: [{ studentId: student.id, classScore: 45, examScore: 40 }],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].classScore).toBe(45);
+    expect(res.body.data[0].classScoreDetails).toBeUndefined();
+  });
+
+  test('classScoreDetails sent to a school WITHOUT decomposition enabled is rejected, not silently coerced to NaN', async () => {
+    const school = await fixtures.createSchool(models);
+    const { classRow, subject, term, teacherUser, teacherPassword, student } = await setupClassroom(school._id);
+    const teacherToken = await fixtures.login(app, school.slug, teacherUser.email, teacherPassword);
+
+    const res = await request(app).post('/api/results/bulk').set(fixtures.authHeader(teacherToken)).send({
+      classId: classRow.id, subjectId: subject.id, academicTermId: term.id,
+      records: [{ studentId: student.id, classScoreDetails: { exercise: 18 }, examScore: 40 }],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/does not have class score decomposition enabled/);
+
+    const stored = await runWithSchool(school._id, async () => models.Result.findOne({ studentId: student.id, subjectId: subject.id, academicTermId: term.id }));
+    expect(stored).toBeNull();
+  });
+
+  test('toggling decomposition off clears a previously-saved classScoreDetails on the next save', async () => {
+    const school = await fixtures.createSchool(models);
+    const { classRow, subject, term, teacherUser, teacherPassword, student } = await setupClassroom(school._id);
+    await enableDecomposition(school._id, STANDARD_COMPONENTS);
+    const teacherToken = await fixtures.login(app, school.slug, teacherUser.email, teacherPassword);
+
+    await request(app).post('/api/results/bulk').set(fixtures.authHeader(teacherToken)).send({
+      classId: classRow.id, subjectId: subject.id, academicTermId: term.id,
+      records: [{ studentId: student.id, classScoreDetails: { exercise: 18, assignment: 12, project: 14 }, examScore: 40 }],
+    });
+
+    await runWithSchool(school._id, async () => models.GradingScheme.findOneAndUpdate(
+      { schoolId: school._id }, { $set: { 'classScoreConfig.enabled': false } },
+    ));
+
+    const res = await request(app).post('/api/results/bulk').set(fixtures.authHeader(teacherToken)).send({
+      classId: classRow.id, subjectId: subject.id, academicTermId: term.id,
+      records: [{ studentId: student.id, classScore: 30, examScore: 40 }],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.data[0].classScore).toBe(30);
+    expect(res.body.data[0].classScoreDetails).toBeUndefined();
   });
 });
 

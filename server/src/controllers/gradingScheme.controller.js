@@ -2,6 +2,7 @@ const { GradingScheme } = require('../models');
 const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/AppError');
 const { getSchemeForSchool } = require('../services/grading.service');
+const { validateClassScoreConfig } = require('../services/result.service');
 const auditLog = require('../services/auditLog.service');
 
 // One grading scheme per school — auto-created seeded with today's
@@ -12,9 +13,11 @@ const get = asyncHandler(async (req, res) => {
   res.json({ success: true, data: scheme });
 });
 
-// PUT /grading-scheme { classScoreMax, examScoreMax, bands: [{min, grade, label}] }
+// PUT /grading-scheme { classScoreMax, examScoreMax, bands: [{min, grade, label}], classScoreConfig? }
 const update = asyncHandler(async (req, res, next) => {
-  const { classScoreMax, examScoreMax, bands } = req.body;
+  const {
+    classScoreMax, examScoreMax, bands, classScoreConfig,
+  } = req.body;
 
   if (!Array.isArray(bands) || bands.length === 0) {
     return next(new AppError('At least one grade band is required', 400));
@@ -33,13 +36,27 @@ const update = asyncHandler(async (req, res, next) => {
     }
   }
 
+  if (classScoreConfig?.enabled) {
+    try {
+      validateClassScoreConfig(classScoreConfig.components, classScoreMax || 50);
+    } catch (err) {
+      return next(new AppError(err.message, 400));
+    }
+  }
+
+  // classScoreConfig is only overwritten when the request actually sent
+  // one -- an admin editing just the grade bands shouldn't silently reset
+  // an already-configured decomposition back to nothing.
+  const setFields = {
+    classScoreMax: classScoreMax || 50,
+    examScoreMax: examScoreMax || 50,
+    bands: sorted,
+  };
+  if (classScoreConfig !== undefined) setFields.classScoreConfig = classScoreConfig;
+
   const scheme = await GradingScheme.findOneAndUpdate(
     { schoolId: req.user.schoolId },
-    { $set: {
-      classScoreMax: classScoreMax || 50,
-      examScoreMax: examScoreMax || 50,
-      bands: sorted,
-    } },
+    { $set: setFields },
     { upsert: true, new: true },
   );
 

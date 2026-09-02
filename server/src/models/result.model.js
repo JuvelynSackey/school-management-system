@@ -10,6 +10,12 @@ const resultSchema = new mongoose.Schema({
   academicTermId: { type: mongoose.Schema.Types.ObjectId, ref: 'AcademicTerm', required: true },
   classScore: { type: Number, required: true },
   examScore: { type: Number, required: true },
+  // Only set when the school's GradingScheme has classScoreConfig.enabled --
+  // the per-component marks (e.g. { exercise: 18, assignment: 12 }) that sum
+  // to classScore above. Left genuinely absent otherwise, same reasoning as
+  // subject.model.js's `code` field: an empty Map on every non-decomposed
+  // result would just be noise, not a meaningful "no data" signal.
+  classScoreDetails: { type: Map, of: Number, default: undefined },
   totalScore: { type: Number, default: null },
   grade: { type: String, default: null, maxlength: 3 },
   subjectPosition: { type: Number, default: null },

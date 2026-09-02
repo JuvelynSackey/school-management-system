@@ -2,6 +2,7 @@ const { Result, Student, Subject, AcademicTerm, Teacher, TerminalReport, Class, 
 const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/AppError');
 const { computeGradeWithScheme, getSchemeForSchool } = require('../services/grading.service');
+const { computeClassScoreFromDetails } = require('../services/result.service');
 const anomalyDetection = require('../services/anomalyDetection.service');
 const performanceInsights = require('../services/performanceInsights.service');
 const aiService = require('../services/ai.service');
@@ -134,14 +135,35 @@ const recordBulk = asyncHandler(async (req, res, next) => {
   const teacher = req.user.role === 'teacher' ? await Teacher.findOne({ userId: req.user.id }) : null;
   const scheme = await getSchemeForSchool(req.user.schoolId);
 
-  const outOfRange = records.find((r) => Number(r.classScore) > scheme.classScoreMax || Number(r.examScore) > scheme.examScoreMax);
+  // When decomposition is on, a record's classScoreDetails (per-component
+  // marks) is authoritative and classScore is derived from it -- a raw
+  // classScore sent alongside is ignored rather than trusted, so a stale
+  // client can never desync the two. A record with no classScoreDetails
+  // (decomposition on, but this particular row wasn't broken out) falls
+  // back to its own raw classScore untouched.
+  let resolvedRecords;
+  try {
+    resolvedRecords = records.map((r) => {
+      if (r.classScoreDetails && !scheme.classScoreConfig?.enabled) {
+        throw new Error('classScoreDetails was provided, but this school does not have class score decomposition enabled');
+      }
+      const classScore = (scheme.classScoreConfig?.enabled && r.classScoreDetails)
+        ? computeClassScoreFromDetails(r.classScoreDetails, scheme.classScoreConfig.components)
+        : Number(r.classScore);
+      return { ...r, classScore };
+    });
+  } catch (err) {
+    return next(new AppError(err.message, 400));
+  }
+
+  const outOfRange = resolvedRecords.find((r) => r.classScore > scheme.classScoreMax || Number(r.examScore) > scheme.examScoreMax);
   if (outOfRange) {
     return next(new AppError(`Class score cannot exceed ${scheme.classScoreMax} and exam score cannot exceed ${scheme.examScoreMax}`, 400));
   }
 
-  await Promise.all(records.map((r) => Result.findOneAndUpdate(
-    { studentId: r.studentId, subjectId, academicTermId },
-    {
+  await Promise.all(resolvedRecords.map((r) => {
+    const hasDetails = scheme.classScoreConfig?.enabled && r.classScoreDetails;
+    const update = {
       $set: {
         studentId: r.studentId,
         subjectId,
@@ -154,9 +176,15 @@ const recordBulk = asyncHandler(async (req, res, next) => {
         remarks: r.remarks || null,
         recordedBy: teacher?.id || null,
       },
-    },
-    { upsert: true },
-  )));
+    };
+    // classScoreDetails is $unset rather than $set-to-undefined when not
+    // applicable -- Mongo silently ignores an undefined value inside $set,
+    // which would leave a stale Map behind if decomposition gets toggled
+    // off for a row that previously had one.
+    if (hasDetails) update.$set.classScoreDetails = r.classScoreDetails;
+    else update.$unset = { classScoreDetails: '' };
+    return Result.findOneAndUpdate({ studentId: r.studentId, subjectId, academicTermId }, update, { upsert: true });
+  }));
 
   await recalculateSubjectPositions(classId, subjectId, academicTermId);
 
