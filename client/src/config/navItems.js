@@ -31,6 +31,7 @@ export const NAV_ITEMS = [
   { to: '/reports', label: 'Reports', roles: ['admin'], group: 'REPORTS', icon: 'reports' },
   { to: '/terminal-reports', label: 'Terminal Reports', roles: ['admin', 'teacher'], group: 'REPORTS', icon: 'terminalReports' },
   { to: '/id-cards', label: 'ID Cards', roles: ['admin'], group: 'REPORTS', icon: 'idcards' },
+  { to: '/analytics/operations-overview', label: 'Operations Overview', roles: ['admin'], group: 'REPORTS', icon: 'dashboard' },
   { to: '/analytics', label: 'Analytics', roles: ['admin'], group: 'REPORTS', icon: 'analytics' },
   { to: '/analytics/data-quality', label: 'Data Quality', roles: ['admin'], group: 'REPORTS', icon: 'audit' },
   { to: '/analytics/bece-readiness', label: 'BECE Readiness', roles: ['admin'], group: 'REPORTS', icon: 'terminalReports' },

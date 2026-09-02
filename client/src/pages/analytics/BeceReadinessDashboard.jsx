@@ -73,11 +73,14 @@ function ExportButton({ classId, className }) {
   );
 }
 
+const TONE_GLYPH = { success: '✓', warning: '!', rose: '✕' };
+
 function CriterionCard({ criterion }) {
   const pct = criterion.total > 0 ? Math.round((criterion.passCount / criterion.total) * 100) : 100;
   const tone = pct === 100 ? 'success' : (pct >= 75 ? 'warning' : 'rose');
   return (
     <div className={`stat-card stat-card-${tone}`}>
+      <span className="stat-card-icon" aria-hidden="true">{TONE_GLYPH[tone]}</span>
       <div>
         <div className="stat-card-label">{criterion.label}</div>
         <div className="stat-card-value">{criterion.passCount} / {criterion.total}</div>

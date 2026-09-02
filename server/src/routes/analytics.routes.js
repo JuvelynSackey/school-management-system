@@ -11,5 +11,6 @@ router.get('/academic', controller.getAcademic);
 router.get('/financial', controller.getFinancial);
 router.get('/data-quality', controller.getDataQuality);
 router.get('/bece-readiness', controller.getBeceReadiness);
+router.get('/operations-overview', controller.getOperationsOverview);
 
 module.exports = router;
