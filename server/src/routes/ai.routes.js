@@ -33,12 +33,23 @@ const queryLimiter = rateLimit({
   message: { success: false, message: 'Too many AI requests. Please try again later.' },
 });
 
-router.use(authenticate, authorize('admin', 'teacher'));
+// No router-level authorize() default — /query needs to reach parents too,
+// who have no access to anything else in this file, so every route below
+// states its own required role(s) explicitly instead of relying on a
+// blanket default that would either lock parents out of /query or (worse)
+// accidentally widen the other admin/teacher-only routes to parents too.
+router.use(authenticate);
 
-router.post('/remarks/suggest', suggestLimiter, suggestRemarkValidator, validate, controller.suggestRemark);
-// Admin-only, narrower than this router's own admin+teacher default above —
-// authorize() checks stack, so this further restricts just this one route.
-router.post('/query', authorize('admin'), queryLimiter, adminQueryValidator, validate, queryController.runQuery);
+router.post('/remarks/suggest', authorize('admin', 'teacher'), suggestLimiter, suggestRemarkValidator, validate, controller.suggestRemark);
+// Every authenticated role reaches the controller, even 'student' (who has
+// no intents assigned in assistantIntents.config.js at all) — a role with
+// nothing it's allowed to ask still gets the assistant's own graceful,
+// config-driven refusal message, not a bare 403 from the route layer.
+// aiQuery.controller.js re-checks the classified intent's allowedRoles
+// server-side regardless of what this authorize() call allows through, and
+// a teacher/parent's classId/studentId scope is always resolved from their
+// own account there, never a request parameter.
+router.post('/query', authorize('admin', 'teacher', 'student', 'parent'), queryLimiter, adminQueryValidator, validate, queryController.runQuery);
 // Admin-only, matching who can actually create an announcement (announcements.routes.js).
 router.post('/compose-announcement', authorize('admin'), suggestLimiter, composeAnnouncementValidator, validate, controller.composeAnnouncement);
 router.get('/performance-summary', authorize('admin'), performanceSummaryValidator, validate, controller.performanceSummary);

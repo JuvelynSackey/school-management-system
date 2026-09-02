@@ -486,29 +486,30 @@ const generateInterventionSynthesis = async (flaggedStudents) => {
   return synthesis;
 };
 
-// Phase 5 — Natural-Language Admin Assistant. The AI's ONLY job here is
-// picking one of a small, fixed set of intents and extracting a few typed
-// parameters from a plain-English question — it never writes or executes a
-// database query itself, and its output is never trusted as-is: every field
-// below is individually type-checked and allowlisted before anything reads
-// it, so a malformed or adversarial model response degrades to "unsupported"
-// rather than ever being passed through as a query.
-const SUPPORTED_INTENTS = [
-  'fee_arrears_by_class',
-  'subject_average_scores',
-  'at_risk_students',
-  'subjects_below_pass_rate',
-  'class_performance_ranking',
-  'teachers_unsubmitted_marksheets',
-  'unsupported',
-];
+// Phase 5 — Natural-Language Assistant (admin, teacher, and parent). The
+// AI's ONLY job here is picking one of a small, fixed set of intents and
+// extracting a few typed parameters from a plain-English question — it
+// never writes or executes a database query itself, and its output is
+// never trusted as-is: every field below is individually type-checked and
+// allowlisted before anything reads it, so a malformed or adversarial model
+// response degrades to "unsupported" rather than ever being passed through
+// as a query. The intent set itself, and which role may use which intent,
+// lives in assistantIntents.config.js — this file only prompts/parses.
+const { ASSISTANT_INTENTS, TERM_HINT_INTENTS, intentsForRole } = require('../config/assistantIntents.config');
 
-const buildQueryInterpretationPrompt = (question) => {
+// Only offers the caller's OWN role's intents — a teacher's prompt never
+// even mentions the admin-only ones. This is a UX/cost optimization (fewer
+// wasted round-trips guessing at something the caller isn't allowed to run)
+// — the real security boundary is aiQuery.controller.js re-checking
+// `allowedRoles` server-side against parseIntentResponse's output before
+// dispatching anything, since a model response is never trusted as-is.
+const buildQueryInterpretationPrompt = (question, userRole) => {
+  const allowedKeys = intentsForRole(userRole);
   const lines = [
-    "You translate a school admin's plain-English question into ONE of a",
-    'fixed set of supported query intents. You do not answer the question',
-    'yourself and you do not write any database query — you only classify',
-    'intent and extract parameters.',
+    "You translate a person's plain-English question into ONE of a fixed",
+    'set of supported query intents. You do not answer the question yourself',
+    'and you do not write any database query — you only classify intent and',
+    'extract parameters.',
     '',
     'For any "academicTermHint" parameter below: use null whenever the',
     'question refers to the CURRENT/default term — including phrases like',
@@ -518,26 +519,9 @@ const buildQueryInterpretationPrompt = (question) => {
     'through words like "this term" as the hint string itself.',
     '',
     'Supported intents, and the parameters each one accepts:',
-    '- "fee_arrears_by_class": students with an outstanding fee balance.',
-    '  params: { "classNameHint": string or null, "minBalance": number or null }',
-    '- "subject_average_scores": average score per subject, for a term.',
-    '  params: { "academicTermHint": string or null }',
-    '- "at_risk_students": students flagged by low attendance, a declining',
-    '  trend, or multiple failing subjects this term.',
-    '  params: {}',
-    '- "subjects_below_pass_rate": subjects where the pass rate is below a',
-    '  threshold (e.g. "subjects with pass rates below 50%").',
-    '  params: { "academicTermHint": string or null, "threshold": number or null }',
-    '- "class_performance_ranking": classes ranked by average score, for a',
-    '  term (e.g. "which class performed best").',
-    '  params: { "academicTermHint": string or null }',
-    '- "teachers_unsubmitted_marksheets": teachers who have not yet submitted',
-    '  one or more of their assigned class/subject result sheets this term.',
-    '  params: { "academicTermHint": string or null }',
-    '- "unsupported": the question does not clearly match any of the above.',
-    '  params: {}',
+    ...allowedKeys.map((key) => ASSISTANT_INTENTS[key].promptLine),
     '',
-    `Admin's question: "${question}"`,
+    `Their question: "${question}"`,
     '',
     'Respond with ONLY a JSON object: { "intent": "...", "params": {...} }.',
     'No markdown, no extra text. If genuinely unsure, use "unsupported"',
@@ -546,6 +530,25 @@ const buildQueryInterpretationPrompt = (question) => {
   return lines.join('\n');
 };
 
+// Belt-and-suspenders alongside the prompt's own instruction: never trust
+// the model to reliably turn "this term"/"currently" into null on its own
+// — coerce known current-term synonyms here too, so a resolveTermHint
+// lookup can never spuriously fail to match a real term name.
+const CURRENT_TERM_SYNONYMS = ['this term', 'current term', 'currently', 'now', 'right now', 'today'];
+const normalizeTermHint = (hint) => {
+  if (typeof hint !== 'string') return null;
+  const trimmed = hint.trim().slice(0, 100);
+  if (CURRENT_TERM_SYNONYMS.includes(trimmed.toLowerCase())) return null;
+  return trimmed || null;
+};
+
+// Only validates that the model returned a REAL, recognized intent key —
+// deliberately does NOT also decide role eligibility here. Collapsing "not
+// a real intent" and "a real intent, but not for this role" into the same
+// unsupported/{} result would erase the distinction aiQuery.controller.js
+// needs to give a genuine out-of-scope attempt its own hard refusal message
+// rather than the softer "try rephrasing" one a genuinely unclear question
+// gets. The controller is the sole, final authority on the role boundary.
 const parseIntentResponse = (text) => {
   const stripped = text.replace(/```json|```/g, '').trim();
   const match = stripped.match(/\{[\s\S]*\}/);
@@ -553,21 +556,9 @@ const parseIntentResponse = (text) => {
   if (match) {
     try { parsed = JSON.parse(match[0]); } catch { parsed = null; }
   }
-  if (!parsed || typeof parsed.intent !== 'string' || !SUPPORTED_INTENTS.includes(parsed.intent)) {
+  if (!parsed || typeof parsed.intent !== 'string' || !ASSISTANT_INTENTS[parsed.intent]) {
     return { intent: 'unsupported', params: {} };
   }
-
-  // Belt-and-suspenders alongside the prompt's own instruction: never trust
-  // the model to reliably turn "this term"/"currently" into null on its
-  // own — coerce known current-term synonyms here too, so a resolveTermHint
-  // lookup can never spuriously fail to match a real term name.
-  const CURRENT_TERM_SYNONYMS = ['this term', 'current term', 'currently', 'now', 'right now', 'today'];
-  const normalizeTermHint = (hint) => {
-    if (typeof hint !== 'string') return null;
-    const trimmed = hint.trim().slice(0, 100);
-    if (CURRENT_TERM_SYNONYMS.includes(trimmed.toLowerCase())) return null;
-    return trimmed || null;
-  };
 
   const raw = (parsed.params && typeof parsed.params === 'object') ? parsed.params : {};
   let params = {};
@@ -576,29 +567,28 @@ const parseIntentResponse = (text) => {
       classNameHint: typeof raw.classNameHint === 'string' ? raw.classNameHint.slice(0, 100) : null,
       minBalance: typeof raw.minBalance === 'number' && raw.minBalance >= 0 ? raw.minBalance : null,
     };
-  } else if (parsed.intent === 'subject_average_scores') {
-    params = { academicTermHint: normalizeTermHint(raw.academicTermHint) };
   } else if (parsed.intent === 'subjects_below_pass_rate') {
     params = {
       academicTermHint: normalizeTermHint(raw.academicTermHint),
       threshold: typeof raw.threshold === 'number' && raw.threshold >= 0 && raw.threshold <= 100 ? raw.threshold : null,
     };
-  } else if (parsed.intent === 'class_performance_ranking' || parsed.intent === 'teachers_unsubmitted_marksheets') {
+  } else if (TERM_HINT_INTENTS.has(parsed.intent)) {
     params = { academicTermHint: normalizeTermHint(raw.academicTermHint) };
   }
-  // at_risk_students and unsupported take no params — params stays {}
+  // Every other intent (at_risk_students, guardians_without_portal_login,
+  // classes_without_homeroom_teacher, unsupported) takes no params.
 
   return { intent: parsed.intent, params };
 };
 
-const interpretAdminQuery = async (question) => {
+const interpretUserQuery = async (question, userRole) => {
   if (!isAIConfigured()) {
     const err = new Error('AI is not configured');
     err.code = 'AI_NOT_CONFIGURED';
     throw err;
   }
 
-  const prompt = buildQueryInterpretationPrompt(question);
+  const prompt = buildQueryInterpretationPrompt(question, userRole);
   const data = await callAI(prompt);
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
   return parseIntentResponse(text);
@@ -660,10 +650,9 @@ module.exports = {
   buildPerformanceNarrativePrompt,
   generateInterventionSynthesis,
   buildInterventionSynthesisPrompt,
-  interpretAdminQuery,
+  interpretUserQuery,
   buildQueryInterpretationPrompt,
   parseIntentResponse,
   summarizeQueryResult,
   buildQuerySummaryPrompt,
-  SUPPORTED_INTENTS,
 };

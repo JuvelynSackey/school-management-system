@@ -7,13 +7,14 @@
 // tenant's data, because this was never a raw AI-supplied query to begin
 // with — only a short hint string used to look something up normally.
 const {
-  Class, AcademicTerm, Student, Result, Subject,
+  Class, AcademicTerm, Student, Result, Subject, Guardian, StudentGuardian, Attendance,
 } = require('../models');
 const { getOutstandingBalanceForStudentTerm } = require('./fees.service');
 const earlyWarning = require('./earlyWarning.service');
 const { getSchemeForSchool } = require('./grading.service');
 const { classAverages, subjectPassRates, round1 } = require('./academicAnalytics.service');
 const { getTeachersWithUnsubmittedMarksheets } = require('./teacherSubmissionStatus.service');
+const { computeAggregatesForStudent } = require('./terminalReports.service');
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -135,6 +136,107 @@ const runClassPerformanceRankingQuery = async (schoolId, academicTermId) => {
 // definition the admin dashboard's Action Center count uses.
 const runTeachersUnsubmittedMarksheetsQuery = async (academicTermId) => getTeachersWithUnsubmittedMarksheets(academicTermId);
 
+// "which guardians don't have a portal login yet" — Guardian.userId has no
+// `default`, same reasoning as every other sparse-partial-index field in
+// this app (Subject.code, Student.waecIndexNumber): a truly-absent field is
+// what "$exists: false" means, not an explicit null.
+const runGuardiansWithoutLoginQuery = async () => {
+  const guardians = await Guardian.find({ userId: { $exists: false } });
+  const links = await StudentGuardian.find({ guardianId: { $in: guardians.map((g) => g.id) } }).populate('student', 'firstName lastName');
+  const childrenByGuardian = new Map();
+  links.forEach((l) => {
+    if (!l.student) return;
+    const key = l.guardianId.toString();
+    if (!childrenByGuardian.has(key)) childrenByGuardian.set(key, []);
+    childrenByGuardian.get(key).push(`${l.student.firstName} ${l.student.lastName}`);
+  });
+
+  return guardians.map((g) => ({
+    guardianId: g.id,
+    name: g.fullName,
+    phone: g.phone,
+    children: childrenByGuardian.get(g.id)?.join(', ') || null,
+  }));
+};
+
+// "which classes have no homeroom teacher"
+const runClassesWithoutHomeroomQuery = async () => {
+  const classes = await Class.find({ classTeacherId: null }, { name: 1, section: 1 });
+  return classes.map((c) => ({ classId: c.id, className: `${c.name} ${c.section || ''}`.trim() }));
+};
+
+// Teacher-scoped: "how is attendance in my classes this term" — classIds
+// comes from getTeacherClassIds(req.user.id) in the controller, never from
+// a client-supplied value, so this can only ever cover classes the
+// requesting teacher actually teaches/homerooms.
+const runMyClassAttendanceSummaryQuery = async (classIds, academicTermId) => {
+  if (classIds.length === 0) return [];
+  const [classes, records] = await Promise.all([
+    Class.find({ _id: { $in: classIds } }, { name: 1, section: 1 }),
+    Attendance.find({ classId: { $in: classIds }, academicTermId }),
+  ]);
+
+  const byClass = new Map();
+  records.forEach((r) => {
+    const key = r.classId.toString();
+    if (!byClass.has(key)) byClass.set(key, { present: 0, absent: 0, late: 0, excused: 0 });
+    const bucket = byClass.get(key);
+    if (r.status === 'Present') bucket.present += 1;
+    else if (r.status === 'Absent') bucket.absent += 1;
+    else if (r.status === 'Late') bucket.late += 1;
+    else if (r.status === 'Excused') bucket.excused += 1;
+  });
+
+  return classes.map((c) => ({
+    classId: c.id,
+    className: `${c.name} ${c.section || ''}`.trim(),
+    ...(byClass.get(c.id) || {
+      present: 0, absent: 0, late: 0, excused: 0,
+    }),
+  }));
+};
+
+// Teacher-scoped: "which of my marksheets are still unsubmitted" — reuses
+// the whole-school function, then narrows to the one row matching the
+// requesting teacher's own teacherId (resolved server-side from
+// req.user.id in the controller, never a client-supplied id).
+const runMyUnsubmittedMarksheetsQuery = async (teacherId, academicTermId) => {
+  const all = await getTeachersWithUnsubmittedMarksheets(academicTermId);
+  const own = all.find((row) => row.teacherId === teacherId);
+  return own ? own.pending : [];
+};
+
+// Parent-scoped: "how much do I owe" — studentIds comes from
+// getParentStudentIds(req.user.id) in the controller.
+const runMyChildFeeBalanceQuery = async (studentIds, academicTermId) => {
+  if (studentIds.length === 0) return [];
+  const students = await Student.find({ _id: { $in: studentIds } }).select('firstName lastName classId').populate('classId', 'name section');
+  return Promise.all(students.map(async (s) => ({
+    studentId: s.id,
+    name: `${s.firstName} ${s.lastName}`,
+    className: s.classId ? `${s.classId.name} ${s.classId.section || ''}`.trim() : null,
+    outstandingBalance: await getOutstandingBalanceForStudentTerm(s.id, academicTermId),
+  })));
+};
+
+// Parent-scoped: "how is my child doing" — same computeAggregatesForStudent
+// already used for terminal report generation, so this can never quietly
+// disagree with the actual report card.
+const runMyChildResultsSummaryQuery = async (studentIds, academicTermId) => {
+  if (studentIds.length === 0) return [];
+  const students = await Student.find({ _id: { $in: studentIds } }).select('firstName lastName classId');
+  return Promise.all(students.map(async (s) => {
+    const aggregates = await computeAggregatesForStudent(s.id, s.classId, academicTermId);
+    return {
+      studentId: s.id,
+      name: `${s.firstName} ${s.lastName}`,
+      averageScore: aggregates.averageScore != null ? round1(aggregates.averageScore) : null,
+      totalAttendance: aggregates.totalAttendance,
+      outOfAttendance: aggregates.outOfAttendance,
+    };
+  }));
+};
+
 module.exports = {
   resolveClassHint,
   resolveTermHint,
@@ -144,4 +246,10 @@ module.exports = {
   runSubjectsBelowPassRateQuery,
   runClassPerformanceRankingQuery,
   runTeachersUnsubmittedMarksheetsQuery,
+  runGuardiansWithoutLoginQuery,
+  runClassesWithoutHomeroomQuery,
+  runMyClassAttendanceSummaryQuery,
+  runMyUnsubmittedMarksheetsQuery,
+  runMyChildFeeBalanceQuery,
+  runMyChildResultsSummaryQuery,
 };

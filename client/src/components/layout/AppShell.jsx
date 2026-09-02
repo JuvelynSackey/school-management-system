@@ -11,6 +11,10 @@ import { NAV_ICONS } from '../icons/NavIcons';
 
 const COLLAPSED_GROUPS_KEY = 'jm_sidebar_collapsed_groups';
 const ICON_ONLY_KEY = 'jm_sidebar_iconOnly';
+// Every role assistantIntents.config.js assigns at least one intent to
+// ('student' has none, and gets a graceful refusal if it ever reaches the
+// endpoint some other way — no need to surface the entry point for it).
+const ASK_JESMANAGE_ROLES = ['admin', 'teacher', 'parent'];
 
 const loadCollapsedGroups = () => {
   try {
@@ -131,7 +135,7 @@ export default function AppShell() {
             </div>
           </div>
           <div className="topbar-actions">
-            {user?.role === 'admin' && (
+            {ASK_JESMANAGE_ROLES.includes(user?.role) && (
               <button type="button" className="btn-secondary" onClick={() => setAskOpen(true)}>🔎 Ask JesManage</button>
             )}
             <OfflineIndicator />
@@ -152,7 +156,7 @@ export default function AppShell() {
       <ScrollToTopButton />
       <CommandPalette
         navItems={visibleNavItems}
-        enableAI={user?.role === 'admin'}
+        enableAI={ASK_JESMANAGE_ROLES.includes(user?.role)}
         onAskJesManage={(q) => { setAskInitialQuestion(q); setAskOpen(true); }}
       />
     </div>

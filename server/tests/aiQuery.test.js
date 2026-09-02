@@ -58,15 +58,31 @@ describe('Natural-Language Admin Assistant', () => {
       global.fetch = originalFetch;
     });
 
-    test('is admin-only — a teacher gets 403, and the AI is never called', async () => {
+    test('a teacher CAN reach /query now, but an admin-only intent is refused, not executed', async () => {
       const school = await fixtures.createSchool(models);
       const { user: teacherUser, password } = await fixtures.createTeacher(models, school._id);
       const token = await fixtures.login(app, school.slug, teacherUser.email, password);
+      // The model still tries to classify this as an admin-only intent —
+      // the controller must catch this independently of what ai.service.js
+      // offered the model in the prompt.
       mockAI('{"intent":"at_risk_students","params":{}}');
 
       const res = await request(app).post('/api/ai/query').set(fixtures.authHeader(token)).send({ question: 'anything' });
-      expect(res.status).toBe(403);
-      expect(global.fetch).not.toHaveBeenCalled();
+      expect(res.status).toBe(200);
+      expect(res.body.data.intent).toBe('unsupported');
+      expect(res.body.data.answer).toBe('I cannot access or disclose information outside your authorized scope.');
+      expect(res.body.data.rows).toEqual([]);
+    });
+
+    test('a student (a role with no assigned intents at all) gets a refusal, not a 403 crash', async () => {
+      const school = await fixtures.createSchool(models);
+      const { user: studentUser, password } = await fixtures.createStudent(models, school._id);
+      const token = await fixtures.login(app, school.slug, studentUser.email, password);
+      mockAI('{"intent":"at_risk_students","params":{}}');
+
+      const res = await request(app).post('/api/ai/query').set(fixtures.authHeader(token)).send({ question: 'anything' });
+      expect(res.status).toBe(200);
+      expect(res.body.data.answer).toBe('I cannot access or disclose information outside your authorized scope.');
     });
 
     test('an unrecognized intent from the model degrades to "unsupported" rather than being executed', async () => {
@@ -200,7 +216,7 @@ describe('Natural-Language Admin Assistant', () => {
       expect(res.status).toBe(200);
       expect(res.body.data.rows.map((r) => r.studentId)).toContain(student.id);
 
-      const logs = await runWithSchool(school._id, async () => AuditLog.find({ action: 'ai.adminQuery' }));
+      const logs = await runWithSchool(school._id, async () => AuditLog.find({ action: 'ai.userQuery' }));
       expect(logs.length).toBe(1);
     });
 
@@ -306,5 +322,6 @@ describe('Natural-Language Admin Assistant', () => {
       ]);
       expect(res.body.data.recommendation).toEqual(expect.any(String));
     });
+
   });
 });
