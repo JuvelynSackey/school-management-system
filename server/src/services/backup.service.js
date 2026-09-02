@@ -1,5 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const { EJSON } = require('bson');
 const { mongoose } = require('../config/database');
 
 const BACKUPS_DIR = path.join(__dirname, '..', '..', 'backups');
@@ -9,6 +10,13 @@ const BACKUPS_DIR = path.join(__dirname, '..', '..', 'backups');
 // (no MongoDB Database Tools on this machine, dataset is small). Also writes
 // a meta.json alongside the snapshot so listBackups() doesn't need to open
 // every collection file just to report a summary.
+//
+// EJSON (BSON's "Extended JSON"), not plain JSON.stringify -- a document's
+// _id and every ref field is a BSON ObjectId, and every timestamp a BSON
+// Date. Plain JSON.stringify silently flattens both to plain strings (their
+// toJSON()), which restore.service.js would then insert back as strings,
+// corrupting every foreign-key relationship and timestamp in the database.
+// EJSON round-trips the real BSON types.
 const runBackup = async () => {
   const startedAt = Date.now();
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -19,7 +27,7 @@ const runBackup = async () => {
   const collections = [];
   for (const { name } of collectionsInfo) {
     const docs = await mongoose.connection.db.collection(name).find({}).toArray();
-    fs.writeFileSync(path.join(outDir, `${name}.json`), JSON.stringify(docs, null, 2));
+    fs.writeFileSync(path.join(outDir, `${name}.json`), EJSON.stringify(docs, null, 2));
     collections.push({ name, count: docs.length });
   }
 

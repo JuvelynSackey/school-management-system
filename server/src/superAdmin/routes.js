@@ -33,6 +33,8 @@ router.put('/schools/:id/branding', authenticateSuperAdmin, updateBrandingValida
 
 router.get('/backups', authenticateSuperAdmin, backupsController.list);
 router.post('/backups/run', authenticateSuperAdmin, backupsController.trigger);
+router.get('/backups/:timestamp/download', authenticateSuperAdmin, backupsController.download);
+router.post('/backups/:timestamp/restore', authenticateSuperAdmin, backupsController.restore);
 
 router.get('/school-admins', authenticateSuperAdmin, platformUsersController.listSchoolAdmins);
 router.put('/school-admins/:id/status', authenticateSuperAdmin, setStatusValidator, validate, platformUsersController.setSchoolAdminStatus);
@@ -43,6 +45,7 @@ router.post('/super-admins', authenticateSuperAdmin, createSuperAdminValidator, 
 router.put('/super-admins/:id/status', authenticateSuperAdmin, setStatusValidator, validate, platformUsersController.setSuperAdminStatus);
 
 router.get('/audit-logs', authenticateSuperAdmin, auditLogsController.list);
+router.get('/audit-logs/export', authenticateSuperAdmin, auditLogsController.exportLogs);
 router.get('/security/failed-logins', authenticateSuperAdmin, securityController.failedLogins);
 
 router.get('/settings', authenticateSuperAdmin, settingsController.get);

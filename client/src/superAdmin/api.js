@@ -19,6 +19,33 @@ export const updateSchoolBranding = (id, payload) => superAdminApiClient.put(`/s
 
 export const listBackups = () => superAdminApiClient.get('/backups').then((res) => res.data.data);
 export const triggerBackup = () => superAdminApiClient.post('/backups/run').then((res) => res.data.data);
+export const restoreBackup = (timestamp) => superAdminApiClient.post(`/backups/${timestamp}/restore`, { confirmation: 'RESTORE' }).then((res) => res.data.data);
+
+const downloadBlob = async (requestFn, filename) => {
+  try {
+    const response = await requestFn();
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    if (err.response?.data instanceof Blob) {
+      try {
+        err.response.data = JSON.parse(await err.response.data.text());
+      } catch { /* leave as-is if it wasn't JSON */ }
+    }
+    throw err;
+  }
+};
+
+export const downloadBackup = (timestamp) => downloadBlob(
+  () => superAdminApiClient.get(`/backups/${timestamp}/download`, { responseType: 'blob' }),
+  `backup-${timestamp}.zip`,
+);
 
 export const listSchoolAdmins = () => superAdminApiClient.get('/school-admins').then((res) => res.data.data);
 export const setSchoolAdminStatus = (id, status) => superAdminApiClient.put(`/school-admins/${id}/status`, { status }).then((res) => res.data.data);
@@ -29,6 +56,10 @@ export const createSuperAdmin = (payload) => superAdminApiClient.post('/super-ad
 export const setSuperAdminStatus = (id, status) => superAdminApiClient.put(`/super-admins/${id}/status`, { status }).then((res) => res.data.data);
 
 export const listAuditLogs = (params = {}) => superAdminApiClient.get('/audit-logs', { params }).then((res) => res.data.data);
+export const exportAuditLogs = (params = {}) => downloadBlob(
+  () => superAdminApiClient.get('/audit-logs/export', { params, responseType: 'blob' }),
+  `audit-log-export.${params.format === 'json' ? 'json' : 'csv'}`,
+);
 export const getFailedLogins = (hours = 24) => superAdminApiClient.get('/security/failed-logins', { params: { hours } }).then((res) => res.data.data);
 
 export const getPlatformSettings = () => superAdminApiClient.get('/settings').then((res) => res.data.data);
