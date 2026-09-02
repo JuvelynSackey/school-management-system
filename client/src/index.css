@@ -122,6 +122,32 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); opacity: 1
 .btn-secondary:hover { background: var(--bg); }
 .btn-danger { background: var(--danger-bg); color: var(--danger); border-color: rgba(220,38,38,0.25); }
 
+/* Below every overlay (sidebar-backdrop/modal/command-palette all sit at
+   z-index 200+) so it never fights with them, but above ordinary content. */
+.scroll-to-top-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 90;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.scroll-to-top-btn:hover { background: var(--accent-hover); transform: translateY(-2px); }
+.scroll-to-top-btn:focus-visible { outline: 2px solid var(--accent-bg); outline-offset: 2px; }
+@media (max-width: 640px) {
+  .scroll-to-top-btn { bottom: 16px; right: 16px; }
+}
+
 /* Forms */
 .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; text-align: left; }
 .field span { font-size: 13px; font-weight: 500; color: var(--text-h); }

@@ -5,6 +5,7 @@ import ThemeToggle from '../common/ThemeToggle';
 import OfflineIndicator from '../common/OfflineIndicator';
 import AskJesManage from '../common/AskJesManage';
 import CommandPalette from '../common/CommandPalette';
+import ScrollToTopButton from '../common/ScrollToTopButton';
 import { NAV_ITEMS, NAV_GROUPS } from '../../config/navItems';
 import { NAV_ICONS } from '../icons/NavIcons';
 
@@ -148,6 +149,7 @@ export default function AppShell() {
           <Outlet />
         </main>
       </div>
+      <ScrollToTopButton />
       <CommandPalette
         navItems={visibleNavItems}
         enableAI={user?.role === 'admin'}
