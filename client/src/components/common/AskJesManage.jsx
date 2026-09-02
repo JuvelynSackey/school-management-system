@@ -3,6 +3,7 @@ import { askAdminQuery } from '../../api/aiQuery.api';
 import { formatCurrency } from '../../utils/currency';
 import { useAuth } from '../../context/AuthContext';
 import Modal from './Modal';
+import IntelligenceInspector from './IntelligenceInspector';
 
 const FLAG_LABELS = {
   low_attendance: 'Low Attendance',
@@ -202,11 +203,17 @@ function ResultsTable({ intent, rows }) {
 // palette already signals "ask this," not "let me review it first."
 export default function AskJesManage({ onClose, initialQuestion }) {
   const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const exampleQuestions = EXAMPLE_QUESTIONS_BY_ROLE[user?.role] || [];
   const [question, setQuestion] = useState(initialQuestion || '');
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [isAsking, setIsAsking] = useState(false);
+  // Admin-only, matching the backend gate in aiQuery.controller.js (a
+  // non-admin's request is silently ignored server-side either way, but
+  // there's no reason to even show the toggle to a role that could never
+  // see a trace).
+  const [inspectorMode, setInspectorMode] = useState(false);
   const askedInitialRef = useRef(false);
 
   const ask = async (q) => {
@@ -215,7 +222,7 @@ export default function AskJesManage({ onClose, initialQuestion }) {
     setError('');
     setResult(null);
     try {
-      const data = await askAdminQuery(q);
+      const data = await askAdminQuery(q, isAdmin && inspectorMode);
       setResult(data);
     } catch (err) {
       setError(err.response?.data?.code === 'AI_NOT_CONFIGURED'
@@ -239,8 +246,10 @@ export default function AskJesManage({ onClose, initialQuestion }) {
     ask(question);
   };
 
+  const showInspector = isAdmin && result?.inspector;
+
   return (
-    <Modal title="Ask JesManage" onClose={onClose}>
+    <Modal title="Ask JesManage" onClose={onClose} wide={isAdmin && inspectorMode}>
       <form onSubmit={handleAsk}>
         <label className="field">
           <span>Ask a question about fees, results, or attendance</span>
@@ -264,6 +273,12 @@ export default function AskJesManage({ onClose, initialQuestion }) {
             ))}
           </p>
         )}
+        {isAdmin && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, marginBottom: 10, cursor: 'pointer' }}>
+            <input type="checkbox" checked={inspectorMode} onChange={(e) => setInspectorMode(e.target.checked)} />
+            🧪 Developer mode — show the Intelligence Inspector trace
+          </label>
+        )}
         <div className="modal-actions">
           <button type="button" className="btn-secondary" onClick={onClose}>Close</button>
           <button type="submit" className="btn-primary" disabled={isAsking || !question.trim()}>
@@ -275,12 +290,15 @@ export default function AskJesManage({ onClose, initialQuestion }) {
       {error && <div className="alert-error" style={{ marginTop: 14 }}>{error}</div>}
 
       {result && (
-        <div style={{ marginTop: 14 }}>
-          {result.answer && <p style={{ fontSize: 14, marginBottom: 10 }}>🧠 {result.answer}</p>}
-          <ResultsTable intent={result.intent} rows={result.rows} />
-          {result.recommendation && (
-            <p className="alert-warning" style={{ fontSize: 13, marginTop: 10 }}>💡 {result.recommendation}</p>
-          )}
+        <div className={showInspector ? 'inspector-layout' : undefined} style={{ marginTop: 14 }}>
+          <div className={showInspector ? 'inspector-answer-col' : undefined}>
+            {result.answer && <p style={{ fontSize: 14, marginBottom: 10 }}>🧠 {result.answer}</p>}
+            <ResultsTable intent={result.intent} rows={result.rows} />
+            {result.recommendation && (
+              <p className="alert-warning" style={{ fontSize: 13, marginTop: 10 }}>💡 {result.recommendation}</p>
+            )}
+          </div>
+          {showInspector && <IntelligenceInspector inspector={result.inspector} />}
         </div>
       )}
     </Modal>

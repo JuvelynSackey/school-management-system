@@ -6,6 +6,26 @@ const auditLog = require('../services/auditLog.service');
 const { ASSISTANT_INTENTS, intentsForRole } = require('../config/assistantIntents.config');
 const { getTeacherClassIds } = require('../services/teacherScope.service');
 const { getParentStudentIds } = require('../services/parentScope.service');
+const { getCurrentSchoolId } = require('../middleware/tenantContext');
+
+// Which aiQuery.service.js function actually runs for each intent — purely
+// descriptive, for the Intelligence Inspector's "Service Dispatch" step.
+// Kept as its own map (rather than derived from the if/else below) so a
+// typo here can never silently change real dispatch behavior.
+const INTENT_SERVICE_FN = {
+  fee_arrears_by_class: 'aiQuery.service.js#runFeeArrearsQuery',
+  subject_average_scores: 'aiQuery.service.js#runSubjectAverageQuery',
+  at_risk_students: 'aiQuery.service.js#runAtRiskStudentsQuery',
+  subjects_below_pass_rate: 'aiQuery.service.js#runSubjectsBelowPassRateQuery',
+  class_performance_ranking: 'aiQuery.service.js#runClassPerformanceRankingQuery',
+  teachers_unsubmitted_marksheets: 'aiQuery.service.js#runTeachersUnsubmittedMarksheetsQuery',
+  guardians_without_portal_login: 'aiQuery.service.js#runGuardiansWithoutLoginQuery',
+  classes_without_homeroom_teacher: 'aiQuery.service.js#runClassesWithoutHomeroomQuery',
+  my_class_attendance_summary: 'aiQuery.service.js#runMyClassAttendanceSummaryQuery',
+  my_class_unsubmitted_marksheets: 'aiQuery.service.js#runMyUnsubmittedMarksheetsQuery',
+  my_child_fee_balance: 'aiQuery.service.js#runMyChildFeeBalanceQuery',
+  my_child_results_summary: 'aiQuery.service.js#runMyChildResultsSummaryQuery',
+};
 
 const REFUSAL_MESSAGE = 'I cannot access or disclose information outside your authorized scope.';
 
@@ -47,9 +67,9 @@ const RECOMMENDATION_BY_INTENT = {
   my_child_fee_balance: 'Outstanding balances can be paid via the Fees page.',
 };
 
-const emptyOrNotFoundResponse = (res, intent, answer) => res.json({
+const emptyOrNotFoundResponse = (res, intent, answer, inspector = null) => res.json({
   success: true, data: {
-    answer, rows: [], intent, recommendation: null,
+    answer, rows: [], intent, recommendation: null, ...(inspector ? { inspector } : {}),
   },
 });
 
@@ -69,8 +89,18 @@ const runQuery = asyncHandler(async (req, res, next) => {
     return next(new AppError('The natural-language assistant is not yet configured for this deployment.', 503, undefined, 'AI_NOT_CONFIGURED'));
   }
 
+  const startTime = Date.now();
   const { question } = req.body;
   const { role } = req.user;
+
+  // Intelligence Inspector: a developer/demo-mode trace of this exact
+  // request's classify -> permission-guard -> tenant-boundary -> dispatch ->
+  // sanitize pipeline, for showing the real enforcement live rather than
+  // describing it. Admin-only (there's no "super admin" session reachable
+  // from this school-scoped route — school admin is the real equivalent
+  // here) and opt-in, so a normal question from any role never carries
+  // this extra payload.
+  const includeInspector = role === 'admin' && req.body.includeInspector === true;
 
   let interpretation;
   try {
@@ -81,15 +111,44 @@ const runQuery = asyncHandler(async (req, res, next) => {
 
   const { intent, params } = interpretation;
 
+  const buildInspector = ({ rbacPassed, executedService = null, sanitization = null }) => ({
+    rawQuery: question,
+    classifiedIntent: intent,
+    extractedParameters: params,
+    rbac: { requiredRoles: ASSISTANT_INTENTS[intent]?.allowedRoles || [], userRole: role, passed: rbacPassed },
+    tenantBoundary: { activeSchoolId: getCurrentSchoolId(), enforced: true },
+    executedService,
+    sanitization,
+    executionTimeMs: Date.now() - startTime,
+  });
+
   if (intent === 'unsupported') {
-    return res.json({ success: true, data: { answer: unsupportedMessageForRole(role), rows: [], intent, recommendation: null } });
+    return res.json({
+      success: true,
+      data: {
+        answer: unsupportedMessageForRole(role),
+        rows: [],
+        intent,
+        recommendation: null,
+        ...(includeInspector ? { inspector: buildInspector({ rbacPassed: true }) } : {}),
+      },
+    });
   }
 
   // Hard refusal boundary — re-derived here independently of anything
   // ai.service.js already filtered/checked, so a bug in one layer can never
   // by itself grant access the other layer would have denied.
   if (!ASSISTANT_INTENTS[intent]?.allowedRoles.includes(role)) {
-    return res.json({ success: true, data: { answer: REFUSAL_MESSAGE, rows: [], intent: 'unsupported', recommendation: null } });
+    return res.json({
+      success: true,
+      data: {
+        answer: REFUSAL_MESSAGE,
+        rows: [],
+        intent: 'unsupported',
+        recommendation: null,
+        ...(includeInspector ? { inspector: buildInspector({ rbacPassed: false }) } : {}),
+      },
+    });
   }
 
   // Teacher/parent scope is always resolved server-side from the
@@ -97,6 +156,7 @@ const runQuery = asyncHandler(async (req, res, next) => {
   // classId/studentId field anywhere in the request body this route reads.
   let rows;
   let hintNote = null;
+  let executedService = includeInspector ? (INTENT_SERVICE_FN[intent] || null) : null;
 
   if (intent === 'fee_arrears_by_class') {
     const { academicTermId } = await aiQuery.resolveTermHint(null);
@@ -107,22 +167,42 @@ const runQuery = asyncHandler(async (req, res, next) => {
     rows = await aiQuery.runFeeArrearsQuery({ classId: notFound ? null : classId, minBalance: params.minBalance }, academicTermId);
   } else if (intent === 'subject_average_scores') {
     const { academicTermId, notFound } = await aiQuery.resolveTermHint(params.academicTermHint);
-    if (notFound) return emptyOrNotFoundResponse(res, intent, `I couldn't find a term matching "${params.academicTermHint}".`);
+    if (notFound) {
+      return emptyOrNotFoundResponse(
+        res, intent, `I couldn't find a term matching "${params.academicTermHint}".`,
+        includeInspector ? buildInspector({ rbacPassed: true, executedService: 'aiQuery.service.js#resolveTermHint' }) : null,
+      );
+    }
     rows = await aiQuery.runSubjectAverageQuery(academicTermId);
   } else if (intent === 'at_risk_students') {
     const { academicTermId } = await aiQuery.resolveTermHint(null);
     rows = await aiQuery.runAtRiskStudentsQuery(academicTermId, req.user.schoolId);
   } else if (intent === 'subjects_below_pass_rate') {
     const { academicTermId, notFound } = await aiQuery.resolveTermHint(params.academicTermHint);
-    if (notFound) return emptyOrNotFoundResponse(res, intent, `I couldn't find a term matching "${params.academicTermHint}".`);
+    if (notFound) {
+      return emptyOrNotFoundResponse(
+        res, intent, `I couldn't find a term matching "${params.academicTermHint}".`,
+        includeInspector ? buildInspector({ rbacPassed: true, executedService: 'aiQuery.service.js#resolveTermHint' }) : null,
+      );
+    }
     rows = await aiQuery.runSubjectsBelowPassRateQuery(req.user.schoolId, academicTermId, params.threshold);
   } else if (intent === 'class_performance_ranking') {
     const { academicTermId, notFound } = await aiQuery.resolveTermHint(params.academicTermHint);
-    if (notFound) return emptyOrNotFoundResponse(res, intent, `I couldn't find a term matching "${params.academicTermHint}".`);
+    if (notFound) {
+      return emptyOrNotFoundResponse(
+        res, intent, `I couldn't find a term matching "${params.academicTermHint}".`,
+        includeInspector ? buildInspector({ rbacPassed: true, executedService: 'aiQuery.service.js#resolveTermHint' }) : null,
+      );
+    }
     rows = await aiQuery.runClassPerformanceRankingQuery(req.user.schoolId, academicTermId);
   } else if (intent === 'teachers_unsubmitted_marksheets') {
     const { academicTermId, notFound } = await aiQuery.resolveTermHint(params.academicTermHint);
-    if (notFound) return emptyOrNotFoundResponse(res, intent, `I couldn't find a term matching "${params.academicTermHint}".`);
+    if (notFound) {
+      return emptyOrNotFoundResponse(
+        res, intent, `I couldn't find a term matching "${params.academicTermHint}".`,
+        includeInspector ? buildInspector({ rbacPassed: true, executedService: 'aiQuery.service.js#resolveTermHint' }) : null,
+      );
+    }
     rows = await aiQuery.runTeachersUnsubmittedMarksheetsQuery(academicTermId);
   } else if (intent === 'guardians_without_portal_login') {
     rows = await aiQuery.runGuardiansWithoutLoginQuery();
@@ -130,21 +210,37 @@ const runQuery = asyncHandler(async (req, res, next) => {
     rows = await aiQuery.runClassesWithoutHomeroomQuery();
   } else if (intent === 'my_class_attendance_summary') {
     const { academicTermId, notFound } = await aiQuery.resolveTermHint(params.academicTermHint);
-    if (notFound) return emptyOrNotFoundResponse(res, intent, `I couldn't find a term matching "${params.academicTermHint}".`);
+    if (notFound) {
+      return emptyOrNotFoundResponse(
+        res, intent, `I couldn't find a term matching "${params.academicTermHint}".`,
+        includeInspector ? buildInspector({ rbacPassed: true, executedService: 'aiQuery.service.js#resolveTermHint' }) : null,
+      );
+    }
     const { classIds } = await getTeacherClassIds(req.user.id);
     rows = await aiQuery.runMyClassAttendanceSummaryQuery(classIds, academicTermId);
   } else if (intent === 'my_class_unsubmitted_marksheets') {
     const { academicTermId, notFound } = await aiQuery.resolveTermHint(params.academicTermHint);
-    if (notFound) return emptyOrNotFoundResponse(res, intent, `I couldn't find a term matching "${params.academicTermHint}".`);
+    if (notFound) {
+      return emptyOrNotFoundResponse(
+        res, intent, `I couldn't find a term matching "${params.academicTermHint}".`,
+        includeInspector ? buildInspector({ rbacPassed: true, executedService: 'aiQuery.service.js#resolveTermHint' }) : null,
+      );
+    }
     const { teacherId } = await getTeacherClassIds(req.user.id);
     rows = teacherId ? await aiQuery.runMyUnsubmittedMarksheetsQuery(teacherId, academicTermId) : [];
+    if (!teacherId) executedService = null;
   } else if (intent === 'my_child_fee_balance') {
     const { academicTermId } = await aiQuery.resolveTermHint(params.academicTermHint);
     const { studentIds } = await getParentStudentIds(req.user.id);
     rows = await aiQuery.runMyChildFeeBalanceQuery(studentIds, academicTermId);
   } else if (intent === 'my_child_results_summary') {
     const { academicTermId, notFound } = await aiQuery.resolveTermHint(params.academicTermHint);
-    if (notFound) return emptyOrNotFoundResponse(res, intent, `I couldn't find a term matching "${params.academicTermHint}".`);
+    if (notFound) {
+      return emptyOrNotFoundResponse(
+        res, intent, `I couldn't find a term matching "${params.academicTermHint}".`,
+        includeInspector ? buildInspector({ rbacPassed: true, executedService: 'aiQuery.service.js#resolveTermHint' }) : null,
+      );
+    }
     const { studentIds } = await getParentStudentIds(req.user.id);
     rows = await aiQuery.runMyChildResultsSummaryQuery(studentIds, academicTermId);
   }
@@ -165,7 +261,26 @@ const runQuery = asyncHandler(async (req, res, next) => {
     req, action: 'ai.userQuery', entityType: 'Query', description: `${role} asked: "${question}"`, metadata: { intent },
   });
 
-  res.json({ success: true, data: { answer, rows, intent, recommendation } });
+  // Not a "strip these fields" step -- every aiQuery.service.js function
+  // builds each row by hand-selecting fields onto a plain object, so _id/
+  // passwordHash/schoolId are never read onto a row in the first place.
+  // Reporting the actual keys present is the honest version of "sanitized":
+  // proof by inspection, not a claimed post-processing step that doesn't
+  // literally happen.
+  const sanitization = includeInspector
+    ? { approach: 'hand-selected fields only — never a raw document', fieldsReturnedPerRow: rows.length > 0 ? Object.keys(rows[0]) : [] }
+    : null;
+
+  res.json({
+    success: true,
+    data: {
+      answer,
+      rows,
+      intent,
+      recommendation,
+      ...(includeInspector ? { inspector: buildInspector({ rbacPassed: true, executedService, sanitization }) } : {}),
+    },
+  });
 });
 
 module.exports = { runQuery };
