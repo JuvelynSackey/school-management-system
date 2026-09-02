@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MotionConfig } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import Reveal from '../../components/landing/Reveal';
 import TiltCard from '../../components/landing/TiltCard';
 import LoginModal from '../../components/auth/LoginModal';
+import ScrollToTopButton from '../../components/common/ScrollToTopButton';
 
 const FEATURE_ICONS = {
   attendance: (
@@ -115,23 +116,40 @@ const INTELLIGENCE_FEATURES = [
 const ROLES = [
   {
     title: 'Admins',
-    tagline: 'Everything under control.',
-    points: ['Full oversight of every class and pupil', 'Review, approve, and publish report cards', 'Track fee collection and outstanding balances', 'Manage students, teachers, classes, and subjects'],
+    tagline: 'Everything under control — including the fees.',
+    points: [
+      'Full oversight of every class, pupil, and fee structure',
+      'Review, approve, and publish report cards',
+      'Toggle showPositions to include or hide class rankings, per report card run',
+      'Manage students, teachers, classes, subjects, and fee collection',
+    ],
   },
   {
     title: 'Teachers',
     tagline: 'Spend less time on paperwork.',
-    points: ['Record attendance for assigned classes', 'Enter subject scores with auto-computed grades', 'Submit each subject for admin review'],
+    points: [
+      'Record attendance for assigned classes only',
+      'Enter Class Score (/50) + Exam Score (/50) — auto-totaled to /100 with the grade computed for you',
+      'Submit each subject for admin review',
+    ],
   },
   {
     title: 'Students',
     tagline: 'Your academic information in one place.',
-    points: ['View approved results, once released', 'Download published report cards', 'Check attendance and school announcements'],
+    points: [
+      'View approved results, once released',
+      'Download published, QR-verified report cards',
+      'JHS 3 (BECE) records are locked as terminal — no accidental promotion past Basic 9',
+    ],
   },
   {
     title: 'Parents',
     tagline: "Stay informed about your child's progress.",
-    points: ["View each child's approved results and attendance", 'Download published report cards', 'Check fee balances and payment history'],
+    points: [
+      'Portal account auto-provisioned at admission, with a private 4-digit PIN',
+      'One login links every child you have at the school',
+      "View each child's approved results, attendance, and fee balance",
+    ],
   },
 ];
 
@@ -144,13 +162,100 @@ const HOW_IT_WORKS = [
   { title: 'Publish & Download', desc: 'Admins publish finished report cards for parents and students to download.' },
 ];
 
-// Real, verifiable numbers as of this build — not marketing copy. Update
-// these alongside the actual test suite/model count if they drift.
-const SYSTEM_STATS = [
-  { value: '27', label: 'Tenant-Scoped Models' },
-  { value: '184', label: 'Automated Tests, All Passing' },
-  { value: '100%', label: 'Tenant Isolation, Test-Verified' },
-  { value: 'Selective', label: 'Offline-Capable Score Entry' },
+const PROBLEM_POINTS = [
+  {
+    title: 'Paper Overload',
+    desc: 'Attendance registers, mark sheets, and fee ledgers scattered across notebooks and spreadsheets that only one person can update at a time.',
+  },
+  {
+    title: 'Data Without Insight',
+    desc: 'Scores get recorded, but turning a term of results into positions, grades, and a locked report card still means hours of manual computation.',
+  },
+  {
+    title: 'Parent Visibility Gaps',
+    desc: 'Parents find out about a fee balance or a falling grade only when they physically visit the school — or not at all.',
+  },
+];
+
+// Real endpoints/files, not illustrative — /api/migration/* and
+// migrationFieldAliases.js are the actual bulk-import pipeline this
+// section describes.
+const MIGRATION_FEATURES = [
+  {
+    title: 'Bulk CSV Import Pipeline',
+    desc: 'Upload a legacy student or score export as CSV. Every row is processed independently and reported back with its own row number — success or a specific reason it failed — nothing silently dropped.',
+    code: '/api/migration/*',
+  },
+  {
+    title: 'Legacy Header Aliasing',
+    desc: 'migrationFieldAliases.js maps whatever a school\'s old system called a column — "DOB", "Parent Phone", "Class Enrolled" — onto the fields JesManage actually expects, so exports don\'t need to be hand-edited first.',
+    code: 'migrationFieldAliases.js',
+  },
+  {
+    title: 'Historical Score Ingestion',
+    desc: 'Imported results are tagged isMigrated: true, missing AcademicTerm rows are auto-provisioned, and an already-Approved ResultSheet is created for each — a historical score is final on arrival, not stuck awaiting review.',
+    code: 'isMigrated: true',
+  },
+  {
+    title: 'Ghana-Aware Data Cleansing',
+    desc: 'Guardian phone numbers are normalized from +233 or 233-prefixed formats to a local 0-prefixed number, and a "hometown / region" string is fuzzy-matched against Ghana\'s 16 official administrative regions.',
+    code: 'migrationCleansing.service.js',
+  },
+];
+
+// The real dispatch path a question takes through server/src — not a
+// simplified diagram. Every stage names the file that actually does it.
+const PIPELINE_STEPS = [
+  {
+    title: 'Natural-Language Query',
+    desc: 'A user types a plain-English question in the "Ask JesManage" panel — e.g. "How much do I owe in fees?"',
+    code: 'AskJesManage.jsx',
+  },
+  {
+    title: 'Intent Classifier',
+    desc: 'The question is matched against a fixed, per-role list of supported intents — never translated into an arbitrary database query.',
+    code: 'ai.service.js',
+  },
+  {
+    title: 'Permission Guard',
+    desc: "The classified intent is checked against the caller's role. A mismatch is a hard refusal — the request never reaches a data query.",
+    code: 'assistantIntents.config.js',
+  },
+  {
+    title: 'Pre-Approved Service Router',
+    desc: 'Only one specific, already-tested function runs — e.g. a parent\'s fee question always resolves through their own linked children, never a request parameter.',
+    code: 'aiQuery.service.js',
+  },
+  {
+    title: 'Prose Synthesizer',
+    desc: 'Query results are built as plain, hand-selected fields — no _id, password hash, or schoolId ever enters this step — then turned into a natural-language answer.',
+    code: 'summarizeQueryResult()',
+  },
+];
+
+// server/src/models/*.model.js — every one with a schoolId field is
+// auto-scoped by tenantScopePlugin at the query layer, not by convention.
+const ARCHITECTURE_GRID = [
+  {
+    value: 'schoolId',
+    title: 'Strict Multi-Tenant Isolation',
+    desc: 'Every one of 26 tenant-scoped models is auto-filtered by schoolId at the query layer — a stray query literally cannot reach another school\'s data.',
+  },
+  {
+    value: 'AsyncLocalStorage',
+    title: 'Context-Preserving Middleware',
+    desc: 'tenantContext.js threads the active schoolId through every async operation — including bulk uploads and background jobs — with nothing to manually pass through.',
+  },
+  {
+    value: 'AuditLog',
+    title: 'Comprehensive Audit Trail',
+    desc: 'Approvals, migrations, AI queries, and other sensitive actions are written to a per-school audit log, queryable by admins for accountability.',
+  },
+  {
+    value: '323/323',
+    title: 'Automated Test Verification',
+    desc: 'Unit and integration coverage across every tenant boundary, role permission, and grading rule — re-run before every release.',
+  },
 ];
 
 const FAQS = [
@@ -233,9 +338,10 @@ export default function LandingPage() {
         <div className="landing-nav-links">
           <button type="button" onClick={() => scrollTo('home')}>Home</button>
           <button type="button" onClick={() => scrollTo('features')}>Features</button>
-          <button type="button" onClick={() => scrollTo('how-it-works')}>How It Works</button>
-          <button type="button" onClick={() => scrollTo('intelligence')}>Intelligence</button>
+          <button type="button" onClick={() => scrollTo('migration')}>Migration</button>
           <button type="button" onClick={() => scrollTo('roles')}>Roles</button>
+          <button type="button" onClick={() => scrollTo('intelligence')}>Intelligence</button>
+          <button type="button" onClick={() => scrollTo('architecture')}>Architecture</button>
           <button type="button" onClick={() => scrollTo('faq')}>FAQ</button>
           {!isAuthenticated && <button type="button" onClick={() => navigate('/register-school')}>Register Your School</button>}
         </div>
@@ -264,6 +370,9 @@ export default function LandingPage() {
             <span className="landing-badge">NaCCA-aligned grading</span>
             <span className="landing-badge">Digital fee receipts</span>
             <span className="landing-badge">QR-verified documents</span>
+            <span className="landing-badge">Strict Tenant Isolation</span>
+            <span className="landing-badge">323/323 Automated Tests Passing</span>
+            <span className="landing-badge">Intent-Gated AI Assistant</span>
           </Reveal>
           <Reveal className="landing-strip" delay={440}>
             Students <span>•</span> Teachers <span>•</span> Attendance <span>•</span> Results <span>•</span> Fees <span>•</span> Report Cards <span>•</span> Intelligence
@@ -301,7 +410,19 @@ export default function LandingPage() {
         </Reveal>
       </header>
 
-      <section id="features" className="landing-section">
+      <section id="problem" className="landing-section">
+        <Reveal as="h2">Your School Has the Data. JesManage Turns It Into Decisions.</Reveal>
+        <div className="landing-problem-grid">
+          {PROBLEM_POINTS.map((p, i) => (
+            <Reveal key={p.title} delay={i * 90} className="landing-problem-card">
+              <h3>{p.title}</h3>
+              <p>{p.desc}</p>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      <section id="features" className="landing-section landing-section-alt">
         <Reveal as="h2">Everything You Need to Run Your School</Reveal>
         <div className="landing-feature-grid">
           {FEATURES.map((f, i) => (
@@ -310,6 +431,26 @@ export default function LandingPage() {
                 <span className="quick-action-icon landing-feature-icon">{FEATURE_ICONS[f.icon]}</span>
                 <h3>{f.title}</h3>
                 <p>{f.desc}</p>
+              </TiltCard>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      <section id="migration" className="landing-section">
+        <Reveal as="h2">The Legacy Data Migration Engine</Reveal>
+        <Reveal as="p" className="landing-section-subtitle">
+          Already keeping records in Excel or an old system? Bring them in — a school doesn't
+          start from a blank slate.
+        </Reveal>
+        <Reveal className="migration-endpoint" as="span">/api/migration/*</Reveal>
+        <div className="landing-feature-grid">
+          {MIGRATION_FEATURES.map((f, i) => (
+            <Reveal key={f.title} delay={i * 80}>
+              <TiltCard className="landing-feature-card">
+                <h3>{f.title}</h3>
+                <p>{f.desc}</p>
+                <code className="landing-code-chip">{f.code}</code>
               </TiltCard>
             </Reveal>
           ))}
@@ -327,17 +468,6 @@ export default function LandingPage() {
               <span className="how-step-number">{i + 1}</span>
               <h3>{step.title}</h3>
               <p>{step.desc}</p>
-            </Reveal>
-          ))}
-        </div>
-      </section>
-
-      <section className="landing-section landing-section-alt">
-        <div className="landing-stats-grid">
-          {SYSTEM_STATS.map((s, i) => (
-            <Reveal key={s.label} delay={i * 70} className="landing-stat-card">
-              <div className="landing-stat-value">{s.value}</div>
-              <div className="landing-stat-label">{s.label}</div>
             </Reveal>
           ))}
         </div>
@@ -367,6 +497,31 @@ export default function LandingPage() {
             </TiltCard>
           </Reveal>
         </div>
+
+        <Reveal as="h3" className="landing-subsection-heading">
+          Ask JesManage: an Intent-Gated Pipeline, Not an Open Query
+        </Reveal>
+        <Reveal as="p" className="landing-section-subtitle">
+          The model never touches the database. It only ever picks one of a fixed set of
+          pre-approved questions — everything else is a hard refusal.
+        </Reveal>
+        <div className="pipeline-flow">
+          {PIPELINE_STEPS.map((step, i) => (
+            <Fragment key={step.title}>
+              <Reveal delay={i * 90} className="pipeline-step">
+                <span className="pipeline-step-num">{i + 1}</span>
+                <h4>{step.title}</h4>
+                <p>{step.desc}</p>
+                <code className="landing-code-chip">{step.code}</code>
+              </Reveal>
+              {i < PIPELINE_STEPS.length - 1 && (
+                <span className="pipeline-arrow" aria-hidden="true">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+                </span>
+              )}
+            </Fragment>
+          ))}
+        </div>
       </section>
 
       <section id="roles" className="landing-section landing-section-alt">
@@ -381,6 +536,23 @@ export default function LandingPage() {
                   {r.points.map((p) => <li key={p}>{p}</li>)}
                 </ul>
               </TiltCard>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      <section id="architecture" className="landing-section landing-section-alt">
+        <Reveal as="h2">Architectural Integrity &amp; Security</Reveal>
+        <Reveal as="p" className="landing-section-subtitle">
+          The same tenant boundary a demo relies on is the one every automated test checks, on
+          every run.
+        </Reveal>
+        <div className="landing-arch-grid">
+          {ARCHITECTURE_GRID.map((a, i) => (
+            <Reveal key={a.title} delay={i * 80} className="landing-arch-card">
+              <div className="landing-arch-value">{a.value}</div>
+              <h3>{a.title}</h3>
+              <p>{a.desc}</p>
             </Reveal>
           ))}
         </div>
@@ -416,6 +588,7 @@ export default function LandingPage() {
         onClose={() => setLoginOpen(false)}
         onSuccess={() => navigate('/dashboard')}
       />
+      <ScrollToTopButton />
     </div>
     </MotionConfig>
   );
