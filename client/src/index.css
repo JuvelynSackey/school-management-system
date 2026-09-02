@@ -706,6 +706,28 @@ th { color: var(--text-muted); font-weight: 500; font-size: 12px; text-transform
 .badge-rose { background: var(--rose-bg); color: var(--rose); }
 .badge-cyan { background: var(--intelligence-bg); color: var(--intelligence); }
 
+/* Data Quality Center */
+.dq-score-panel { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+.dq-score-ring {
+  width: 108px; height: 108px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; position: relative;
+  background: conic-gradient(var(--dq-ring-color) calc(var(--dq-pct) * 1%), var(--border) 0);
+}
+.dq-score-ring::before { content: ''; position: absolute; inset: 9px; border-radius: 50%; background: var(--surface); }
+.dq-score-value { position: relative; font-size: 24px; font-weight: 800; color: var(--text-h); }
+.dq-score-ring-success { --dq-ring-color: var(--success); }
+.dq-score-ring-warning { --dq-ring-color: var(--warning); }
+.dq-score-ring-danger { --dq-ring-color: var(--danger); }
+
+.dq-category-card { padding: 0; overflow: hidden; }
+.dq-category-header {
+  width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  background: none; border: none; cursor: pointer; text-align: left; padding: 18px 22px; font-size: 14.5px; color: var(--text-h);
+}
+.dq-category-header:hover { background: var(--bg); }
+.dq-chevron { color: var(--text-muted); font-size: 16px; width: 16px; text-align: center; flex-shrink: 0; }
+.dq-category-body { padding: 0 22px 18px; }
+
 /* Solid, vivid variant — used for headline indicators like exam grades,
    mirroring the color-coded grade chips in the design reference. */
 .badge-solid { color: #fff; font-weight: 700; padding: 3px 11px; }

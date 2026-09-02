@@ -30,6 +30,7 @@ import SchoolSettings from '../pages/settings/SchoolSettings';
 import DataMigration from '../pages/system/DataMigration';
 import AuditLogPage from '../pages/audit/AuditLogPage';
 import AnalyticsPage from '../pages/analytics/AnalyticsPage';
+import DataQualityCenter from '../pages/analytics/DataQualityCenter';
 import AssessmentSheetsPage from '../pages/assessmentSheets/AssessmentSheetsPage';
 import MyAccount from '../pages/account/MyAccount';
 import Announcements from '../pages/announcements/Announcements';
@@ -70,6 +71,7 @@ export default function AppRoutes() {
             <Route path="/reports" element={<ReportsHub />} />
             <Route path="/id-cards" element={<IDCards />} />
             <Route path="/analytics" element={<AnalyticsPage />} />
+            <Route path="/analytics/data-quality" element={<DataQualityCenter />} />
             <Route path="/school-settings" element={<SchoolSettings />} />
             <Route path="/migration" element={<DataMigration />} />
             <Route path="/audit-log" element={<AuditLogPage />} />

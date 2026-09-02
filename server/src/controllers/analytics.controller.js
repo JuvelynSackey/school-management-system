@@ -7,6 +7,7 @@ const { getFeeBalance } = require('../services/fees.service');
 const {
   round1, classAverages, subjectAverages, overallPassRate, resolvePreviousTerm,
 } = require('../services/academicAnalytics.service');
+const { getDataQualityReport } = require('../services/dataQuality.service');
 const { UNRANKED_LEVEL_ORDER } = require('../constants/gradeLevels');
 
 // GET /analytics/academic?academicTermId=
@@ -113,4 +114,10 @@ const getFinancial = asyncHandler(async (req, res, next) => {
   res.json({ success: true, data: { overall, byClass: byClassOut } });
 });
 
-module.exports = { getAcademic, getFinancial };
+// GET /analytics/data-quality
+const getDataQuality = asyncHandler(async (req, res) => {
+  const report = await getDataQualityReport();
+  res.json({ success: true, data: report });
+});
+
+module.exports = { getAcademic, getFinancial, getDataQuality };

@@ -9,5 +9,6 @@ router.use(authenticate, authorize('admin'));
 
 router.get('/academic', controller.getAcademic);
 router.get('/financial', controller.getFinancial);
+router.get('/data-quality', controller.getDataQuality);
 
 module.exports = router;

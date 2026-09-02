@@ -109,6 +109,7 @@ export default function AppShell() {
                   <NavLink
                     key={item.to}
                     to={item.to}
+                    end
                     title={item.label}
                     onClick={() => setSidebarOpen(false)}
                     className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}${item.to === '/intelligence' ? ' sidebar-link--intelligence' : ''}`}
