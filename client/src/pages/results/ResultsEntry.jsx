@@ -247,6 +247,27 @@ export default function ResultsEntry({ initialClassId = '', initialSubjectId = '
     setRoster((prev) => prev.map((r) => (r.studentId === studentId ? { ...r, [field]: value } : r)));
   };
 
+  // scheme.classScoreConfig comes straight off GradingScheme (already
+  // fetched above) -- no separate request needed. Decomposition only
+  // actually takes effect once a school has both turned it on AND defined
+  // at least one component; an enabled: true with an empty components list
+  // (a scheme mid-setup) falls back to the plain classScore input.
+  const isDecomposed = Boolean(scheme?.classScoreConfig?.enabled) && (scheme?.classScoreConfig?.components?.length > 0);
+
+  // classScore is kept in sync with the live component sum as the teacher
+  // types, so every existing consumer of r.classScore (rowTotal, the
+  // anomaly stats, the grade/total preview, handleSave's payload check)
+  // keeps working completely unchanged -- decomposition only changes how
+  // that number gets typed in, never how it's read downstream.
+  const setDetailField = (studentId, componentKey, value) => {
+    setRoster((prev) => prev.map((r) => {
+      if (r.studentId !== studentId) return r;
+      const details = { ...(r.classScoreDetails || {}), [componentKey]: value };
+      const sum = Object.values(details).reduce((acc, v) => (v === '' || v === null || v === undefined ? acc : acc + Number(v)), 0);
+      return { ...r, classScoreDetails: details, classScore: sum };
+    }));
+  };
+
   const isLocked = sheet?.status === 'Submitted' || sheet?.status === 'Approved';
   const canSubmit = sheet && (sheet.status === 'Draft' || sheet.status === 'Rejected');
   const missingScores = roster.some((r) => r.classScore === '' || r.examScore === '' || r.classScore === null || r.examScore === null);
@@ -261,7 +282,9 @@ export default function ResultsEntry({ initialClassId = '', initialSubjectId = '
       academicTermId,
       records: roster
         .filter((r) => r.classScore !== '' && r.examScore !== '' && r.classScore !== null && r.examScore !== null)
-        .map((r) => ({ studentId: r.studentId, classScore: Number(r.classScore), examScore: Number(r.examScore) })),
+        .map((r) => (isDecomposed
+          ? { studentId: r.studentId, classScoreDetails: r.classScoreDetails || {}, examScore: Number(r.examScore) }
+          : { studentId: r.studentId, classScore: Number(r.classScore), examScore: Number(r.examScore) })),
     };
 
     if (!isOnline) {
@@ -387,7 +410,14 @@ export default function ResultsEntry({ initialClassId = '', initialSubjectId = '
               <thead>
                 <tr>
                   <th>Name</th><th>Admission No.</th>
-                  <th>Class Score ({scheme?.classScoreMax ?? 50})</th>
+                  {isDecomposed ? (
+                    <>
+                      {scheme.classScoreConfig.components.map((c) => <th key={c.key}>{c.label} (/{c.maxMarks})</th>)}
+                      <th>Class Score ({scheme.classScoreMax})</th>
+                    </>
+                  ) : (
+                    <th>Class Score ({scheme?.classScoreMax ?? 50})</th>
+                  )}
                   <th>Exam Score ({scheme?.examScoreMax ?? 50})</th>
                   <th>Total</th><th>Grade</th><th>Position</th>
                   {isAdmin && sheet?.status === 'Approved' && <th />}
@@ -401,17 +431,44 @@ export default function ResultsEntry({ initialClassId = '', initialSubjectId = '
                     <tr key={r.studentId}>
                       <td>{r.firstName} {r.lastName}</td>
                       <td>{r.admissionNo}</td>
-                      <td>
-                        <input
-                          type="number"
-                          min="0"
-                          max={scheme?.classScoreMax ?? 50}
-                          value={r.classScore}
-                          onChange={(e) => setField(r.studentId, 'classScore', e.target.value)}
-                          disabled={isLocked}
-                          style={{ width: 70, padding: '6px 8px', border: '1px solid var(--border)', borderRadius: 6 }}
-                        />
-                      </td>
+                      {isDecomposed ? (
+                        <>
+                          {scheme.classScoreConfig.components.map((c) => {
+                            const value = r.classScoreDetails?.[c.key] ?? '';
+                            const overMax = value !== '' && Number(value) > c.maxMarks;
+                            return (
+                              <td key={c.key}>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max={c.maxMarks}
+                                  value={value}
+                                  onChange={(e) => setDetailField(r.studentId, c.key, e.target.value)}
+                                  disabled={isLocked}
+                                  style={{
+                                    width: 60, padding: '6px 8px', borderRadius: 6,
+                                    border: `1px solid ${overMax ? 'var(--danger)' : 'var(--border)'}`,
+                                  }}
+                                  title={overMax ? `${c.label} cannot exceed ${c.maxMarks}` : undefined}
+                                />
+                              </td>
+                            );
+                          })}
+                          <td>{r.classScore !== '' ? r.classScore : '—'}</td>
+                        </>
+                      ) : (
+                        <td>
+                          <input
+                            type="number"
+                            min="0"
+                            max={scheme?.classScoreMax ?? 50}
+                            value={r.classScore}
+                            onChange={(e) => setField(r.studentId, 'classScore', e.target.value)}
+                            disabled={isLocked}
+                            style={{ width: 70, padding: '6px 8px', border: '1px solid var(--border)', borderRadius: 6 }}
+                          />
+                        </td>
+                      )}
                       <td>
                         <input
                           type="number"
@@ -449,7 +506,16 @@ export default function ResultsEntry({ initialClassId = '', initialSubjectId = '
                     </tr>
                   );
                 })}
-                {roster.length === 0 && <tr><td colSpan={7} className="muted">No students in this class.</td></tr>}
+                {roster.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={6 + (isDecomposed ? scheme.classScoreConfig.components.length : 0) + (isAdmin && sheet?.status === 'Approved' ? 1 : 0)}
+                      className="muted"
+                    >
+                      No students in this class.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
             {roster.length > 0 && (

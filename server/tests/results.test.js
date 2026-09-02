@@ -190,6 +190,37 @@ describe('Class Score Decomposition (recordBulk)', () => {
     expect(res.body.data[0].classScoreDetails).toEqual({ exercise: 18, assignment: 12, project: 14 });
   });
 
+  test('getRoster returns a previously-saved classScoreDetails so the entry screen can pre-fill it on reopen', async () => {
+    const school = await fixtures.createSchool(models);
+    const { classRow, subject, term, teacherUser, teacherPassword, student } = await setupClassroom(school._id);
+    await enableDecomposition(school._id, STANDARD_COMPONENTS);
+    const teacherToken = await fixtures.login(app, school.slug, teacherUser.email, teacherPassword);
+
+    await request(app).post('/api/results/bulk').set(fixtures.authHeader(teacherToken)).send({
+      classId: classRow.id, subjectId: subject.id, academicTermId: term.id,
+      records: [{ studentId: student.id, classScoreDetails: { exercise: 18, assignment: 12, project: 14 }, examScore: 40 }],
+    });
+
+    const roster = await request(app).get('/api/results/roster')
+      .query({ classId: classRow.id, subjectId: subject.id, academicTermId: term.id })
+      .set(fixtures.authHeader(teacherToken));
+    expect(roster.status).toBe(200);
+    const row = roster.body.data.find((r) => r.studentId === student.id);
+    expect(row.classScoreDetails).toEqual({ exercise: 18, assignment: 12, project: 14 });
+  });
+
+  test('getRoster reports classScoreDetails: null for a student with no result yet', async () => {
+    const school = await fixtures.createSchool(models);
+    const { classRow, subject, term, teacherUser, teacherPassword } = await setupClassroom(school._id);
+    await enableDecomposition(school._id, STANDARD_COMPONENTS);
+    const teacherToken = await fixtures.login(app, school.slug, teacherUser.email, teacherPassword);
+
+    const roster = await request(app).get('/api/results/roster')
+      .query({ classId: classRow.id, subjectId: subject.id, academicTermId: term.id })
+      .set(fixtures.authHeader(teacherToken));
+    expect(roster.body.data[0].classScoreDetails).toBeNull();
+  });
+
   test('a raw classScore sent alongside classScoreDetails is ignored — the computed sum always wins', async () => {
     const school = await fixtures.createSchool(models);
     const { classRow, subject, term, teacherUser, teacherPassword, student } = await setupClassroom(school._id);

@@ -63,6 +63,10 @@ const getRoster = asyncHandler(async (req, res, next) => {
       lastName: s.lastName,
       admissionNo: s.admissionNo,
       classScore: existing?.classScore ?? '',
+      // A Mongoose Map, not a plain object -- doesn't survive JSON.stringify
+      // as-is (this row is a hand-built plain object, not the Result
+      // document itself, so its own toJSON transform never runs on it).
+      classScoreDetails: existing?.classScoreDetails ? Object.fromEntries(existing.classScoreDetails) : null,
       examScore: existing?.examScore ?? '',
       totalScore: existing?.totalScore ?? null,
       grade: existing?.grade ?? null,
