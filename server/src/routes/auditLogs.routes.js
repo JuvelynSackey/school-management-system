@@ -7,6 +7,7 @@ const router = express.Router();
 
 router.use(authenticate, authorize('admin'));
 
+router.get('/export', controller.exportLogs);
 router.get('/', controller.list);
 
 module.exports = router;

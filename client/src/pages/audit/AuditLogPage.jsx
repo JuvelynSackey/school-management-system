@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { listAuditLogs } from '../../api/auditLogs.api';
+import { listAuditLogs, downloadAuditLogExport } from '../../api/auditLogs.api';
 
 const ENTITY_TYPES = ['Fee', 'Payment', 'Result', 'ResultSheet', 'TerminalReport', 'Student', 'Teacher', 'Admission', 'Guardian'];
 const LIMIT = 50;
@@ -11,6 +11,20 @@ export default function AuditLogPage() {
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    setExportError('');
+    try {
+      await downloadAuditLogExport(entityType ? { entityType } : {});
+    } catch (err) {
+      setExportError(err.response?.data?.message || 'Failed to export the audit log.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const loadPage = async (nextPage, reset) => {
     setIsLoading(true);
@@ -47,8 +61,12 @@ export default function AuditLogPage() {
             <option value="">All record types</option>
             {ENTITY_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
+          <button type="button" className="btn-secondary" onClick={handleExport} disabled={isExporting}>
+            {isExporting ? 'Exporting…' : '⬇ Export CSV'}
+          </button>
         </div>
 
+        {exportError && <div className="alert-error">{exportError}</div>}
         {error && <div className="alert-error">{error}</div>}
         {!error && (
           <table>
