@@ -20,14 +20,71 @@ const CURRICULUM_TEMPLATES = {
   blank: [],
 };
 
-const STANDARD_SUBJECTS = [
-  { name: 'Mathematics', code: 'MATH' },
-  { name: 'English Language', code: 'ENG' },
-  { name: 'Integrated Science', code: 'SCI' },
-  { name: 'Social Studies', code: 'SOC' },
-  { name: 'Computing / ICT', code: 'COMP' },
-  { name: 'Religious & Moral Education', code: 'RME' },
-];
+// A finer split than Class.stage: Basic 1-3 and Basic 4-6 share a stage
+// ('Primary') but not a NaCCA subject list (French starts at Basic 4;
+// Basic 1-3 keeps Physical Education & Health in that slot instead), and
+// Nursery/KG both sit under no single existing stage split.
+const CURRICULUM_BUCKET_FOR_CLASS = (name) => {
+  if (name.startsWith('Nursery')) return 'nursery';
+  if (name.startsWith('KG')) return 'kg';
+  if (['Basic 1', 'Basic 2', 'Basic 3'].includes(name)) return 'lowerPrimary';
+  if (['Basic 4', 'Basic 5', 'Basic 6'].includes(name)) return 'upperPrimary';
+  if (name.startsWith('JHS')) return 'jhs';
+  return null;
+};
+
+// NaCCA-aligned subject list per bucket. Deliberately no core/elective
+// flag -- Subject and ClassSubject have no such field in this schema, and
+// nothing here treats one subject as more "core" than another; the BECE
+// Candidate Readiness Dashboard's own subjects_configured check only asks
+// whether a class has ANY ClassSubject links at all, not which ones.
+const NACCA_SUBJECTS_BY_BUCKET = {
+  nursery: [
+    { name: 'Language and Literacy', code: 'LANG' },
+    { name: 'Numeracy', code: 'NUM' },
+    { name: 'Creative Arts', code: 'CA' },
+    { name: 'Our World Our People', code: 'OWOP' },
+    { name: 'Social and Emotional Development', code: 'SED' },
+  ],
+  kg: [
+    { name: 'Language and Literacy', code: 'LANG' },
+    { name: 'Numeracy', code: 'NUM' },
+    { name: 'Our World Our People', code: 'OWOP' },
+    { name: 'Creative Arts', code: 'CA' },
+  ],
+  lowerPrimary: [
+    { name: 'English Language', code: 'ENG' },
+    { name: 'Mathematics', code: 'MATH' },
+    { name: 'Science', code: 'SCI' },
+    { name: 'Ghanaian Language and Culture', code: 'GLC' },
+    { name: 'Religious and Moral Education', code: 'RME' },
+    { name: 'Creative Arts', code: 'CA' },
+    { name: 'Computing', code: 'ICT' },
+    { name: 'Physical Education and Health', code: 'PEH' },
+  ],
+  upperPrimary: [
+    { name: 'English Language', code: 'ENG' },
+    { name: 'Mathematics', code: 'MATH' },
+    { name: 'Science', code: 'SCI' },
+    { name: 'Ghanaian Language and Culture', code: 'GLC' },
+    { name: 'Religious and Moral Education', code: 'RME' },
+    { name: 'Creative Arts', code: 'CA' },
+    { name: 'Computing', code: 'ICT' },
+    { name: 'French', code: 'FRE' },
+  ],
+  jhs: [
+    { name: 'English Language', code: 'ENG' },
+    { name: 'Mathematics', code: 'MATH' },
+    { name: 'Integrated Science', code: 'ISCI' },
+    { name: 'Social Studies', code: 'SOC' },
+    { name: 'Ghanaian Language and Culture', code: 'GLC' },
+    { name: 'Religious and Moral Education', code: 'RME' },
+    { name: 'Creative Arts and Design', code: 'CAD' },
+    { name: 'Career Technology', code: 'CTECH' },
+    { name: 'Computing', code: 'ICT' },
+    { name: 'French', code: 'FRE' },
+  ],
+};
 
 // Seeds a brand-new school's starting class/subject structure so it's
 // usable the moment the first admin logs in, instead of an empty shell.
@@ -52,9 +109,22 @@ const seedSchoolDefaults = async (schoolId, curriculumTemplate) => {
         levelOrder: LEVEL_ORDER_BY_GRADE[name],
       })),
     );
+
+    // Subject.name is unique per school, so a subject shared across
+    // buckets (e.g. "English Language" for both Basic 3 and JHS 2) is
+    // only ever inserted once -- deduplicated here by name before the
+    // single insertMany, across only the buckets this template's classes
+    // actually touch (a jhs_only school never gets a Nursery-only
+    // subject like "Social and Emotional Development" created for it).
+    const bucketsInUse = new Set(classNames.map((name) => CURRICULUM_BUCKET_FOR_CLASS(name)).filter(Boolean));
+    const subjectByName = new Map();
+    bucketsInUse.forEach((bucket) => {
+      (NACCA_SUBJECTS_BY_BUCKET[bucket] || []).forEach((s) => subjectByName.set(s.name, s));
+    });
     const subjects = await Subject.insertMany(
-      STANDARD_SUBJECTS.map((s) => ({ schoolId, name: s.name, code: s.code })),
+      [...subjectByName.values()].map((s) => ({ schoolId, name: s.name, code: s.code })),
     );
+    const subjectIdByName = new Map(subjects.map((s) => [s.name, s._id]));
 
     // academicTermId: null — a brand-new school has no AcademicTerm yet;
     // the existing subjects.controller.js assignToClass action already
@@ -62,9 +132,10 @@ const seedSchoolDefaults = async (schoolId, curriculumTemplate) => {
     // is a partial index that excludes null-typed academicTermId docs).
     const links = [];
     classes.forEach((c) => {
-      subjects.forEach((s) => {
+      const bucket = CURRICULUM_BUCKET_FOR_CLASS(c.name);
+      (NACCA_SUBJECTS_BY_BUCKET[bucket] || []).forEach((s) => {
         links.push({
-          schoolId, classId: c._id, subjectId: s._id, academicTermId: null,
+          schoolId, classId: c._id, subjectId: subjectIdByName.get(s.name), academicTermId: null,
         });
       });
     });
@@ -74,4 +145,4 @@ const seedSchoolDefaults = async (schoolId, curriculumTemplate) => {
   });
 };
 
-module.exports = { seedSchoolDefaults, CURRICULUM_TEMPLATES, STANDARD_SUBJECTS };
+module.exports = { seedSchoolDefaults, CURRICULUM_TEMPLATES, NACCA_SUBJECTS_BY_BUCKET };
