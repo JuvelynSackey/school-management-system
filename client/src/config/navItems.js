@@ -33,6 +33,7 @@ export const NAV_ITEMS = [
   { to: '/id-cards', label: 'ID Cards', roles: ['admin'], group: 'REPORTS', icon: 'idcards' },
   { to: '/analytics', label: 'Analytics', roles: ['admin'], group: 'REPORTS', icon: 'analytics' },
   { to: '/analytics/data-quality', label: 'Data Quality', roles: ['admin'], group: 'REPORTS', icon: 'audit' },
+  { to: '/analytics/bece-readiness', label: 'BECE Readiness', roles: ['admin'], group: 'REPORTS', icon: 'terminalReports' },
   { to: '/audit-log', label: 'Audit Log', roles: ['admin'], group: 'REPORTS', icon: 'audit' },
   { to: '/migration', label: 'Data Migration', roles: ['admin'], group: 'SYSTEM', icon: 'bulkImport' },
   { to: '/school-settings', label: 'School Settings', roles: ['admin'], group: 'SYSTEM', icon: 'settings' },

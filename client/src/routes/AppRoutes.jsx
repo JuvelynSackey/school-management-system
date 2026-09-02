@@ -31,6 +31,7 @@ import DataMigration from '../pages/system/DataMigration';
 import AuditLogPage from '../pages/audit/AuditLogPage';
 import AnalyticsPage from '../pages/analytics/AnalyticsPage';
 import DataQualityCenter from '../pages/analytics/DataQualityCenter';
+import BeceReadinessDashboard from '../pages/analytics/BeceReadinessDashboard';
 import AssessmentSheetsPage from '../pages/assessmentSheets/AssessmentSheetsPage';
 import MyAccount from '../pages/account/MyAccount';
 import Announcements from '../pages/announcements/Announcements';
@@ -72,6 +73,7 @@ export default function AppRoutes() {
             <Route path="/id-cards" element={<IDCards />} />
             <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/analytics/data-quality" element={<DataQualityCenter />} />
+            <Route path="/analytics/bece-readiness" element={<BeceReadinessDashboard />} />
             <Route path="/school-settings" element={<SchoolSettings />} />
             <Route path="/migration" element={<DataMigration />} />
             <Route path="/audit-log" element={<AuditLogPage />} />

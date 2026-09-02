@@ -8,6 +8,7 @@ const {
   round1, classAverages, subjectAverages, overallPassRate, resolvePreviousTerm,
 } = require('../services/academicAnalytics.service');
 const { getDataQualityReport } = require('../services/dataQuality.service');
+const { getBeceReadinessReport } = require('../services/beceReadiness.service');
 const { UNRANKED_LEVEL_ORDER } = require('../constants/gradeLevels');
 
 // GET /analytics/academic?academicTermId=
@@ -120,4 +121,12 @@ const getDataQuality = asyncHandler(async (req, res) => {
   res.json({ success: true, data: report });
 });
 
-module.exports = { getAcademic, getFinancial, getDataQuality };
+// GET /analytics/bece-readiness
+const getBeceReadiness = asyncHandler(async (req, res) => {
+  const report = await getBeceReadinessReport();
+  res.json({ success: true, data: report });
+});
+
+module.exports = {
+  getAcademic, getFinancial, getDataQuality, getBeceReadiness,
+};

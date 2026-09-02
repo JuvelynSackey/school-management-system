@@ -10,5 +10,6 @@ router.use(authenticate, authorize('admin'));
 router.get('/academic', controller.getAcademic);
 router.get('/financial', controller.getFinancial);
 router.get('/data-quality', controller.getDataQuality);
+router.get('/bece-readiness', controller.getBeceReadiness);
 
 module.exports = router;
