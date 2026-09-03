@@ -25,22 +25,38 @@ const assertClassAccess = async (req, classId) => {
   throw new AppError('You do not have permission to perform this action', 403);
 };
 
-// POST /ai/remarks/suggest { reportId }
+// Headteacher remarks are typically written while an admin is reviewing an
+// already-submitted report, not just at Draft/Rejected like the teacher's
+// own remark — so the editable-status window is wider for that remark type,
+// matching exactly when the Headteacher's Remark field itself is actually
+// editable in TerminalReports.jsx (anything short of Locked/Published).
+const EDITABLE_STATUS_BY_REMARK_TYPE = {
+  teacher: ['Draft', 'Rejected'],
+  headteacher: ['Draft', 'Rejected', 'Submitted'],
+};
+
+// POST /ai/remarks/suggest { reportId, remarkType? }
 //
-// Deliberately takes only a reportId, not scores/attendance — every fact fed
-// to the model is re-read here from the database under the requester's own
-// tenant/role authorization, never trusted from the client. This is the
-// "AI -> authorized service -> MongoDB" boundary: the AI call sits behind
-// the exact same authorization check as editing the report itself, and never
-// gets broader data access than the teacher making the request already has.
+// Deliberately takes only a reportId (+ remarkType), not scores/attendance —
+// every fact fed to the model is re-read here from the database under the
+// requester's own tenant/role authorization, never trusted from the client.
+// This is the "AI -> authorized service -> MongoDB" boundary: the AI call
+// sits behind the exact same authorization check as editing the report
+// itself, and never gets broader data access than the requester already has.
 const suggestRemark = asyncHandler(async (req, res, next) => {
-  const { reportId } = req.body;
+  const { reportId, remarkType = 'teacher' } = req.body;
   const report = await TerminalReport.findById(reportId);
   if (!report) return next(new AppError('Terminal report not found', 404));
 
   await assertClassAccess(req, report.classId);
+  // The Headteacher's Remark field only ever renders for admins in the
+  // frontend — enforced here too, not just left to the UI, since a teacher
+  // otherwise has legitimate class access via assertClassAccess above.
+  if (remarkType === 'headteacher' && req.user.role !== 'admin') {
+    return next(new AppError('Only an admin can request a headteacher remark suggestion', 403));
+  }
 
-  if (!['Draft', 'Rejected'].includes(report.status)) {
+  if (!EDITABLE_STATUS_BY_REMARK_TYPE[remarkType].includes(report.status)) {
     return next(new AppError('This report is not open for editing', 400));
   }
 
@@ -58,9 +74,13 @@ const suggestRemark = asyncHandler(async (req, res, next) => {
     classPosition: report.classPosition,
     classSize,
     attendancePercent,
+    teacherRemark: report.teacherRemark || '',
   };
 
-  // "Suggest Remark" should never just dead-end the teacher — if AI isn't
+  const generate = remarkType === 'headteacher' ? aiService.generateHeadteacherRemarkSuggestions : aiService.generateRemarkSuggestions;
+  const generateFallback = remarkType === 'headteacher' ? aiService.generateFallbackHeadteacherRemarkSuggestions : aiService.generateFallbackRemarkSuggestions;
+
+  // "Suggest Remark" should never just dead-end the requester — if AI isn't
   // configured, or the live AI request itself fails (rate limit,
   // timeout, bad response), fall back to the deterministic score-banded
   // templates instead of surfacing an error.
@@ -68,13 +88,13 @@ const suggestRemark = asyncHandler(async (req, res, next) => {
   let fallbackMode = false;
   if (aiService.isAIConfigured()) {
     try {
-      suggestions = await aiService.generateRemarkSuggestions(context);
+      suggestions = await generate(context);
     } catch {
-      suggestions = aiService.generateFallbackRemarkSuggestions(context);
+      suggestions = generateFallback(context);
       fallbackMode = true;
     }
   } else {
-    suggestions = aiService.generateFallbackRemarkSuggestions(context);
+    suggestions = generateFallback(context);
     fallbackMode = true;
   }
 
@@ -83,7 +103,7 @@ const suggestRemark = asyncHandler(async (req, res, next) => {
     action: 'ai.remarkSuggested',
     entityType: 'TerminalReport',
     entityId: report.id,
-    description: `${fallbackMode ? 'Fallback' : 'AI'} remark suggestions generated for ${student.firstName} ${student.lastName}`,
+    description: `${fallbackMode ? 'Fallback' : 'AI'} ${remarkType} remark suggestions generated for ${student.firstName} ${student.lastName}`,
   });
 
   res.json({ success: true, data: { suggestions, fallbackMode } });

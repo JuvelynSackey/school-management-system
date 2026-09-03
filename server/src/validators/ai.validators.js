@@ -2,6 +2,7 @@ const { body, query } = require('express-validator');
 
 const suggestRemarkValidator = [
   body('reportId').isMongoId(),
+  body('remarkType').optional().isIn(['teacher', 'headteacher']).withMessage('remarkType must be teacher or headteacher'),
 ];
 
 const adminQueryValidator = [

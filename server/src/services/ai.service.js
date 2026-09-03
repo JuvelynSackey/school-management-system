@@ -190,6 +190,77 @@ const scoreBand = (averageScore) => {
 
 const generateFallbackRemarkSuggestions = (context) => FALLBACK_TEMPLATES[scoreBand(Number(context.averageScore) || 0)](context);
 
+// Headteacher remarks are a distinct register from the class teacher's —
+// a brief closing endorsement on the report, not detailed commentary — and
+// where available, take the teacher's own remark as context so the two
+// remarks don't just repeat each other. teacherRemark may be an empty
+// string (headteacher can act before the teacher has written one), and the
+// prompt is told that explicitly rather than silently omitting it.
+const buildHeadteacherRemarkPrompt = ({
+  studentFirstName, averageScore, classPosition, classSize, attendancePercent, teacherRemark,
+}) => {
+  const lines = [
+    'You are helping a headteacher at a Ghanaian basic school write a short',
+    "closing remark for a student's term report card, underneath the class",
+    "teacher's own remark. Use only the facts given below — never invent or",
+    'assume anything beyond them.',
+    '',
+    `Student: ${studentFirstName}`,
+    `Term average: ${averageScore}%`,
+    classPosition && classSize ? `Class position: ${classPosition} of ${classSize}` : null,
+    attendancePercent != null ? `Attendance: ${attendancePercent}%` : null,
+    teacherRemark ? `Class teacher's remark: "${teacherRemark}"` : "Class teacher's remark: not yet written",
+    '',
+    'Write exactly 3 different remark options. Each should be a single short',
+    'sentence, in a brief, authoritative headteacher\'s voice — a closing',
+    "endorsement of the term's result, not a repeat of the teacher's remark.",
+    'Return ONLY a JSON array of exactly 3 strings — no markdown, no code',
+    'fences, no extra commentary before or after the array.',
+  ].filter(Boolean);
+  return lines.join('\n');
+};
+
+const generateHeadteacherRemarkSuggestions = async (context) => {
+  if (!isAIConfigured()) {
+    const err = new Error('AI is not configured');
+    err.code = 'AI_NOT_CONFIGURED';
+    throw err;
+  }
+
+  const prompt = buildHeadteacherRemarkPrompt(context);
+  const data = await callAI(prompt);
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const suggestions = parseSuggestions(text);
+  if (suggestions.length === 0) {
+    const err = new Error('AI returned no usable suggestions');
+    err.code = 'AI_EMPTY_RESPONSE';
+    throw err;
+  }
+  return suggestions;
+};
+
+// Same score bands as the teacher templates, deliberately much shorter —
+// a headteacher's remark on a real report card is a one-line sign-off.
+const HEADTEACHER_FALLBACK_TEMPLATES = {
+  A: (ctx) => [
+    'An excellent result this term. Keep up the outstanding work.',
+    `A commendable performance from ${ctx.studentFirstName}. Well done.`,
+    'A very pleasing result — well earned. Keep up this standard.',
+  ],
+  B: (ctx) => [
+    'A satisfactory result this term. Continued effort will bring further improvement.',
+    `${ctx.studentFirstName} is making steady progress. Keep working hard.`,
+    'A fair result — more consistent effort next term will help raise it further.',
+  ],
+  C: (ctx) => [
+    'This result calls for closer attention and more consistent effort next term.',
+    `${ctx.studentFirstName} can do better with more focused effort and regular attendance.`,
+    'A challenging term. Extra support at home is encouraged going forward.',
+  ],
+};
+
+const generateFallbackHeadteacherRemarkSuggestions = (context) => HEADTEACHER_FALLBACK_TEMPLATES[scoreBand(Number(context.averageScore) || 0)](context);
+
 // Announcements are a single message string in this app (no separate
 // headline/body field — see Announcement.model.js), so this drafts one
 // cohesive message per option, not a title+body pair. targetLabel is
@@ -637,6 +708,9 @@ module.exports = {
   generateFallbackRemarkSuggestions,
   buildRemarkPrompt,
   parseSuggestions,
+  generateHeadteacherRemarkSuggestions,
+  generateFallbackHeadteacherRemarkSuggestions,
+  buildHeadteacherRemarkPrompt,
   generateAnnouncementSuggestions,
   generateFallbackAnnouncementSuggestions,
   buildAnnouncementPrompt,

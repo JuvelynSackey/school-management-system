@@ -202,6 +202,81 @@ describe('AI Remark Assistant', () => {
   });
 });
 
+describe('Headteacher Remark Assistant', () => {
+  test('allows a suggestion while Submitted, unlike the teacher remarkType which stays Draft/Rejected-only', async () => {
+    const school = await fixtures.createSchool(models);
+    const classRow = await fixtures.createClass(models, school._id);
+    const term = await fixtures.createTerm(models, school._id);
+    const { student } = await fixtures.createStudent(models, school._id, { classId: classRow.id, overrides: { firstName: 'Efua' } });
+    const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin7@ai-test.local' });
+    const token = await fixtures.login(app, school.slug, 'admin7@ai-test.local', password);
+
+    const report = await createDraftReport(school._id, {
+      schoolId: school._id, studentId: student.id, classId: classRow.id, academicTermId: term.id, averageScore: 75, status: 'Submitted',
+    });
+
+    const teacherRes = await request(app).post('/api/ai/remarks/suggest').set(fixtures.authHeader(token))
+      .send({ reportId: report.id, remarkType: 'teacher' });
+    expect(teacherRes.status).toBe(400);
+
+    const headteacherRes = await request(app).post('/api/ai/remarks/suggest').set(fixtures.authHeader(token))
+      .send({ reportId: report.id, remarkType: 'headteacher' });
+    expect(headteacherRes.status).toBe(200);
+    expect(headteacherRes.body.data.fallbackMode).toBe(true);
+    expect(headteacherRes.body.data.suggestions).toHaveLength(3);
+  });
+
+  test('the fallback headteacher templates are a distinct, shorter voice from the teacher templates', async () => {
+    const school = await fixtures.createSchool(models);
+    const classRow = await fixtures.createClass(models, school._id);
+    const term = await fixtures.createTerm(models, school._id);
+    const { student } = await fixtures.createStudent(models, school._id, { classId: classRow.id, overrides: { firstName: 'Kwabena' } });
+    const { password } = await fixtures.createAdmin(models, school._id, { email: 'admin8@ai-test.local' });
+    const token = await fixtures.login(app, school.slug, 'admin8@ai-test.local', password);
+
+    const report = await createDraftReport(school._id, {
+      schoolId: school._id, studentId: student.id, classId: classRow.id, academicTermId: term.id, averageScore: 90,
+    });
+
+    const teacherRes = await request(app).post('/api/ai/remarks/suggest').set(fixtures.authHeader(token))
+      .send({ reportId: report.id, remarkType: 'teacher' });
+    const headteacherRes = await request(app).post('/api/ai/remarks/suggest').set(fixtures.authHeader(token))
+      .send({ reportId: report.id, remarkType: 'headteacher' });
+
+    expect(teacherRes.body.data.suggestions).not.toEqual(headteacherRes.body.data.suggestions);
+    // The headteacher fallback templates are a one-line sign-off — meaningfully
+    // shorter than the teacher's more detailed remark, on average.
+    const avgLen = (arr) => arr.reduce((sum, s) => sum + s.length, 0) / arr.length;
+    expect(avgLen(headteacherRes.body.data.suggestions)).toBeLessThan(avgLen(teacherRes.body.data.suggestions));
+  });
+
+  test('a teacher with real class access still cannot request a headteacher remark suggestion', async () => {
+    const school = await fixtures.createSchool(models);
+    const classRow = await fixtures.createClass(models, school._id);
+    const subject = await fixtures.createSubject(models, school._id);
+    const term = await fixtures.createTerm(models, school._id);
+    const { teacher, user: teacherUser, password: teacherPassword } = await fixtures.createTeacher(models, school._id);
+    await fixtures.assignSubjectToClass(models, school._id, { classId: classRow.id, subjectId: subject.id });
+    await fixtures.assignTeacherToClass(models, school._id, { teacherId: teacher.id, subjectId: subject.id, classId: classRow.id });
+    const { student } = await fixtures.createStudent(models, school._id, { classId: classRow.id });
+    const teacherToken = await fixtures.login(app, school.slug, teacherUser.email, teacherPassword);
+
+    const report = await createDraftReport(school._id, {
+      schoolId: school._id, studentId: student.id, classId: classRow.id, academicTermId: term.id, averageScore: 75,
+    });
+
+    // Same teacher can request their own remarkType fine — proves the 403
+    // below is specifically about remarkType, not a broader access problem.
+    const teacherOwnRes = await request(app).post('/api/ai/remarks/suggest').set(fixtures.authHeader(teacherToken))
+      .send({ reportId: report.id, remarkType: 'teacher' });
+    expect(teacherOwnRes.status).toBe(200);
+
+    const headteacherRes = await request(app).post('/api/ai/remarks/suggest').set(fixtures.authHeader(teacherToken))
+      .send({ reportId: report.id, remarkType: 'headteacher' });
+    expect(headteacherRes.status).toBe(403);
+  });
+});
+
 describe('Announcement Composer', () => {
   test('with no GEMINI_API_KEY, falls back to tone templates that carry the exact objective text', async () => {
     const school = await fixtures.createSchool(models);

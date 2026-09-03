@@ -509,6 +509,13 @@ function ManageReportModal({
   const [suggestionsAreFallback, setSuggestionsAreFallback] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [suggestError, setSuggestError] = useState('');
+  // Separate state from the teacher-remark suggestion flow above — both
+  // buttons can be used independently in the same session, and each needs
+  // its own pending suggestion list rather than sharing one.
+  const [headteacherRemarkSuggestions, setHeadteacherRemarkSuggestions] = useState(null);
+  const [headteacherSuggestionsAreFallback, setHeadteacherSuggestionsAreFallback] = useState(false);
+  const [isSuggestingHeadteacher, setIsSuggestingHeadteacher] = useState(false);
+  const [headteacherSuggestError, setHeadteacherSuggestError] = useState('');
 
   useEffect(() => { listPersonalAttributes().then(setAttributes).catch(() => setAttributes([])); }, []);
 
@@ -531,6 +538,26 @@ function ManageReportModal({
       setSuggestError(err.response?.data?.message || 'Could not generate a suggestion right now.');
     } finally {
       setIsSuggesting(false);
+    }
+  };
+
+  // Same shape as handleSuggestRemark above, but requests the headteacher-
+  // voiced remarkType — a short closing endorsement rather than detailed
+  // teacher commentary, and (server-side) allowed while the report is
+  // Submitted too, not just Draft/Rejected, matching when this field is
+  // actually editable below.
+  const handleSuggestHeadteacherRemark = async () => {
+    setIsSuggestingHeadteacher(true);
+    setHeadteacherSuggestError('');
+    setHeadteacherRemarkSuggestions(null);
+    try {
+      const { suggestions, fallbackMode } = await suggestRemark(report.id, 'headteacher');
+      setHeadteacherRemarkSuggestions(suggestions);
+      setHeadteacherSuggestionsAreFallback(Boolean(fallbackMode));
+    } catch (err) {
+      setHeadteacherSuggestError(err.response?.data?.message || 'Could not generate a suggestion right now.');
+    } finally {
+      setIsSuggestingHeadteacher(false);
     }
   };
 
@@ -710,6 +737,37 @@ function ManageReportModal({
             <span>Headteacher's Remark</span>
             <textarea rows={2} value={headteacherRemark} onChange={(e) => setHeadteacherRemark(e.target.value)} disabled={readOnly} />
           </label>
+          {!readOnly && (
+            <div style={{ marginBottom: 12 }}>
+              <button type="button" className="btn-secondary" onClick={handleSuggestHeadteacherRemark} disabled={isSuggestingHeadteacher}>
+                {isSuggestingHeadteacher ? 'Generating…' : headteacherRemarkSuggestions ? '✨ Regenerate' : '✨ Suggest Remark'}
+              </button>
+              {headteacherSuggestError && <p className="muted" style={{ fontSize: 12.5, marginTop: 6 }}>{headteacherSuggestError}</p>}
+              {headteacherRemarkSuggestions && (
+                <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {headteacherSuggestionsAreFallback && (
+                    <span className="badge badge-neutral" style={{ alignSelf: 'flex-start', fontSize: 11 }}>
+                      ⚡ JesManage Intelligence (Rule-Based Fallback Mode)
+                    </span>
+                  )}
+                  {headteacherRemarkSuggestions.map((s, i) => (
+                    // eslint-disable-next-line react/no-array-index-key
+                    <div key={i} className="panel" style={{ padding: 10, display: 'flex', gap: 10, alignItems: 'center' }}>
+                      <p style={{ fontSize: 13, margin: 0, flex: 1 }}>{s}</p>
+                      <button type="button" className="btn-secondary" style={{ flexShrink: 0 }} onClick={() => { setHeadteacherRemark(s); setHeadteacherRemarkSuggestions(null); }}>
+                        Use
+                      </button>
+                    </div>
+                  ))}
+                  <p className="muted" style={{ fontSize: 11.5 }}>
+                    {headteacherSuggestionsAreFallback
+                      ? 'Rule-based templates — review before using. Using a suggestion fills the textarea above; you can still edit it before submitting.'
+                      : 'AI-generated — review before using. Using a suggestion fills the textarea above; you can still edit it before submitting.'}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
           <label className="field">
             <span>Headteacher Signature Name</span>
             <input value={headteacherSignatureName} onChange={(e) => setHeadteacherSignatureName(e.target.value)} disabled={readOnly} />
