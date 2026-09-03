@@ -6,6 +6,13 @@ import Reveal from '../../components/landing/Reveal';
 import TiltCard from '../../components/landing/TiltCard';
 import LoginModal from '../../components/auth/LoginModal';
 import ScrollToTopButton from '../../components/common/ScrollToTopButton';
+import ThemeToggle from '../../components/common/ThemeToggle';
+import HeroVisual from '../../components/landing/HeroVisual';
+import GhanaValueSection from './sections/GhanaValueSection';
+import OfflineFeatureSection from './sections/OfflineFeatureSection';
+import ReportCardShowcase from './sections/ReportCardShowcase';
+import FeesShowcase from './sections/FeesShowcase';
+import AnnouncementsShowcase from './sections/AnnouncementsShowcase';
 
 const FEATURE_ICONS = {
   attendance: (
@@ -154,12 +161,14 @@ const ROLES = [
 ];
 
 const HOW_IT_WORKS = [
-  { title: 'Register', desc: 'Admins add students, teachers, and classes to the system.' },
-  { title: 'Record', desc: 'Teachers take daily attendance and enter subject scores.' },
-  { title: 'Submit', desc: "Teachers submit each subject's scores for admin review." },
-  { title: 'Approve', desc: 'Admins review and approve — or send scores back with a reason.' },
-  { title: 'Generate & Lock', desc: 'Once every subject is approved, report cards are generated and locked.' },
-  { title: 'Publish & Download', desc: 'Admins publish finished report cards for parents and students to download.' },
+  { title: 'Student Registration', desc: 'Admins register students, link guardians, and place them into a class.' },
+  { title: 'Academic Management', desc: "Subjects, terms, and each school's own grading scheme are configured once." },
+  { title: 'Attendance & Fees', desc: 'Teachers record daily attendance; fee structures and balances are tracked in GH₵.' },
+  { title: 'Result Entry', desc: "Teachers enter Class Score (/50) and Exam Score (/50) per subject — offline if needed." },
+  { title: 'Admin Review', desc: 'Admins review each submitted subject — approve, or send it back with a reason.' },
+  { title: 'Approval', desc: 'Once every subject for a class is approved, that term\'s results are final.' },
+  { title: 'Terminal Report', desc: 'Report cards are generated, locked, and each carries a QR code anyone can verify.' },
+  { title: 'Parent/Student Access', desc: 'Parents and students see approved results and download published report cards.' },
 ];
 
 const PROBLEM_POINTS = [
@@ -258,6 +267,10 @@ const ARCHITECTURE_GRID = [
   },
 ];
 
+const SECURITY_CHAIN = [
+  'JWT Verified', 'Tenant Context Set', 'Role Authorized', 'Tenant-Scoped Query', 'Audit Logged',
+];
+
 const FAQS = [
   {
     q: 'Can teachers change marks after submitting them?',
@@ -337,6 +350,7 @@ export default function LandingPage() {
         </div>
         <div className="landing-nav-links">
           <button type="button" onClick={() => scrollTo('home')}>Home</button>
+          <button type="button" onClick={() => navigate('/demo')}>Demo</button>
           <button type="button" onClick={() => scrollTo('features')}>Features</button>
           <button type="button" onClick={() => scrollTo('migration')}>Migration</button>
           <button type="button" onClick={() => scrollTo('roles')}>Roles</button>
@@ -345,13 +359,16 @@ export default function LandingPage() {
           <button type="button" onClick={() => scrollTo('faq')}>FAQ</button>
           {!isAuthenticated && <button type="button" onClick={() => navigate('/register-school')}>Register Your School</button>}
         </div>
-        <button
-          type="button"
-          className="landing-nav-cta"
-          onClick={() => (isAuthenticated ? navigate('/dashboard') : setLoginOpen(true))}
-        >
-          {isAuthenticated ? 'Go to Dashboard' : 'Login'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <ThemeToggle />
+          <button
+            type="button"
+            className="landing-nav-cta"
+            onClick={() => (isAuthenticated ? navigate('/dashboard') : setLoginOpen(true))}
+          >
+            {isAuthenticated ? 'Go to Dashboard' : 'Login'}
+          </button>
+        </div>
       </nav>
 
       <header id="home" className="landing-hero">
@@ -379,34 +396,7 @@ export default function LandingPage() {
           </Reveal>
         </div>
         <Reveal className="landing-hero-illustration" delay={150}>
-          <TiltCard className="landing-dashboard-preview" maxTilt={7}>
-            <div className="dp-titlebar">
-              <span className="dp-dot" /><span className="dp-dot" /><span className="dp-dot" />
-              <span className="dp-titlebar-label">JesManage — Dashboard</span>
-            </div>
-            <div className="dp-body">
-              <div className="dp-nav-sliver">
-                <span className="dp-nav-pill is-active" />
-                <span className="dp-nav-pill" />
-                <span className="dp-nav-pill" />
-                <span className="dp-nav-pill" />
-              </div>
-              <div className="dp-main">
-                <div className="dp-stat-row">
-                  <div className="dp-stat-tile dp-stat-gold"><span className="dp-stat-num">482</span><span className="dp-stat-label">Students</span></div>
-                  <div className="dp-stat-tile dp-stat-cyan"><span className="dp-stat-num">96%</span><span className="dp-stat-label">Attendance</span></div>
-                  <div className="dp-stat-tile"><span className="dp-stat-num">GH₵12k</span><span className="dp-stat-label">Fees Collected</span></div>
-                </div>
-                <div className="dp-chart">
-                  <span style={{ height: '40%' }} /><span style={{ height: '65%' }} /><span style={{ height: '52%' }} />
-                  <span style={{ height: '80%' }} /><span style={{ height: '70%' }} /><span style={{ height: '90%' }} />
-                </div>
-                <div className="dp-rows">
-                  <span className="dp-row" /><span className="dp-row" style={{ width: '70%' }} /><span className="dp-row" style={{ width: '85%' }} />
-                </div>
-              </div>
-            </div>
-          </TiltCard>
+          <HeroVisual />
         </Reveal>
       </header>
 
@@ -437,6 +427,8 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <GhanaValueSection />
+
       <section id="migration" className="landing-section">
         <Reveal as="h2">The Legacy Data Migration Engine</Reveal>
         <Reveal as="p" className="landing-section-subtitle">
@@ -462,9 +454,9 @@ export default function LandingPage() {
         <Reveal as="p" className="landing-section-subtitle">
           From admission to a published report card — the real workflow behind every result.
         </Reveal>
-        <div className="how-it-works-grid">
+        <div className="how-it-works-timeline">
           {HOW_IT_WORKS.map((step, i) => (
-            <Reveal key={step.title} className="how-step" delay={i * 80}>
+            <Reveal key={step.title} className="how-step" delay={i * 70}>
               <span className="how-step-number">{i + 1}</span>
               <h3>{step.title}</h3>
               <p>{step.desc}</p>
@@ -472,6 +464,8 @@ export default function LandingPage() {
           ))}
         </div>
       </section>
+
+      <OfflineFeatureSection />
 
       <section id="intelligence" className="landing-section">
         <Reveal as="h2">Meet JesManage Intelligence</Reveal>
@@ -541,11 +535,23 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <ReportCardShowcase />
+      <FeesShowcase />
+      <AnnouncementsShowcase />
+
       <section id="architecture" className="landing-section landing-section-alt">
         <Reveal as="h2">Architectural Integrity &amp; Security</Reveal>
         <Reveal as="p" className="landing-section-subtitle">
           The same tenant boundary a demo relies on is the one every automated test checks, on
           every run.
+        </Reveal>
+        <Reveal className="migration-flow" style={{ marginBottom: '2.5rem' }}>
+          {SECURITY_CHAIN.map((step, i) => (
+            <span key={step} style={{ display: 'contents' }}>
+              <span className="migration-flow-node">{step}</span>
+              {i < SECURITY_CHAIN.length - 1 && <span className="migration-flow-arrow" aria-hidden="true">→</span>}
+            </span>
+          ))}
         </Reveal>
         <div className="landing-arch-grid">
           {ARCHITECTURE_GRID.map((a, i) => (
@@ -569,7 +575,8 @@ export default function LandingPage() {
         <Reveal as="h2">Ready to simplify school management?</Reveal>
         <Reveal as="p">Manage students, teachers, attendance, results, fees, and report cards from one platform.</Reveal>
         <Reveal className="landing-hero-ctas">
-          <button type="button" className="landing-btn-primary" onClick={() => setLoginOpen(true)}>Login</button>
+          <button type="button" className="landing-btn-primary" onClick={() => navigate('/demo')}>Explore Demo</button>
+          <button type="button" className="landing-btn-secondary" onClick={() => setLoginOpen(true)}>Login to JesManage</button>
         </Reveal>
       </section>
 
@@ -579,6 +586,11 @@ export default function LandingPage() {
           <span>JesManage</span>
         </div>
         <p>Built for Ghanaian Creche-to-Basic-9 private schools.</p>
+        <div className="landing-footer-links">
+          <button type="button" onClick={() => navigate('/demo')}>Explore Demo</button>
+          <button type="button" onClick={() => scrollTo('intelligence')}>Intelligence</button>
+          <button type="button" onClick={() => scrollTo('architecture')}>Security</button>
+        </div>
         <button type="button" className="landing-footer-login" onClick={() => setLoginOpen(true)}>Login</button>
         <p className="landing-copyright">&copy; {new Date().getFullYear()} JesManage.</p>
       </footer>

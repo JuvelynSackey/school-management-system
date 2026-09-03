@@ -44,6 +44,7 @@ import Unauthorized from '../pages/errors/Unauthorized';
 import NotFound from '../pages/errors/NotFound';
 import VerifyDocument from '../pages/verify/VerifyDocument';
 import SuperAdminRoutes from '../superAdmin/SuperAdminRoutes';
+import DemoPage from '../pages/demo/DemoPage';
 
 export default function AppRoutes() {
   return (
@@ -54,6 +55,7 @@ export default function AppRoutes() {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/verify/:type/:schoolSlug/:id" element={<VerifyDocument />} />
+      <Route path="/demo" element={<DemoPage />} />
       <Route path="/super-admin/*" element={<SuperAdminRoutes />} />
 
       <Route element={<ProtectedRoute />}>
