@@ -1,3 +1,6 @@
+import SectionHeading from '../components/SectionHeading';
+import Reveal from '../components/Reveal';
+
 // Every item verified against server/src: ghanaRegions.js (exactly 16
 // official regions), beceReadiness.service.js, grading.service.js's 50/50
 // bands, and the Creche-to-JHS-3 class hierarchy from schoolOnboarding.
@@ -11,18 +14,15 @@ const FEATURES = [
 
 export default function GhanaFeatures() {
   return (
-    <section className="border-t border-gray-100 bg-gray-50 py-16">
+    <section className="border-t border-gray-100 bg-gray-50 py-20 dark:border-gray-900 dark:bg-gray-900/40">
       <div className="mx-auto max-w-5xl px-4 sm:px-6">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold text-gray-900">Built for Ghana</h2>
-          <p className="mt-3 text-gray-600">Details a generic school platform gets wrong.</p>
-        </div>
+        <SectionHeading title="Built for Ghana" subtitle="Details a generic school platform gets wrong." />
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {FEATURES.map((f) => (
-            <div key={f.title} className="rounded-xl bg-white p-5 shadow-sm">
-              <h3 className="text-sm font-semibold text-gray-900">{f.title}</h3>
-              <p className="mt-1.5 text-sm text-gray-600">{f.desc}</p>
-            </div>
+          {FEATURES.map((f, i) => (
+            <Reveal key={f.title} delay={i * 60} className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-950">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{f.title}</h3>
+              <p className="mt-1.5 text-sm text-gray-600 dark:text-gray-400">{f.desc}</p>
+            </Reveal>
           ))}
         </div>
       </div>

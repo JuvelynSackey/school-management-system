@@ -1,97 +1,161 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import Reveal from '../components/Reveal';
 
-// Static, illustrative sample data only — this page never calls the real
-// API, so nothing here reflects (or can affect) any actual school's data.
-const SAMPLE_METRICS = {
-  'Term 1': { students: 462, attendance: 94, fees: 98200 },
-  'Term 2': { students: 482, attendance: 96, fees: 128400 },
-  'Term 3': { students: 479, attendance: 93, fees: 141900 },
-};
+// Two real, separately-recorded clips (real login, real dashboard, real
+// navigation through an actual seeded demo school — genuine footage, not a
+// mockup) played back-to-back as one experience. If a single continuous
+// jesmanage-demo.mp4 is supplied later, this can collapse to one <source>
+// and drop the two-part logic below with zero changes elsewhere on the page.
+const PARTS = [
+  '/assets/demo/jesmanage-demo-part1.webm',
+  '/assets/demo/jesmanage-demo-part2.webm',
+];
 
-const formatCedis = (n) => `GH₵ ${n.toLocaleString('en-GH')}`;
+// Real timestamps from the actual recording, not aspirational chapter marks.
+const CHAPTERS = [
+  { part: 0, time: 0, label: 'Home & Login' },
+  { part: 0, time: 8, label: 'Admin Dashboard' },
+  { part: 0, time: 11, label: 'Student Management' },
+  { part: 0, time: 17, label: 'Terminal Reports' },
+  { part: 0, time: 20, label: 'Attendance' },
+  { part: 0, time: 22, label: 'Fees' },
+  { part: 1, time: 0, label: 'Teacher Login' },
+  { part: 1, time: 7, label: 'Score Entry' },
+  { part: 1, time: 11, label: 'JesManage Intelligence' },
+];
 
-// Mirrors the real pipeline (LandingPage's old How-It-Works steps, and the
-// actual Result Entry -> Admin Review -> Approval -> Terminal Report ->
-// Parent Access flow in results.controller.js) — kept to 4 steps for a
-// breadcrumb, but not skipping the approval gate the real system enforces.
-const WORKFLOW_STEPS = [
-  'Teacher Enters Scores', 'Admin Approves', 'Report Card Generated', 'Parent Views Report',
+const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+const ROLE_PANELS = [
+  { role: 'Admin', desc: 'Setup, approvals, fees, and analytics.', part: 0, time: 8 },
+  { role: 'Teacher', desc: 'Score entry, offline mode, remarks.', part: 1, time: 7 },
+  { role: 'Parent', desc: 'Results, attendance, fees, and reports.', part: 0, time: 17 },
+  { role: 'Student', desc: 'Results, attendance, and school information.', part: 0, time: 17 },
 ];
 
 export default function Demo() {
-  const [term, setTerm] = useState('Term 2');
-  const metrics = SAMPLE_METRICS[term];
+  const videoRef = useRef(null);
+  const pendingSeek = useRef(null);
+  const [videoAvailable, setVideoAvailable] = useState(true);
+  const [playing, setPlaying] = useState(false);
+  const [part, setPart] = useState(0);
+
+  const seekTo = (chapter) => {
+    const el = videoRef.current;
+    if (!el || !videoAvailable) return;
+    if (chapter.part !== part) {
+      pendingSeek.current = chapter.time;
+      setPart(chapter.part);
+    } else {
+      el.currentTime = chapter.time;
+      el.play();
+      setPlaying(true);
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    const el = videoRef.current;
+    if (!el) return;
+    if (pendingSeek.current != null) {
+      el.currentTime = pendingSeek.current;
+      pendingSeek.current = null;
+    }
+    el.play();
+    setPlaying(true);
+  };
+
+  const handleEnded = () => {
+    if (part === 0) {
+      setPart(1);
+    } else {
+      setPlaying(false);
+    }
+  };
 
   return (
-    <section className="mx-auto max-w-5xl px-4 py-16 sm:px-6">
-      <div className="mx-auto mb-8 max-w-3xl rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-2.5 text-center text-xs font-medium text-indigo-700 sm:text-sm">
-        Simulated Sandbox — No Network Requests, Pure Local State
-      </div>
+    <div>
+      <section className="mx-auto max-w-3xl px-4 pb-6 pt-16 text-center sm:px-6 sm:pt-20">
+        <Reveal as="h1" className="text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white sm:text-5xl">
+          See JesManage in action.
+        </Reveal>
+        <Reveal as="p" delay={100} className="mt-3 inline-block rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+          Product demonstration &middot; real interface, real demo account
+        </Reveal>
+      </section>
 
-      <div className="mx-auto max-w-2xl text-center">
-        <h1 className="text-3xl font-bold text-gray-900">See JesManage in Action</h1>
-        <p className="mt-3 text-gray-600">
-          A sample dashboard with illustrative numbers — nothing below is real school data.
-        </p>
-      </div>
+      <section className="mx-auto max-w-4xl px-4 pb-4 sm:px-6">
+        <Reveal delay={150} className="relative aspect-video w-full overflow-hidden rounded-2xl border border-gray-200 bg-gray-950 shadow-xl dark:border-gray-800">
+          {videoAvailable ? (
+            <video
+              ref={videoRef}
+              key={part}
+              className="h-full w-full"
+              controls
+              playsInline
+              poster="/logo.png"
+              onError={() => setVideoAvailable(false)}
+              onLoadedMetadata={handleLoadedMetadata}
+              onPlay={() => setPlaying(true)}
+              onPause={() => setPlaying(false)}
+              onEnded={handleEnded}
+            >
+              <source src={PARTS[part]} type="video/webm" />
+              <track kind="captions" label="English" default />
+            </video>
+          ) : (
+            <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-center text-white">
+              <img src="/logo.png" alt="" className="h-12 w-12 rounded-xl opacity-80" />
+              <p className="text-sm font-medium">Demo video coming soon</p>
+              <p className="max-w-xs text-xs text-gray-400">
+                Drop a file at <code className="rounded bg-white/10 px-1.5 py-0.5">/assets/demo/jesmanage-demo.mp4</code> — this page picks it up automatically.
+              </p>
+            </div>
+          )}
+          {!playing && videoAvailable && (
+            <button
+              type="button"
+              onClick={() => { videoRef.current?.play(); setPlaying(true); }}
+              aria-label="Play demo video"
+              className="absolute inset-0 flex items-center justify-center bg-black/20 transition-opacity hover:bg-black/30"
+            >
+              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white/95 text-cyan-700 shadow-lg">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z" /></svg>
+              </span>
+            </button>
+          )}
+        </Reveal>
 
-      <div className="mx-auto mt-8 flex max-w-3xl flex-wrap items-center justify-center gap-x-2 gap-y-3">
-        {WORKFLOW_STEPS.map((step, i) => (
-          <span key={step} className="flex items-center gap-2">
-            <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 sm:text-sm">
-              {step}
-            </span>
-            {i < WORKFLOW_STEPS.length - 1 && <span className="text-gray-300">→</span>}
-          </span>
-        ))}
-      </div>
+        <Reveal delay={220} className="mt-5 flex flex-wrap justify-center gap-2">
+          {CHAPTERS.map((c) => (
+            <button
+              key={c.label}
+              type="button"
+              onClick={() => seekTo(c)}
+              className="rounded-full border border-gray-200 bg-white px-3.5 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:border-cyan-300 hover:text-cyan-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:border-cyan-800 dark:hover:text-cyan-400"
+            >
+              <span className="text-gray-400 dark:text-gray-600">{formatTime(c.time)}</span> — {c.label}
+            </button>
+          ))}
+        </Reveal>
+      </section>
 
-      <div className="mx-auto mt-8 max-w-3xl rounded-2xl border border-gray-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-          <div className="flex items-center gap-3">
-            <span className="h-2.5 w-2.5 rounded-full bg-red-400" />
-            <span className="h-2.5 w-2.5 rounded-full bg-yellow-400" />
-            <span className="h-2.5 w-2.5 rounded-full bg-green-400" />
-            <span className="ml-2 text-xs font-medium text-gray-400">JesManage — Sample Dashboard</span>
-          </div>
-          <div className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">Demo Data</div>
-        </div>
-
-        <div className="p-6">
-          <div className="flex items-center gap-2">
-            {Object.keys(SAMPLE_METRICS).map((t) => (
+      <section className="mx-auto max-w-5xl px-4 py-16 sm:px-6">
+        <Reveal as="h2" className="text-center text-xl font-bold text-gray-900 dark:text-white">Explore the experience</Reveal>
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {ROLE_PANELS.map((p, i) => (
+            <Reveal key={p.role} delay={i * 70}>
               <button
-                key={t} type="button"
-                onClick={() => setTerm(t)}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                  term === t ? 'bg-indigo-700 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
+                type="button"
+                onClick={() => seekTo(p)}
+                className="w-full rounded-2xl border border-gray-200 bg-white p-5 text-left transition-colors hover:border-cyan-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-cyan-800"
               >
-                {t}
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">{p.role}</p>
+                <p className="mt-1.5 text-xs leading-relaxed text-gray-500 dark:text-gray-500">{p.desc}</p>
               </button>
-            ))}
-          </div>
-
-          <div className="mt-6 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-xl bg-gray-50 p-5">
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Students</p>
-              <p className="mt-1 text-2xl font-bold text-gray-900">{metrics.students}</p>
-            </div>
-            <div className="rounded-xl bg-gray-50 p-5">
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Attendance</p>
-              <p className="mt-1 text-2xl font-bold text-gray-900">{metrics.attendance}%</p>
-            </div>
-            <div className="rounded-xl bg-gray-50 p-5">
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Fees Collected</p>
-              <p className="mt-1 text-2xl font-bold text-gray-900">{formatCedis(metrics.fees)}</p>
-            </div>
-          </div>
-
-          <p className="mt-6 text-center text-xs text-gray-400">
-            Sample data for illustration only. Click a term above to switch.
-          </p>
+            </Reveal>
+          ))}
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
   );
 }

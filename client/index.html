@@ -5,9 +5,38 @@
     <link rel="icon" type="image/png" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>JesManage</title>
+    <style>
+      /* Static markup only, no JS — React replaces #root's contents (this
+         included) the instant it mounts, so this only covers the real
+         JS-parse/first-render window, never an artificial delay. Generic
+         enough to be correct on any route, not just the marketing site. */
+      #boot-loader {
+        position: fixed; inset: 0; z-index: 9999;
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+        background: #ffffff;
+      }
+      @media (prefers-color-scheme: dark) {
+        #boot-loader { background: #030712; }
+      }
+      #boot-loader img { width: 40px; height: 40px; border-radius: 10px; }
+      #boot-loader .boot-track { width: 120px; height: 2px; border-radius: 999px; background: rgba(6, 182, 212, 0.15); overflow: hidden; }
+      #boot-loader .boot-fill { width: 40%; height: 100%; background: #0891b2; border-radius: 999px; animation: boot-slide 0.9s ease-in-out infinite; }
+      @keyframes boot-slide {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(250%); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #boot-loader .boot-fill { animation: none; width: 100%; opacity: 0.5; }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="boot-loader" aria-hidden="true">
+        <img src="/logo.png" alt="" />
+        <div class="boot-track"><div class="boot-fill"></div></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

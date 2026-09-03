@@ -46,8 +46,15 @@ import SuperAdminRoutes from '../superAdmin/SuperAdminRoutes';
 import MarketingLayout from '../marketing/MarketingLayout';
 import Home from '../marketing/pages/Home';
 import Features from '../marketing/pages/Features';
+import HowItWorks from '../marketing/pages/HowItWorks';
+// Renamed on import: /pages/intelligence/Intelligence.jsx above is the real,
+// protected, admin-only Intelligence dashboard mounted at /intelligence —
+// this is the separate public marketing page, mounted at
+// /jesmanage-intelligence specifically to avoid colliding with it.
+import MarketingIntelligence from '../marketing/pages/Intelligence';
 import Demo from '../marketing/pages/Demo';
 import About from '../marketing/pages/About';
+import Contact from '../marketing/pages/Contact';
 
 export default function AppRoutes() {
   return (
@@ -120,8 +127,11 @@ export default function AppRoutes() {
       <Route element={<MarketingLayout />}>
         <Route path="/" element={<Home />} />
         <Route path="/features" element={<Features />} />
+        <Route path="/how-it-works" element={<HowItWorks />} />
+        <Route path="/jesmanage-intelligence" element={<MarketingIntelligence />} />
         <Route path="/demo" element={<Demo />} />
         <Route path="/about" element={<About />} />
+        <Route path="/contact" element={<Contact />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

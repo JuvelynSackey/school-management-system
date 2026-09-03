@@ -5,6 +5,23 @@
 @import "tailwindcss/theme.css";
 @import "tailwindcss/utilities.css";
 
+/* Wires Tailwind's dark: variant to the app's real theme mechanism
+   (ThemeContext.jsx sets/removes data-theme="dark"|"light" on <html>;
+   'system' removes the attribute entirely and relies on the OS media
+   query) instead of Tailwind's own default (prefers-color-scheme only,
+   with no way to force an explicit choice). Mirrors the same three-tier
+   pattern the app's own CSS custom properties already use below. */
+@custom-variant dark {
+  @media (prefers-color-scheme: dark) {
+    &:not(:where([data-theme="light"], [data-theme="light"] *)) {
+      @slot;
+    }
+  }
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+}
+
 :root {
   --text: #3f3d45;
   --text-h: #0c0a1f;
