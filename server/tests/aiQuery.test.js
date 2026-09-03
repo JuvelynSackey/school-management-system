@@ -15,6 +15,9 @@ beforeAll(async () => {
 });
 afterAll(stopTestServer);
 afterEach(clearTestDb);
+// See ai.test.js — this dev environment has a real GEMINI_API_KEY in .env;
+// tests that need AI configured set their own key explicitly, so this is safe.
+beforeEach(() => { delete process.env.GEMINI_API_KEY; });
 
 // Mocks the AI call's TEXT response for the intent-interpretation step, and
 // lets the (separate) summary call return a fixed sentence — matching how

@@ -15,6 +15,12 @@ beforeAll(async () => {
 });
 afterAll(stopTestServer);
 afterEach(clearTestDb);
+// This dev environment has a real GEMINI_API_KEY in .env, which the "no
+// GEMINI_API_KEY configured" tests below assume is absent by default —
+// every test that needs AI configured already sets its own key explicitly,
+// so clearing it here is safe and matches what a real CI/prod-unconfigured
+// environment would see.
+beforeEach(() => { delete process.env.GEMINI_API_KEY; });
 
 const createDraftReport = async (schoolId, overrides = {}) => {
   const { TerminalReport } = models;

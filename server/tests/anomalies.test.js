@@ -15,6 +15,9 @@ beforeAll(async () => {
 });
 afterAll(stopTestServer);
 afterEach(clearTestDb);
+// See ai.test.js — this dev environment has a real GEMINI_API_KEY in .env;
+// tests that need AI configured set their own key explicitly, so this is safe.
+beforeEach(() => { delete process.env.GEMINI_API_KEY; });
 
 const createResult = async (schoolId, fields) => {
   const { Result } = models;
