@@ -10,12 +10,24 @@ const SAMPLE_METRICS = {
 
 const formatCedis = (n) => `GH₵ ${n.toLocaleString('en-GH')}`;
 
+// Mirrors the real pipeline (LandingPage's old How-It-Works steps, and the
+// actual Result Entry -> Admin Review -> Approval -> Terminal Report ->
+// Parent Access flow in results.controller.js) — kept to 4 steps for a
+// breadcrumb, but not skipping the approval gate the real system enforces.
+const WORKFLOW_STEPS = [
+  'Teacher Enters Scores', 'Admin Approves', 'Report Card Generated', 'Parent Views Report',
+];
+
 export default function Demo() {
   const [term, setTerm] = useState('Term 2');
   const metrics = SAMPLE_METRICS[term];
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-16 sm:px-6">
+      <div className="mx-auto mb-8 max-w-3xl rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-2.5 text-center text-xs font-medium text-indigo-700 sm:text-sm">
+        Simulated Sandbox — No Network Requests, Pure Local State
+      </div>
+
       <div className="mx-auto max-w-2xl text-center">
         <h1 className="text-3xl font-bold text-gray-900">See JesManage in Action</h1>
         <p className="mt-3 text-gray-600">
@@ -23,7 +35,18 @@ export default function Demo() {
         </p>
       </div>
 
-      <div className="mx-auto mt-10 max-w-3xl rounded-2xl border border-gray-200 bg-white shadow-sm">
+      <div className="mx-auto mt-8 flex max-w-3xl flex-wrap items-center justify-center gap-x-2 gap-y-3">
+        {WORKFLOW_STEPS.map((step, i) => (
+          <span key={step} className="flex items-center gap-2">
+            <span className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 sm:text-sm">
+              {step}
+            </span>
+            {i < WORKFLOW_STEPS.length - 1 && <span className="text-gray-300">→</span>}
+          </span>
+        ))}
+      </div>
+
+      <div className="mx-auto mt-8 max-w-3xl rounded-2xl border border-gray-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
           <div className="flex items-center gap-3">
             <span className="h-2.5 w-2.5 rounded-full bg-red-400" />
