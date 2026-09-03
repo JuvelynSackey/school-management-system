@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import LoginModal from '../../components/auth/LoginModal';
 import Button from './Button';
@@ -19,7 +19,8 @@ export default function Navbar() {
   const navigate = useNavigate();
 
   return (
-    <header className="sticky top-0 z-40 border-b border-gray-200 bg-white/90 backdrop-blur">
+    <Fragment>
+      <header className="sticky top-0 z-40 border-b border-gray-200 bg-white/90 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
         <NavLink to="/" className="flex items-center gap-2 text-lg font-bold text-gray-900 no-underline">
           <img src="/logo.png" alt="JesManage" className="h-8 w-8 rounded-lg" />
@@ -67,12 +68,13 @@ export default function Navbar() {
           </div>
         </div>
       )}
+      </header>
 
       <LoginModal
         isOpen={loginOpen}
         onClose={() => setLoginOpen(false)}
         onSuccess={() => navigate('/dashboard')}
       />
-    </header>
+    </Fragment>
   );
 }
