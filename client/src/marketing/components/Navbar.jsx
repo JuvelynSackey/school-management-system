@@ -1,6 +1,7 @@
 import { Fragment, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import LoginModal from '../../components/auth/LoginModal';
+import RegisterModal from '../../components/auth/RegisterModal';
 import Button from './Button';
 
 const LINKS = [
@@ -16,6 +17,7 @@ const linkClasses = ({ isActive }) =>
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
+  const [registerOpen, setRegisterOpen] = useState(false);
   const navigate = useNavigate();
 
   return (
@@ -35,7 +37,7 @@ export default function Navbar() {
 
         <div className="hidden items-center gap-3 md:flex">
           <Button variant="secondary" onClick={() => setLoginOpen(true)}>Login</Button>
-          <Button variant="primary" onClick={() => navigate('/register-school')}>Register Your School</Button>
+          <Button variant="primary" onClick={() => setRegisterOpen(true)}>Register Your School</Button>
         </div>
 
         <button
@@ -64,7 +66,7 @@ export default function Navbar() {
           </nav>
           <div className="mt-4 flex flex-col gap-2">
             <Button variant="secondary" onClick={() => { setMenuOpen(false); setLoginOpen(true); }}>Login</Button>
-            <Button variant="primary" onClick={() => { setMenuOpen(false); navigate('/register-school'); }}>Register Your School</Button>
+            <Button variant="primary" onClick={() => { setMenuOpen(false); setRegisterOpen(true); }}>Register Your School</Button>
           </div>
         </div>
       )}
@@ -74,6 +76,10 @@ export default function Navbar() {
         isOpen={loginOpen}
         onClose={() => setLoginOpen(false)}
         onSuccess={() => navigate('/dashboard')}
+      />
+      <RegisterModal
+        isOpen={registerOpen}
+        onClose={() => setRegisterOpen(false)}
       />
     </Fragment>
   );
