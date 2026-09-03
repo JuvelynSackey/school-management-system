@@ -2,7 +2,6 @@ import { Route, Routes } from 'react-router-dom';
 import ProtectedRoute from '../components/guards/ProtectedRoute';
 import RoleRoute from '../components/guards/RoleRoute';
 import AppShell from '../components/layout/AppShell';
-import LandingPage from '../pages/landing/LandingPage';
 import Login from '../pages/auth/Login';
 import RegisterSchool from '../pages/auth/RegisterSchool';
 import ForgotPassword from '../pages/auth/ForgotPassword';
@@ -44,7 +43,11 @@ import Unauthorized from '../pages/errors/Unauthorized';
 import NotFound from '../pages/errors/NotFound';
 import VerifyDocument from '../pages/verify/VerifyDocument';
 import SuperAdminRoutes from '../superAdmin/SuperAdminRoutes';
-import DemoPage from '../pages/demo/DemoPage';
+import MarketingLayout from '../marketing/MarketingLayout';
+import Home from '../marketing/pages/Home';
+import Features from '../marketing/pages/Features';
+import Demo from '../marketing/pages/Demo';
+import About from '../marketing/pages/About';
 
 export default function AppRoutes() {
   return (
@@ -55,7 +58,6 @@ export default function AppRoutes() {
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/verify/:type/:schoolSlug/:id" element={<VerifyDocument />} />
-      <Route path="/demo" element={<DemoPage />} />
       <Route path="/super-admin/*" element={<SuperAdminRoutes />} />
 
       <Route element={<ProtectedRoute />}>
@@ -115,7 +117,12 @@ export default function AppRoutes() {
         </Route>
       </Route>
 
-      <Route path="/" element={<LandingPage />} />
+      <Route element={<MarketingLayout />}>
+        <Route path="/" element={<Home />} />
+        <Route path="/features" element={<Features />} />
+        <Route path="/demo" element={<Demo />} />
+        <Route path="/about" element={<About />} />
+      </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
