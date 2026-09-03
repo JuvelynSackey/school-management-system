@@ -309,6 +309,17 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); opacity: 1
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
+/* Opaque variant — same cosmic card shape/sizing, but a solid surface
+   instead of a blurred glass pane over the background (used on
+   RegisterSchool.jsx, which wants the cosmic backdrop without the
+   frosted-glass card look). */
+.cosmic-card--solid {
+  background: #0f2f2f;
+  border-color: rgba(255, 255, 255, 0.08);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 .cosmic-card h1 {
   font-family: var(--sans);
   font-weight: 800;

@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { registerSchool } from '../../api/schools.api';
+
+const STAR_COUNT = 55;
 
 // Same icon/behavior as LoginForm.jsx's password toggle — duplicated
 // rather than shared since every auth-page icon in this app is a small
@@ -34,6 +36,14 @@ export default function RegisterSchool() {
   const [submitted, setSubmitted] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
 
+  const stars = useMemo(() => Array.from({ length: STAR_COUNT }, () => ({
+    left: `${Math.random() * 100}%`,
+    top: `${Math.random() * 100}%`,
+    size: `${1 + Math.random() * 1.6}px`,
+    delay: `${Math.random() * 4}s`,
+    duration: `${2.5 + Math.random() * 2.5}s`,
+  })), []);
+
   const handleNameChange = (schoolName) => setForm((f) => ({ ...f, schoolName, slug: slugify(schoolName) }));
 
   const handleSubmit = async (e) => {
@@ -55,8 +65,24 @@ export default function RegisterSchool() {
       <div className="cosmic-orb cosmic-orb-purple" />
       <div className="cosmic-orb cosmic-orb-blue" />
       <div className="cosmic-orb cosmic-orb-orange" />
+      <div className="cosmic-orb cosmic-orb-dot-purple" />
+      <div className="cosmic-orb cosmic-orb-dot-brown" />
 
-      <div className="cosmic-card" style={{ maxWidth: 400 }}>
+      <div className="cosmic-starfield">
+        {stars.map((s, i) => (
+          // eslint-disable-next-line react/no-array-index-key
+          <span
+            key={i}
+            className="cosmic-star"
+            style={{
+              left: s.left, top: s.top, width: s.size, height: s.size,
+              animationDelay: s.delay, animationDuration: s.duration,
+            }}
+          />
+        ))}
+      </div>
+
+      <div className="cosmic-card cosmic-card--solid" style={{ maxWidth: 400 }}>
         {submitted ? (
           <div>
             <h2 style={{ marginTop: 0 }}>Registration Submitted</h2>
