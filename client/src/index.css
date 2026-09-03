@@ -226,6 +226,12 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); opacity: 1
 }
 
 .cosmic-auth-page {
+  /* No color-scheme is declared anywhere else in the app, so on a dark-mode
+     OS/browser, Chrome renders native form-control chrome with its dark UA
+     stylesheet — bleeding through the translucent .cosmic-field pills and
+     muddying them, even though every color here is a hardcoded,
+     theme-invariant value. Pin it so this page always renders as designed. */
+  color-scheme: light;
   min-height: 100svh;
   position: relative;
   overflow-x: hidden;
@@ -337,6 +343,22 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); opacity: 1
 .cosmic-card h2, .cosmic-card h3 { color: #fff; }
 .cosmic-card .field span { color: rgba(255, 255, 255, 0.85); }
 .cosmic-card .muted { color: rgba(255, 255, 255, 0.6); }
+/* Same theme-invariance gap for RegisterSchool.jsx's plain .field inputs
+   and its .btn-primary submit — both read var(--surface)/var(--accent),
+   which in dark mode become a dark navy input (blending into the
+   already-dark card, killing contrast) and a lighter lavender button. */
+.cosmic-card .field input,
+.cosmic-card .field select,
+.cosmic-card .field textarea {
+  background: #fff;
+  color: #1a1a2e;
+  border-color: rgba(255, 255, 255, 0.16);
+}
+.cosmic-card .field input::placeholder,
+.cosmic-card .field textarea::placeholder { color: #8a8794; }
+.cosmic-card .btn-primary { background: #322c7c; color: #fff; }
+.cosmic-card .btn-primary:hover { background: #26215f; }
+.cosmic-card a { color: #6fd8d1; }
 .cosmic-subtitle {
   display: block;
   color: rgba(255, 255, 255, 0.65);
@@ -360,6 +382,18 @@ input::placeholder, textarea::placeholder { color: var(--text-muted); opacity: 1
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
   font-size: 14px;
+}
+/* The generic `input:not([type=checkbox]):not([type=radio])` base rule
+   (near the top of this file) has higher specificity than `.cosmic-field
+   input` — its two :not() clauses each count as a class-level selector,
+   giving it (0,2,1) against this rule's (0,1,1) — so in dark mode it wins
+   and overrides this always-translucent pill with the dark --surface
+   token. Re-declared here, scoped to the two real containers this class is
+   ever used inside, to win on specificity + source order instead. */
+.cosmic-auth-page .cosmic-field input,
+.login-modal-overlay .cosmic-field input {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
 }
 .cosmic-field--icon-left input { padding-left: 60px; }
 .cosmic-field--icon-right input { padding-right: 60px; }
@@ -401,6 +435,10 @@ button.cosmic-field-badge { cursor: pointer; }
 
 /* Login modal (opened from the landing page — see components/auth/LoginModal.jsx) */
 .login-modal-overlay {
+  /* Same fixed-light color-scheme as .cosmic-auth-page, and for the same
+     reason — this modal's cosmic-card/cosmic-field pills are theme-invariant
+     by design and shouldn't pick up the dark UA form-control chrome. */
+  color-scheme: light;
   position: fixed; inset: 0; z-index: 500;
   background: rgba(10, 8, 18, 0.72);
   backdrop-filter: blur(6px);
