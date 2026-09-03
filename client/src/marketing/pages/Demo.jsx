@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import Reveal from '../components/Reveal';
+import Sandbox from '../sandbox/Sandbox';
 
 // Two real, separately-recorded clips (real login, real dashboard, real
 // navigation through an actual seeded demo school — genuine footage, not a
@@ -27,10 +28,10 @@ const CHAPTERS = [
 const formatTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 const ROLE_PANELS = [
-  { role: 'Admin', desc: 'Setup, approvals, fees, and analytics.', part: 0, time: 8 },
-  { role: 'Teacher', desc: 'Score entry, offline mode, remarks.', part: 1, time: 7 },
-  { role: 'Parent', desc: 'Results, attendance, fees, and reports.', part: 0, time: 17 },
-  { role: 'Student', desc: 'Results, attendance, and school information.', part: 0, time: 17 },
+  { role: 'Admin', roleValue: 'admin', desc: 'Setup, approvals, fees, and analytics.', part: 0, time: 8 },
+  { role: 'Teacher', roleValue: 'teacher', desc: 'Score entry, offline mode, remarks.', part: 1, time: 7 },
+  { role: 'Parent', roleValue: 'parent', desc: 'Results, attendance, fees, and reports.', part: 0, time: 17 },
+  { role: 'Student', roleValue: 'student', desc: 'Results, attendance, and school information.', part: 0, time: 17 },
 ];
 
 export default function Demo() {
@@ -39,6 +40,13 @@ export default function Demo() {
   const [videoAvailable, setVideoAvailable] = useState(true);
   const [playing, setPlaying] = useState(false);
   const [part, setPart] = useState(0);
+  const [sandboxRole, setSandboxRole] = useState('admin');
+  const sandboxRef = useRef(null);
+
+  const openSandbox = (role) => {
+    setSandboxRole(role);
+    sandboxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   const seekTo = (chapter) => {
     const el = videoRef.current;
@@ -143,17 +151,31 @@ export default function Demo() {
         <Reveal as="h2" className="text-center text-xl font-bold text-gray-900 dark:text-white">Explore the experience</Reveal>
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {ROLE_PANELS.map((p, i) => (
-            <Reveal key={p.role} delay={i * 70}>
-              <button
-                type="button"
-                onClick={() => seekTo(p)}
-                className="w-full rounded-2xl border border-gray-200 bg-white p-5 text-left transition-colors hover:border-cyan-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-cyan-800"
-              >
+            <Reveal key={p.role} delay={i * 70} className="rounded-2xl border border-gray-200 bg-white p-5 text-left transition-colors hover:border-cyan-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-cyan-800">
+              <button type="button" onClick={() => seekTo(p)} className="block w-full text-left">
                 <p className="text-sm font-semibold text-gray-900 dark:text-white">{p.role}</p>
                 <p className="mt-1.5 text-xs leading-relaxed text-gray-500 dark:text-gray-500">{p.desc}</p>
               </button>
+              <button
+                type="button" onClick={() => openSandbox(p.roleValue)}
+                className="mt-3 text-xs font-semibold text-cyan-700 no-underline hover:text-cyan-800 dark:text-cyan-400 dark:hover:text-cyan-300"
+              >
+                Try it yourself →
+              </button>
             </Reveal>
           ))}
+        </div>
+      </section>
+
+      <section ref={sandboxRef} className="border-t border-gray-100 bg-gray-50 py-16 dark:border-gray-900 dark:bg-gray-900/40">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6">
+          <Reveal as="h2" className="text-center text-xl font-bold text-gray-900 dark:text-white">Want to explore it yourself?</Reveal>
+          <Reveal as="p" delay={80} className="mx-auto mt-2 max-w-xl text-center text-sm text-gray-500 dark:text-gray-400">
+            A local, in-browser sandbox with sample data — pick a role, edit a score, generate a remark. Nothing here is saved or sent anywhere.
+          </Reveal>
+          <div className="mt-8">
+            <Sandbox key={sandboxRole} initialRole={sandboxRole} />
+          </div>
         </div>
       </section>
     </div>
