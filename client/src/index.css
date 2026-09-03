@@ -493,6 +493,7 @@ button.cosmic-field-badge { cursor: pointer; }
   transition: width 0.2s ease;
 }
 .sidebar-brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; color: #fff; padding: 0 22px 22px; letter-spacing: 0.2px; }
+.brand-logo { width: 34px; height: 34px; border-radius: 9px; object-fit: cover; flex-shrink: 0; }
 .sidebar-collapse-toggle {
   display: none;
   margin-left: auto;
