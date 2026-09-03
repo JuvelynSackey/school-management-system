@@ -25,7 +25,7 @@ export default function LoginModal({ isOpen, onClose, onSuccess }) {
 
   return (
     <div className="login-modal-overlay" onClick={onClose}>
-      <div className="cosmic-card cosmic-card--modal" onClick={(e) => e.stopPropagation()}>
+      <div className="cosmic-card cosmic-card--modal cosmic-card--solid" onClick={(e) => e.stopPropagation()}>
         <button type="button" className="login-modal-close" onClick={onClose} aria-label="Close">&times;</button>
         <LoginForm onSuccess={onSuccess} />
       </div>
