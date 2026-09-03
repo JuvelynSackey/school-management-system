@@ -1,4 +1,7 @@
 import Button from '../components/Button';
+import WhyJesManage from '../sections/WhyJesManage';
+import GhanaFeatures from '../sections/GhanaFeatures';
+import HealthScoreWidget from '../sections/HealthScoreWidget';
 
 const HIGHLIGHTS = [
   { title: 'Fees in GH₵', desc: 'Fee structures, balances, and receipts tracked in Ghana cedis throughout — no currency conversion.' },
@@ -34,6 +37,10 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      <WhyJesManage />
+      <GhanaFeatures />
+      <HealthScoreWidget />
     </div>
   );
 }
