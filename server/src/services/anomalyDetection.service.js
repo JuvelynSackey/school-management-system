@@ -10,6 +10,12 @@ const SCORE_GAP_THRESHOLD_POINTS = 40; // percentage points between normalized c
 const MIN_HISTORY_TERMS = 1;
 const STDDEV_THRESHOLD = 2.5; // z-score magnitude past which a score is a statistical outlier
 const MIN_HISTORY_FOR_STDDEV = 3; // fewer prior terms than this and a stddev isn't meaningful
+// A student whose own history happens to be unusually consistent (small
+// stdDev over 3+ terms) can have an ordinary few-point difference this term
+// blow past 2.5sigma on stdDev alone. Kept as a second, independent gate
+// rather than flooring stdDev, so the sigma figure this produces (surfaced
+// to the admin) always reflects the real numbers, not a dampened one.
+const MIN_ABSOLUTE_DELTA = 10; // out of a /100 total — more than one grade band's worth of gap
 
 // One batched aggregate for a whole roster's worth of students, rather than
 // a per-student query — this is also what getRoster uses to hand the
@@ -44,8 +50,9 @@ const getHistoricalStatsForRoster = async (schoolId, studentIds, subjectId, acad
 // usually-rock-steady student's smaller-but-unusual swing will.
 const detectStatisticalOutlier = (totalScore, stats) => {
   if (!stats || stats.count < MIN_HISTORY_FOR_STDDEV || stats.stdDev <= 0) return null;
-  const z = (totalScore - stats.mean) / stats.stdDev;
-  if (Math.abs(z) < STDDEV_THRESHOLD) return null;
+  const delta = totalScore - stats.mean;
+  const z = delta / stats.stdDev;
+  if (Math.abs(z) < STDDEV_THRESHOLD || Math.abs(delta) < MIN_ABSOLUTE_DELTA) return null;
 
   const direction = z < 0 ? 'below' : 'above';
   return {
@@ -127,4 +134,5 @@ module.exports = {
   SCORE_GAP_THRESHOLD_POINTS,
   STDDEV_THRESHOLD,
   MIN_HISTORY_FOR_STDDEV,
+  MIN_ABSOLUTE_DELTA,
 };

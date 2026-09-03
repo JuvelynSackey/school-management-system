@@ -20,11 +20,22 @@ import HomeroomBadge from '../../components/common/HomeroomBadge';
 
 const rosterCacheKey = (classId, subjectId, academicTermId) => `roster:${classId}:${subjectId}:${academicTermId}`;
 
-// Mirrors anomalyDetection.service.js's STDDEV_THRESHOLD/MIN_HISTORY_FOR_STDDEV
-// on the backend — kept in sync by hand since this check runs entirely
-// client-side (see rationale below) rather than calling that service.
+// Mirrors anomalyDetection.service.js's STDDEV_THRESHOLD/MIN_HISTORY_FOR_STDDEV/
+// MIN_ABSOLUTE_DELTA on the backend — kept in sync by hand since this check
+// runs entirely client-side (see rationale below) rather than calling that service.
 const STDDEV_THRESHOLD = 2.5;
 const MIN_HISTORY_FOR_STDDEV = 3;
+// A small, tightly-clustered sample (e.g. 4-5 students all scoring 87-95, or
+// a student whose own history is unusually consistent) can push a
+// perfectly ordinary few-point difference past 2.5sigma on stdDev alone —
+// real example: 5 students totaling 87/91/95/91/91 gives student "-0004"
+// (87) a leave-one-out class mean of 92, stdDev~1.7, z~2.9, despite every
+// score in the same A1 grade band. Flooring stdDev would make the
+// displayed "Xsigma" figure not match the real numbers shown alongside it,
+// so instead this is a second, independent gate: the raw point gap must
+// also be meaningful on its own, out of a /100 total (grade bands here run
+// 5-10 points wide, so 10 is "more than one band's worth of difference").
+const MIN_ABSOLUTE_DELTA = 10;
 
 const rowTotal = (r) => {
   const hasBoth = r.classScore !== '' && r.examScore !== '' && r.classScore !== null && r.examScore !== null;
@@ -62,8 +73,9 @@ const computeAnomalies = (roster, classStats) => {
     const reasons = [];
 
     if (r.historyCount >= MIN_HISTORY_FOR_STDDEV && r.historyStdDev > 0) {
-      const z = Math.abs((total - r.historyMean) / r.historyStdDev);
-      if (z >= STDDEV_THRESHOLD) {
+      const delta = Math.abs(total - r.historyMean);
+      const z = delta / r.historyStdDev;
+      if (z >= STDDEV_THRESHOLD && delta >= MIN_ABSOLUTE_DELTA) {
         reasons.push({
           key: 'history',
           message: "⚠️ Score deviates significantly from student's historical average",
@@ -74,8 +86,9 @@ const computeAnomalies = (roster, classStats) => {
 
     const classStat = classStats.get(r.studentId);
     if (classStat && classStat.stdDev > 0) {
-      const z = Math.abs((total - classStat.mean) / classStat.stdDev);
-      if (z >= STDDEV_THRESHOLD) {
+      const delta = Math.abs(total - classStat.mean);
+      const z = delta / classStat.stdDev;
+      if (z >= STDDEV_THRESHOLD && delta >= MIN_ABSOLUTE_DELTA) {
         reasons.push({
           key: 'class',
           message: '⚠️ Score deviates significantly from the class average',
