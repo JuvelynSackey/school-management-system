@@ -6,6 +6,11 @@ const announcementSchema = new mongoose.Schema({
   schoolId: { type: mongoose.Schema.Types.ObjectId, ref: 'School', index: true },
   message: { type: String, required: true, maxlength: 1000 },
   category: { type: String, required: true, enum: ['general', 'fee_reminder'], default: 'general' },
+  // 'urgent' announcements additionally surface as a persistent top-of-page
+  // banner (see getBanner) until bannerExpiresAt, instead of waiting to be
+  // discovered on the /announcements notice board.
+  priority: { type: String, required: true, enum: ['normal', 'urgent'], default: 'normal' },
+  bannerExpiresAt: { type: Date, default: null },
   // 'school'/'class'/'student' are the original single-target shapes (still
   // used by e.g. the fee-reminder flow) and are unchanged. The
   // 'specific_*'/'all_*' values are additive — each has its own array field

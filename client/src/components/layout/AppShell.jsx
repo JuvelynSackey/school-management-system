@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import ThemeToggle from '../common/ThemeToggle';
 import OfflineIndicator from '../common/OfflineIndicator';
+import AnnouncementBanner from '../common/AnnouncementBanner';
 import AskJesManage from '../common/AskJesManage';
 import CommandPalette from '../common/CommandPalette';
 import ScrollToTopButton from '../common/ScrollToTopButton';
@@ -150,6 +151,7 @@ export default function AppShell() {
             onClose={() => { setAskOpen(false); setAskInitialQuestion(''); }}
           />
         )}
+        <AnnouncementBanner />
         <main className="page-content">
           <Outlet />
         </main>

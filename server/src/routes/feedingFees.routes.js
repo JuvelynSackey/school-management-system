@@ -5,7 +5,7 @@ const authorize = require('../middleware/authorize');
 
 const router = express.Router();
 
-router.use(authenticate, authorize('admin', 'teacher'));
+router.use(authenticate, authorize('admin'));
 
 router.get('/daily', controller.getDaily);
 router.post('/charge', controller.chargeDay);

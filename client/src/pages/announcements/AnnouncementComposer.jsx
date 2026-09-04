@@ -20,6 +20,8 @@ const emptyForm = {
   channels: ['in_app'],
   sendMode: 'now', // 'now' | 'later'
   scheduledFor: '',
+  priority: 'normal', // 'normal' | 'urgent'
+  bannerExpiresAt: '',
 };
 
 const TONE_OPTIONS = [
@@ -139,6 +141,8 @@ export default function AnnouncementComposer() {
         ...(multiField ? { [multiField]: form[multiField] } : {}),
         channels: form.channels,
         scheduledFor: form.sendMode === 'later' && form.scheduledFor ? new Date(form.scheduledFor).toISOString() : undefined,
+        priority: form.priority,
+        bannerExpiresAt: form.priority === 'urgent' && form.bannerExpiresAt ? new Date(form.bannerExpiresAt).toISOString() : undefined,
       });
       setForm(emptyForm);
       setMessage(form.sendMode === 'later' ? 'Announcement scheduled.' : 'Announcement sent.');
@@ -315,6 +319,30 @@ export default function AnnouncementComposer() {
           </label>
 
           <label className="field">
+            <span>Priority</span>
+            <div style={{ display: 'flex', gap: 16, marginBottom: form.priority === 'urgent' ? 8 : 0 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
+                <input type="radio" name="priority" checked={form.priority === 'normal'} onChange={() => setForm({ ...form, priority: 'normal' })} />
+                Normal
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
+                <input type="radio" name="priority" checked={form.priority === 'urgent'} onChange={() => setForm({ ...form, priority: 'urgent' })} />
+                Urgent — also shows as a banner at the top of every screen
+              </label>
+            </div>
+            {form.priority === 'urgent' && (
+              <>
+                <span style={{ fontSize: 12.5 }} className="muted">Banner shows until (optional — leave blank to show until you delete it)</span>
+                <input
+                  type="datetime-local"
+                  value={form.bannerExpiresAt}
+                  onChange={(e) => setForm({ ...form, bannerExpiresAt: e.target.value })}
+                />
+              </>
+            )}
+          </label>
+
+          <label className="field">
             <span>When</span>
             <div style={{ display: 'flex', gap: 16, marginBottom: 8 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
@@ -361,7 +389,10 @@ export default function AnnouncementComposer() {
                     )}
                   </td>
                   <td>{targetLabel(a)}</td>
-                  <td>{a.category === 'fee_reminder' ? <span className="badge badge-warning">Fee Reminder</span> : <span className="badge badge-neutral">General</span>}</td>
+                  <td>
+                    {a.category === 'fee_reminder' ? <span className="badge badge-warning">Fee Reminder</span> : <span className="badge badge-neutral">General</span>}
+                    {a.priority === 'urgent' && <span className="badge badge-danger" style={{ marginLeft: 6 }}>Urgent</span>}
+                  </td>
                   <td>
                     {a.status === 'scheduled' ? (
                       <span className="badge badge-warning" title={a.scheduledFor ? new Date(a.scheduledFor).toLocaleString() : ''}>Scheduled</span>

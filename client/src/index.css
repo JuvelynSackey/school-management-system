@@ -619,6 +619,30 @@ button.cosmic-field-badge { cursor: pointer; }
 .topbar-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .topbar-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .topbar-user { text-align: right; min-width: 0; }
+
+.announcement-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 24px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  border-bottom: 1px solid var(--border);
+  font-size: 13.5px;
+}
+.announcement-banner-text { display: flex; align-items: baseline; gap: 8px; min-width: 0; overflow: hidden; }
+.announcement-banner-text strong { flex-shrink: 0; }
+.announcement-banner-text span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.announcement-banner-actions { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+.announcement-banner-link { color: var(--danger); font-weight: 600; text-decoration: underline; white-space: nowrap; }
+.announcement-banner-dismiss {
+  background: none; border: none; color: var(--danger); font-size: 16px; line-height: 1;
+  cursor: pointer; padding: 2px;
+}
+@media (max-width: 860px) {
+  .announcement-banner { padding: 10px 14px; flex-wrap: wrap; }
+}
 .user-name { display: block; font-weight: 500; color: var(--text-h); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .user-role { display: block; font-size: 12px; text-transform: capitalize; color: var(--text-muted); }
 

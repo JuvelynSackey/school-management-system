@@ -3,23 +3,10 @@ const {
 } = require('../models');
 const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/AppError');
-const { getTeacherClassIds } = require('../services/teacherScope.service');
 const { findOrCreate } = require('../utils/findOrCreate');
 const { renderHtmlToPdfBuffer } = require('../services/pdf.service');
 const { buildAssessmentSheetsPdfHtml } = require('../services/assessmentSheetTemplate.service');
 const auditLog = require('../services/auditLog.service');
-
-const assertClassAccess = async (req, classId) => {
-  if (req.user.role === 'admin') return;
-  if (req.user.role === 'teacher') {
-    const { classIds } = await getTeacherClassIds(req.user.id);
-    if (!classIds.includes(String(classId))) {
-      throw new AppError('You are not assigned to this class', 403);
-    }
-    return;
-  }
-  throw new AppError('You do not have permission to perform this action', 403);
-};
 
 const footerTemplate = `
   <div style="width:100%; font-size:9px; text-align:center; color:#777; padding: 0 20px;">
@@ -34,7 +21,6 @@ const footerTemplate = `
 const listSubjectsForClass = asyncHandler(async (req, res, next) => {
   const { classId, academicTermId } = req.query;
   if (!classId || !academicTermId) return next(new AppError('classId and academicTermId are required', 400));
-  await assertClassAccess(req, classId);
 
   const [classSubjects, assignments, rosterCount] = await Promise.all([
     ClassSubject.find({ classId }).populate('subject', 'name'),
@@ -70,7 +56,6 @@ const downloadSingle = asyncHandler(async (req, res, next) => {
   const { classId, subjectId, academicTermId } = req.query;
   const mode = req.query.mode === 'blank' ? 'blank' : 'prefilled';
   if (!classId || !subjectId || !academicTermId) return next(new AppError('classId, subjectId, and academicTermId are required', 400));
-  await assertClassAccess(req, classId);
 
   const [classRow, subject, term, students] = await Promise.all([
     Class.findById(classId),
@@ -111,7 +96,6 @@ const downloadBulk = asyncHandler(async (req, res, next) => {
   const { classId, academicTermId } = req.query;
   const mode = req.query.mode === 'blank' ? 'blank' : 'prefilled';
   if (!classId || !academicTermId) return next(new AppError('classId and academicTermId are required', 400));
-  await assertClassAccess(req, classId);
 
   const [classRow, term, students, classSubjects, assignments, settings] = await Promise.all([
     Class.findById(classId),

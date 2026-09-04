@@ -92,13 +92,13 @@ export default function AppRoutes() {
             <Route path="/audit-log" element={<AuditLogPage />} />
             <Route path="/fee-structures" element={<FeeStructuresPage />} />
             <Route path="/arrears" element={<ArrearsPage />} />
+            <Route path="/assessment-sheets" element={<AssessmentSheetsPage />} />
+            <Route path="/feeding-charges" element={<FeedingChargesPage />} />
           </Route>
 
           <Route element={<RoleRoute roles={['admin', 'teacher']} />}>
             <Route path="/students" element={<StudentList />} />
-            <Route path="/assessment-sheets" element={<AssessmentSheetsPage />} />
             <Route path="/parents" element={<Parents />} />
-            <Route path="/feeding-charges" element={<FeedingChargesPage />} />
             <Route path="/terminal-reports" element={<TerminalReports />} />
           </Route>
 

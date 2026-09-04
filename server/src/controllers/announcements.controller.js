@@ -46,7 +46,7 @@ const create = asyncHandler(async (req, res, next) => {
   const {
     message, targetType, targetClassId, targetStudentId,
     targetClassIds, targetTeacherIds, targetStudentIds, targetGuardianIds,
-    category, channels, scheduledFor,
+    category, channels, scheduledFor, priority, bannerExpiresAt,
   } = req.body;
 
   if (targetType === 'class' && !targetClassId) {
@@ -70,6 +70,8 @@ const create = asyncHandler(async (req, res, next) => {
   let announcement = await Announcement.create({
     message,
     category: category || 'general',
+    priority: priority || 'normal',
+    bannerExpiresAt: priority === 'urgent' ? (bannerExpiresAt ? new Date(bannerExpiresAt) : null) : null,
     targetType,
     targetClassId: targetType === 'class' ? targetClassId : null,
     targetStudentId: targetType === 'student' ? targetStudentId : null,
@@ -135,6 +137,24 @@ const getMyNoticeBoard = asyncHandler(async (req, res, next) => {
   res.json({ success: true, data: withReadState });
 });
 
+// GET /announcements/banner — the single newest still-active urgent
+// announcement targeted at the logged-in user, for the persistent top banner.
+// Reuses the same recipient-matching logic as the notice board so a banner
+// never shows something the recipient couldn't already see on /announcements.
+const getBanner = asyncHandler(async (req, res, next) => {
+  const match = await resolveNoticeBoardMatchForRole(req.user);
+  if (match === undefined || match === null) return res.json({ success: true, data: null });
+
+  const announcement = await Announcement.findOne({
+    ...match,
+    sentAt: { $ne: null },
+    priority: 'urgent',
+    $or: [{ bannerExpiresAt: null }, { bannerExpiresAt: { $gt: new Date() } }],
+  }).sort({ createdAt: -1 });
+
+  res.json({ success: true, data: announcement });
+});
+
 // GET /announcements/unread-count
 const unreadCount = asyncHandler(async (req, res, next) => {
   const match = await resolveNoticeBoardMatchForRole(req.user);
@@ -165,5 +185,5 @@ const markRead = asyncHandler(async (req, res, next) => {
 });
 
 module.exports = {
-  create, list, remove, getMyNoticeBoard, unreadCount, markRead, dispatchAnnouncement,
+  create, list, remove, getMyNoticeBoard, getBanner, unreadCount, markRead, dispatchAnnouncement,
 };
