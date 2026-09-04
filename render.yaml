@@ -28,6 +28,15 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # PDF generation (report cards, ID cards, broadsheets) uses
+      # puppeteer-core + @sparticuz/chromium in production — a Chromium
+      # build made for constrained Linux containers like this one, since
+      # puppeteer's own full bundled Chromium either fails to launch here
+      # (missing shared libs) or exceeds the free plan's RAM. This var
+      # skips puppeteer's own ~300MB Chromium download during the build,
+      # since production never uses it (local dev still does).
+      - key: PUPPETEER_SKIP_DOWNLOAD
+        value: 'true'
       # Your MongoDB Atlas connection string (Atlas is already a replica
       # set, which the app needs for its multi-document transactions —
       # nothing extra required there). Paste it in on Render's dashboard.
