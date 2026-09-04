@@ -1,6 +1,6 @@
 const {
   Student, Teacher, Class, Subject, Attendance, Fee, Payment, AcademicTerm, TerminalReport, SchoolSettings,
-  TeacherSubjectAssignment, GradingScheme,
+  TeacherSubjectAssignment, GradingScheme, Result, ExamSchedule,
 } = require('../models');
 const asyncHandler = require('../middleware/asyncHandler');
 const { getTeacherClassIds } = require('../services/teacherScope.service');
@@ -184,6 +184,10 @@ const getTeacherDashboard = async (userId, schoolId) => {
     acc.total += 1;
     return acc;
   }, { total: 0, Present: 0, Absent: 0, Late: 0, Excused: 0 });
+  const overallAttendancePercent = attendanceStats.total > 0
+    ? Math.round((attendanceStats.Present / attendanceStats.total) * 100)
+    : null;
+  const classIdsWithAttendanceToday = new Set(todayAttendance.map((r) => r.classId.toString()));
 
   // The class/subject pairs this teacher is assigned to, for the dashboard's
   // "My Classes" cards. There's no timetable/period model in this app, so
@@ -247,11 +251,102 @@ const getTeacherDashboard = async (userId, schoolId) => {
     ])
     : [[], []];
 
+  // Result-entry completion per (class, subject) assignment this term — same
+  // roster-vs-entered-count pattern assessmentSheets.controller.js's
+  // listSubjectsForClass uses, aggregated here for the Command Center's
+  // metric card, task list, and per-class progress bars instead of listed
+  // per subject.
+  const resultCompletion = currentTerm ? await Promise.all(myClasses.map(async (mc) => {
+    const [rosterCount, enteredCount] = await Promise.all([
+      Student.countDocuments({ classId: mc.classId, status: 'active' }),
+      Result.countDocuments({ classId: mc.classId, subjectId: mc.subjectId, academicTermId: currentTerm.id }),
+    ]);
+    let entryStatus = 'Not started';
+    if (enteredCount > 0 && enteredCount < rosterCount) entryStatus = 'In progress';
+    if (rosterCount > 0 && enteredCount >= rosterCount) entryStatus = 'Complete';
+    return {
+      classId: mc.classId, subjectId: mc.subjectId, rosterCount, enteredCount, entryStatus,
+    };
+  })) : [];
+  const completionByPair = new Map(resultCompletion.map((r) => [`${r.classId}:${r.subjectId}`, r]));
+  const pendingResultsCount = resultCompletion.filter((r) => r.entryStatus !== 'Complete').length;
+  const pendingMarksheets = resultCompletion.filter((r) => r.entryStatus !== 'Complete').map((r) => {
+    const pair = myClasses.find((mc) => mc.classId === r.classId && mc.subjectId === r.subjectId);
+    return {
+      classId: r.classId, subjectId: r.subjectId, className: pair?.className, subjectName: pair?.subjectName, entryStatus: r.entryStatus,
+    };
+  });
+
+  // One card per class — groups the flat (class, subject) myClasses list
+  // above by classId so a teacher who teaches 2 subjects in the same class
+  // sees one class card, not two.
+  const classCardMap = new Map();
+  myClasses.forEach((mc) => {
+    if (!classCardMap.has(mc.classId)) classCardMap.set(mc.classId, { classId: mc.classId, className: mc.className, subjects: [] });
+    const completion = completionByPair.get(`${mc.classId}:${mc.subjectId}`);
+    classCardMap.get(mc.classId).subjects.push({
+      subjectId: mc.subjectId, subjectName: mc.subjectName, entryStatus: completion?.entryStatus || 'Not started',
+    });
+  });
+  const classAttendanceToday = new Map();
+  todayAttendance.forEach((r) => {
+    const key = r.classId.toString();
+    const bucket = classAttendanceToday.get(key) || { total: 0, present: 0 };
+    bucket.total += 1;
+    if (r.status === 'Present') bucket.present += 1;
+    classAttendanceToday.set(key, bucket);
+  });
+  const classStudentCountEntries = await Promise.all([...classCardMap.keys()].map(async (id) => [
+    id, await Student.countDocuments({ classId: id, status: 'active' }),
+  ]));
+  const studentCountByClass = new Map(classStudentCountEntries);
+  const classCards = [...classCardMap.values()].map((c) => {
+    const attendanceBucket = classAttendanceToday.get(c.classId);
+    const completions = c.subjects.map((s) => completionByPair.get(`${c.classId}:${s.subjectId}`)).filter(Boolean);
+    const totalRoster = completions.reduce((sum, r) => sum + r.rosterCount, 0);
+    const totalEntered = completions.reduce((sum, r) => sum + r.enteredCount, 0);
+    return {
+      classId: c.classId,
+      className: c.className,
+      subjectNames: c.subjects.map((s) => s.subjectName),
+      studentCount: studentCountByClass.get(c.classId) || 0,
+      attendancePercent: attendanceBucket ? Math.round((attendanceBucket.present / attendanceBucket.total) * 100) : null,
+      resultCompletionPercent: totalRoster > 0 ? Math.round((totalEntered / totalRoster) * 100) : null,
+      subjects: c.subjects,
+    };
+  });
+  const overdueAttendanceClasses = classCards
+    .filter((c) => !classIdsWithAttendanceToday.has(c.classId))
+    .map((c) => ({ classId: c.classId, className: c.className }));
+
+  // Exam-only — this app has no daily period timetable, so "today's
+  // schedule" is today's scheduled exams for this teacher's classes (often
+  // empty; the UI shows an explicit empty state rather than implying a full
+  // class-period timetable exists).
+  const todaysExamScheduleRaw = classIds.length > 0
+    ? await ExamSchedule.find({ classId: { $in: classIds }, examDate: today })
+      .populate('class', 'name section')
+      .populate('subject', 'name')
+    : [];
+  const todaysExamSchedule = todaysExamScheduleRaw.map((e) => ({
+    id: e.id,
+    className: e.class ? `${e.class.name} ${e.class.section || ''}`.trim() : null,
+    subjectName: e.subject?.name || null,
+    startTime: e.startTime,
+    endTime: e.endTime,
+    room: e.room,
+  }));
+
   return {
     role: 'teacher',
     counts: { classes: classIds.length, students: studentCount },
     attendanceStats,
+    overallAttendancePercent,
+    pendingResultsCount,
     myClasses,
+    classCards,
+    taskCenter: { pendingMarksheets, overdueAttendanceClasses },
+    todaysExamSchedule,
     teachingResponsibilities,
     insights: {
       currentTermId: currentTerm?.id || null,

@@ -18,14 +18,14 @@ const createValidator = [
   body('targetStudentIds.*').optional().isMongoId(),
   body('targetGuardianIds').optional().isArray(),
   body('targetGuardianIds.*').optional().isMongoId(),
-  body('category').optional().isIn(['general', 'fee_reminder']),
+  body('category').optional().isIn(['general', 'fee_reminder', 'academic']),
   body('priority').optional().isIn(['normal', 'urgent']),
   body('bannerExpiresAt').optional({ nullable: true, checkFalsy: true }).isISO8601().withMessage('bannerExpiresAt must be a valid date/time'),
   body('scheduledFor').optional({ nullable: true, checkFalsy: true }).isISO8601().withMessage('scheduledFor must be a valid date/time'),
 ];
 
 const listValidator = [
-  query('category').optional().isIn(['general', 'fee_reminder']),
+  query('category').optional().isIn(['general', 'fee_reminder', 'academic']),
 ];
 
 module.exports = { createValidator, listValidator };

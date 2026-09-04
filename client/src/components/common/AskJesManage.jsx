@@ -11,6 +11,13 @@ const FLAG_LABELS = {
   failing_multiple_subjects: 'Failing Subjects',
 };
 
+// Fixed contextual placeholder for roles where a generic "pick from your
+// examples" hint isn't as useful as a one-line reminder of what this role
+// can actually ask about.
+const PLACEHOLDER_BY_ROLE = {
+  teacher: 'Ask about your classes, results, attendance...',
+};
+
 const EXAMPLE_QUESTIONS_BY_ROLE = {
   admin: [
     'Which students owe more than 200 in fees?',
@@ -257,7 +264,7 @@ export default function AskJesManage({ onClose, initialQuestion }) {
             type="text"
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
-            placeholder={exampleQuestions[0] ? `e.g. ${exampleQuestions[0]}` : 'e.g. Which class performed best this term?'}
+            placeholder={PLACEHOLDER_BY_ROLE[user?.role] || (exampleQuestions[0] ? `e.g. ${exampleQuestions[0]}` : 'e.g. Which class performed best this term?')}
             maxLength={300}
             autoFocus
           />

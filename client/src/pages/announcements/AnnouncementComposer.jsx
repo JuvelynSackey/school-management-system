@@ -17,6 +17,7 @@ const emptyForm = {
   targetTeacherIds: [],
   targetStudentIds: [],
   targetGuardianIds: [],
+  category: 'general',
   channels: ['in_app'],
   sendMode: 'now', // 'now' | 'later'
   scheduledFor: '',
@@ -139,6 +140,7 @@ export default function AnnouncementComposer() {
         targetClassId: form.targetType === 'class' ? form.targetClassId : undefined,
         targetStudentId: form.targetType === 'student' ? form.targetStudentId : undefined,
         ...(multiField ? { [multiField]: form[multiField] } : {}),
+        category: form.category,
         channels: form.channels,
         scheduledFor: form.sendMode === 'later' && form.scheduledFor ? new Date(form.scheduledFor).toISOString() : undefined,
         priority: form.priority,
@@ -235,6 +237,15 @@ export default function AnnouncementComposer() {
               <button key={t.key} type="button" className="link-btn" onClick={() => setForm((f) => ({ ...f, message: t.text }))}>{t.label}</button>
             ))}
           </div>
+
+          <label className="field">
+            <span>Category</span>
+            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+              <option value="general">General</option>
+              <option value="academic">Academic</option>
+              <option value="fee_reminder">Fee Reminder</option>
+            </select>
+          </label>
 
           <label className="field">
             <span>Send to</span>
@@ -390,7 +401,9 @@ export default function AnnouncementComposer() {
                   </td>
                   <td>{targetLabel(a)}</td>
                   <td>
-                    {a.category === 'fee_reminder' ? <span className="badge badge-warning">Fee Reminder</span> : <span className="badge badge-neutral">General</span>}
+                    {a.category === 'fee_reminder' && <span className="badge badge-warning">Fee Reminder</span>}
+                    {a.category === 'academic' && <span className="badge badge-neutral">Academic</span>}
+                    {a.category === 'general' && <span className="badge badge-neutral">General</span>}
                     {a.priority === 'urgent' && <span className="badge badge-danger" style={{ marginLeft: 6 }}>Urgent</span>}
                   </td>
                   <td>

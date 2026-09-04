@@ -12,7 +12,7 @@ import { computeGrade } from '../../utils/grading';
 import { useAuth } from '../../context/AuthContext';
 import { useOffline } from '../../context/OfflineContext';
 import {
-  getCache, setCache, queueWrite, removeFromQueue, markConflict, markFailed, getPending, isNetworkError,
+  getCache, setCache, queueWrite, removeFromQueue, markConflict, markFailed, getPending, getQueue, isNetworkError,
 } from '../../utils/offlineStore';
 import Modal from '../../components/common/Modal';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
@@ -131,6 +131,8 @@ export default function ResultsEntry({ initialClassId = '', initialSubjectId = '
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [dirtyStudentIds, setDirtyStudentIds] = useState(() => new Set());
+  const [lastSavedAt, setLastSavedAt] = useState(null);
   const [amending, setAmending] = useState(null);
   const [showingCached, setShowingCached] = useState(false);
   const [ackedAnomalies, setAckedAnomalies] = useState(new Set());
@@ -221,12 +223,14 @@ export default function ResultsEntry({ initialClassId = '', initialSubjectId = '
       const data = await getResultsRoster({ classId, subjectId, academicTermId });
       setRoster(data);
       setCache(key, data);
+      setDirtyStudentIds(new Set());
     } catch (err) {
       if (isNetworkError(err)) {
         const cached = getCache(key);
         if (cached) {
           setRoster(cached);
           setShowingCached(true);
+          setDirtyStudentIds(new Set());
         } else {
           setError('No connection, and no cached data for this selection yet.');
         }
@@ -256,8 +260,13 @@ export default function ResultsEntry({ initialClassId = '', initialSubjectId = '
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classId, subjectId, academicTermId]);
 
+  const markDirty = (studentId) => {
+    setDirtyStudentIds((prev) => new Set(prev).add(studentId));
+  };
+
   const setField = (studentId, field, value) => {
     setRoster((prev) => prev.map((r) => (r.studentId === studentId ? { ...r, [field]: value } : r)));
+    markDirty(studentId);
   };
 
   // scheme.classScoreConfig comes straight off GradingScheme (already
@@ -279,6 +288,7 @@ export default function ResultsEntry({ initialClassId = '', initialSubjectId = '
       const sum = Object.values(details).reduce((acc, v) => (v === '' || v === null || v === undefined ? acc : acc + Number(v)), 0);
       return { ...r, classScoreDetails: details, classScore: sum };
     }));
+    markDirty(studentId);
   };
 
   const isLocked = sheet?.status === 'Submitted' || sheet?.status === 'Approved';
@@ -306,6 +316,8 @@ export default function ResultsEntry({ initialClassId = '', initialSubjectId = '
       setCache(key, roster);
       refreshPendingCount();
       setMessage("Saved offline — will sync when you're back online.");
+      setDirtyStudentIds(new Set());
+      setLastSavedAt(new Date());
       setIsSaving(false);
       return;
     }
@@ -313,6 +325,8 @@ export default function ResultsEntry({ initialClassId = '', initialSubjectId = '
     try {
       await recordResults(payload);
       setMessage('Results saved.');
+      setDirtyStudentIds(new Set());
+      setLastSavedAt(new Date());
       loadRoster();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save results.');
@@ -382,6 +396,12 @@ export default function ResultsEntry({ initialClassId = '', initialSubjectId = '
     }
   };
 
+  // Precise, per-sheet sync status (as opposed to OfflineIndicator's global
+  // one) — read straight from the same offline queue this page already
+  // writes to, keyed to exactly the class/subject/term combo on screen.
+  const currentSheetKey = classId && subjectId && academicTermId ? rosterCacheKey(classId, subjectId, academicTermId) : null;
+  const queueEntry = currentSheetKey ? getQueue().find((entry) => entry.key === currentSheetKey) : null;
+
   return (
     <div>
       <div className="toolbar"><h1>Score Entry</h1></div>
@@ -412,6 +432,18 @@ export default function ResultsEntry({ initialClassId = '', initialSubjectId = '
 
         {showingCached && (
           <p className="muted" style={{ marginBottom: 12 }}>Showing cached data from earlier — reconnect to refresh.</p>
+        )}
+        {(dirtyStudentIds.size > 0 || lastSavedAt || queueEntry) && (
+          <div style={{
+            display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12, fontSize: 12.5,
+          }}
+          >
+            {dirtyStudentIds.size > 0 && <span className="badge badge-warning">Unsaved changes</span>}
+            {lastSavedAt && <span className="muted">Last saved {lastSavedAt.toLocaleTimeString()}</span>}
+            {queueEntry?.status === 'pending' && <span className="badge badge-neutral">Saved on this device — will sync automatically</span>}
+            {queueEntry?.status === 'conflict' && <span className="badge badge-danger">Sync conflict — resolve from the sync status menu in the top bar</span>}
+            {queueEntry?.status === 'failed' && <span className="badge badge-danger">Sync failed — will retry</span>}
+          </div>
         )}
         {error && <div className="alert-error">{error}</div>}
         {message && <div className="alert-error" style={{ background: 'var(--accent-bg)', color: 'var(--accent)' }}>{message}</div>}
@@ -458,6 +490,7 @@ export default function ResultsEntry({ initialClassId = '', initialSubjectId = '
                                   value={value}
                                   onChange={(e) => setDetailField(r.studentId, c.key, e.target.value)}
                                   disabled={isLocked}
+                                  className={dirtyStudentIds.has(r.studentId) ? 'score-cell-dirty' : undefined}
                                   style={{
                                     width: 60, padding: '6px 8px', borderRadius: 6,
                                     border: `1px solid ${overMax ? 'var(--danger)' : 'var(--border)'}`,
@@ -478,6 +511,7 @@ export default function ResultsEntry({ initialClassId = '', initialSubjectId = '
                             value={r.classScore}
                             onChange={(e) => setField(r.studentId, 'classScore', e.target.value)}
                             disabled={isLocked}
+                            className={dirtyStudentIds.has(r.studentId) ? 'score-cell-dirty' : undefined}
                             style={{ width: 70, padding: '6px 8px', border: '1px solid var(--border)', borderRadius: 6 }}
                           />
                         </td>
@@ -490,6 +524,7 @@ export default function ResultsEntry({ initialClassId = '', initialSubjectId = '
                           value={r.examScore}
                           onChange={(e) => setField(r.studentId, 'examScore', e.target.value)}
                           disabled={isLocked}
+                          className={dirtyStudentIds.has(r.studentId) ? 'score-cell-dirty' : undefined}
                           style={{ width: 70, padding: '6px 8px', border: '1px solid var(--border)', borderRadius: 6 }}
                         />
                       </td>

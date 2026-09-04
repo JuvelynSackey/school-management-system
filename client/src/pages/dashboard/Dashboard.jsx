@@ -6,7 +6,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { getDashboard } from '../../api/dashboard.api';
-import { listAnnouncements } from '../../api/announcements.api';
+import { listAnnouncements, getUnreadAnnouncementCount } from '../../api/announcements.api';
 import { listAuditLogs } from '../../api/auditLogs.api';
 import { getAtRiskStudents } from '../../api/earlyWarning.api';
 import { getAcademicAnalytics } from '../../api/analytics.api';
@@ -708,65 +708,159 @@ function TeacherInsightsPanel({ insights }) {
   );
 }
 
+function TaskCenter({ taskCenter, unreadNoticeCount, navigate }) {
+  const { pendingMarksheets, overdueAttendanceClasses } = taskCenter || { pendingMarksheets: [], overdueAttendanceClasses: [] };
+  const hasTasks = pendingMarksheets.length > 0 || overdueAttendanceClasses.length > 0 || unreadNoticeCount > 0;
+
+  return (
+    <div className="panel">
+      <h2>Task Center</h2>
+      {!hasTasks && <p className="muted">Nothing outstanding — you&apos;re caught up.</p>}
+      {hasTasks && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {pendingMarksheets.map((t) => (
+            <div key={`${t.classId}:${t.subjectId}`} className="task-row">
+              <span>Enter results — <strong>{t.className}</strong> ({t.subjectName}) <span className="badge badge-warning" style={{ marginLeft: 6 }}>{t.entryStatus}</span></span>
+              <button type="button" className="btn-secondary" onClick={() => navigate(`/results?classId=${t.classId}&subjectId=${t.subjectId}`)}>Enter Results</button>
+            </div>
+          ))}
+          {overdueAttendanceClasses.map((c) => (
+            <div key={c.classId} className="task-row">
+              <span>Attendance not yet taken today — <strong>{c.className}</strong></span>
+              <button type="button" className="btn-secondary" onClick={() => navigate(`/attendance?classId=${c.classId}`)}>Take Attendance</button>
+            </div>
+          ))}
+          {unreadNoticeCount > 0 && (
+            <div className="task-row">
+              <span>{unreadNoticeCount} unread notice{unreadNoticeCount === 1 ? '' : 's'} from administration</span>
+              <button type="button" className="btn-secondary" onClick={() => navigate('/announcements')}>View Notices</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ClassCardsGrid({ classCards, navigate }) {
+  if (classCards.length === 0) {
+    return <p className="muted">No class/subject assignments yet — ask an admin to assign you one.</p>;
+  }
+  return (
+    <div className="class-cards-grid">
+      {classCards.map((c) => (
+        <div key={c.classId} className="class-command-card">
+          <span style={{ fontWeight: 600, color: 'var(--text-h)' }}>{c.className}</span>
+          <span className="muted" style={{ fontSize: 12.5 }}>{c.subjectNames.join(', ') || 'No subjects assigned'}</span>
+          <span className="muted" style={{ fontSize: 12.5 }}>{c.studentCount} student{c.studentCount === 1 ? '' : 's'}</span>
+
+          <div style={{ marginTop: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5 }} className="muted">
+              <span>Attendance today</span>
+              <span>{c.attendancePercent === null ? 'Not recorded' : `${c.attendancePercent}%`}</span>
+            </div>
+            <div className="progress-bar"><div className="progress-bar-fill" style={{ width: `${c.attendancePercent ?? 0}%` }} /></div>
+          </div>
+
+          <div style={{ marginTop: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5 }} className="muted">
+              <span>Result completion</span>
+              <span>{c.resultCompletionPercent === null ? 'N/A' : `${c.resultCompletionPercent}%`}</span>
+            </div>
+            <div className="progress-bar"><div className="progress-bar-fill" style={{ width: `${c.resultCompletionPercent ?? 0}%` }} /></div>
+          </div>
+
+          <div style={{
+            display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap',
+          }}
+          >
+            <button type="button" className="btn-secondary" style={{ fontSize: 12.5, padding: '6px 12px' }} onClick={() => navigate(`/attendance?classId=${c.classId}`)}>
+              Take Attendance
+            </button>
+            {c.subjects.map((s) => (
+              <button
+                key={s.subjectId}
+                type="button"
+                className="btn-primary"
+                style={{ fontSize: 12.5, padding: '6px 12px' }}
+                onClick={() => navigate(`/results?classId=${c.classId}&subjectId=${s.subjectId}`)}
+              >
+                Enter Results{c.subjects.length > 1 ? ` (${s.subjectName})` : ''}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TodaysSchedule({ todaysExamSchedule }) {
+  return (
+    <div className="panel">
+      <h2>Today&apos;s Schedule</h2>
+      <p className="muted" style={{ marginBottom: 12 }}>Scheduled exams for your classes today.</p>
+      {todaysExamSchedule.length === 0 && <p className="muted">No exams scheduled for today.</p>}
+      {todaysExamSchedule.length > 0 && (
+        <table>
+          <thead><tr><th>Time</th><th>Class</th><th>Subject</th><th>Room</th></tr></thead>
+          <tbody>
+            {todaysExamSchedule.map((e) => (
+              <tr key={e.id}>
+                <td>{e.startTime}–{e.endTime}</td>
+                <td>{e.className}</td>
+                <td>{e.subjectName}</td>
+                <td>{e.room || '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 function TeacherDashboard({ data, user }) {
   const {
-    counts, attendanceStats, myClasses, teachingResponsibilities, insights,
+    counts, overallAttendancePercent, pendingResultsCount, classCards, taskCenter, todaysExamSchedule, teachingResponsibilities, insights,
   } = data;
   const navigate = useNavigate();
+  const [unreadNoticeCount, setUnreadNoticeCount] = useState(0);
   const homeroomClasses = (teachingResponsibilities || []).filter((r) => r.isHomeroom);
+
+  useEffect(() => {
+    getUnreadAnnouncementCount().then(setUnreadNoticeCount).catch(() => setUnreadNoticeCount(0));
+  }, []);
+
   return (
     <>
-      <h1 style={{ marginBottom: 4 }}>{timeOfDayGreeting()}, {user?.fullName?.split(' ')[0]} 👋</h1>
+      <h1 style={{ marginBottom: 4 }}>{timeOfDayGreeting()}, {user?.fullName?.split(' ')[0]}</h1>
       <p className="muted" style={{ marginBottom: 20 }}>Here&apos;s what&apos;s on today.</p>
 
       <div className="cards">
-        <div className="card"><div>My Classes</div><div className="num">{counts.classes}</div></div>
         <div className="card"><div>My Students</div><div className="num">{counts.students}</div></div>
+        <div className="card"><div>My Classes</div><div className="num">{counts.classes}</div></div>
+        <div className="card"><div>Attendance Today</div><div className="num">{overallAttendancePercent === null ? '—' : `${overallAttendancePercent}%`}</div></div>
+        <div className="card"><div>Pending Results</div><div className="num">{pendingResultsCount}</div></div>
       </div>
+
+      <TaskCenter taskCenter={taskCenter} unreadNoticeCount={unreadNoticeCount} navigate={navigate} />
 
       <div className="panel">
         <h2>My Classes</h2>
         {homeroomClasses.length > 0 && (
           <div style={{ marginBottom: 12 }}>
             {homeroomClasses.map((c) => (
-              <span key={c.classId} className="badge badge-success" style={{ marginRight: 8 }}>🏠 Homeroom: {c.className}</span>
+              <span key={c.classId} className="badge badge-success" style={{ marginRight: 8 }}>Homeroom: {c.className}</span>
             ))}
           </div>
         )}
-        {myClasses.length === 0 && homeroomClasses.length === 0 && (
-          <p className="muted">No class/subject assignments yet — ask an admin to assign you one.</p>
-        )}
-        {myClasses.length === 0 && homeroomClasses.length > 0 && (
-          <p className="muted">No subject assignments yet — you still have full Master Entry access to your homeroom class above.</p>
-        )}
-        {myClasses.length > 0 && (
-          <div className="quick-actions-grid">
-            {myClasses.map((c) => (
-              <div key={`${c.classId}:${c.subjectId}`} className="quick-action-item" style={{ cursor: 'default' }}>
-                <span style={{ fontWeight: 600, color: 'var(--text-h)' }}>{c.className}</span>
-                <span className="muted" style={{ fontSize: 12.5 }}>{c.subjectName}</span>
-                <button
-                  type="button"
-                  className="btn-primary"
-                  style={{ marginTop: 4, fontSize: 12.5, padding: '6px 12px' }}
-                  onClick={() => navigate(`/results?classId=${c.classId}&subjectId=${c.subjectId}`)}
-                >
-                  Enter Scores
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+        <ClassCardsGrid classCards={classCards} navigate={navigate} />
       </div>
 
-      <div className="toolbar" style={{ marginBottom: 16 }}>
-        <button type="button" className="btn-secondary" onClick={() => navigate('/attendance')}>Record Attendance</button>
-        <button type="button" className="btn-secondary" onClick={() => navigate('/results')}>Score Entry (all classes)</button>
-      </div>
-      <div className="panel">
-        <h2>Today&apos;s Attendance (My Classes)</h2>
-        <AttendanceCards stats={attendanceStats} />
-      </div>
+      <TodaysSchedule todaysExamSchedule={todaysExamSchedule} />
+
+      <h2 style={{ marginTop: 24, marginBottom: 8 }}>Class Performance</h2>
       <TeacherInsightsPanel insights={insights} />
       <AtRiskStudentsPanel />
     </>

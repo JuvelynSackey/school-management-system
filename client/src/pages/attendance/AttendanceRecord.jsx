@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { listClasses, getMyClassAccess } from '../../api/classes.api';
 import { listTerms } from '../../api/terms.api';
 import { getRoster, recordAttendance, getClassSummary } from '../../api/attendance.api';
@@ -11,9 +12,10 @@ const today = () => new Date().toISOString().slice(0, 10);
 export default function AttendanceRecord() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const [searchParams] = useSearchParams();
   const [classes, setClasses] = useState([]);
   const [terms, setTerms] = useState([]);
-  const [classId, setClassId] = useState('');
+  const [classId, setClassId] = useState(searchParams.get('classId') || '');
   const [access, setAccess] = useState(null);
   const [date, setDate] = useState(today());
   const [roster, setRoster] = useState([]);

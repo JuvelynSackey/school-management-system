@@ -620,6 +620,66 @@ button.cosmic-field-badge { cursor: pointer; }
 .topbar-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .topbar-user { text-align: right; min-width: 0; }
 
+.notice-drawer-overlay {
+  position: fixed; inset: 0; background: rgba(8,6,13,0.45); z-index: 110;
+  display: flex; justify-content: flex-end;
+}
+.notice-drawer {
+  width: min(420px, 100%); height: 100%; overflow-y: auto;
+  background: var(--surface); border-left: 1px solid var(--border);
+  box-shadow: -12px 0 32px rgba(0,0,0,0.18);
+}
+.notice-drawer-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--surface);
+}
+.notice-drawer-body { padding: 20px; }
+.notice-drawer-meta {
+  display: grid; grid-template-columns: auto 1fr; gap: 6px 12px;
+  margin: 16px 0; font-size: 13px;
+}
+.notice-drawer-meta dt { color: var(--text-muted); font-weight: 500; }
+.notice-drawer-meta dd { margin: 0; color: var(--text); }
+
+.notification-bell { position: relative; }
+.notification-bell-trigger {
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px;
+  background: none; border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text-h); cursor: pointer;
+}
+.notification-bell-trigger:hover { background: var(--bg); }
+.notification-bell-count {
+  position: absolute; top: -6px; right: -6px;
+  min-width: 16px; height: 16px; padding: 0 4px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--danger); color: #fff;
+  font-size: 10px; font-weight: 700; border-radius: 999px; line-height: 1;
+}
+.notification-dropdown {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  width: 340px; max-height: 420px; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.18);
+  z-index: 120;
+}
+.notification-dropdown-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  font-size: 13px; font-weight: 600; color: var(--text-h);
+  position: sticky; top: 0; background: var(--surface);
+}
+.notification-dropdown-item { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.notification-dropdown-item:last-child { border-bottom: none; }
+.notification-dropdown-item.is-unread { background: var(--accent-bg); }
+.notification-dropdown-message { margin: 0 0 6px; font-size: 13px; color: var(--text); }
+.notification-dropdown-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11.5px; }
+@media (max-width: 860px) {
+  .notification-dropdown { position: fixed; top: 60px; left: 12px; right: 12px; width: auto; }
+}
+
 .announcement-banner {
   display: flex;
   align-items: center;
@@ -913,6 +973,23 @@ th { color: var(--text-muted); font-weight: 500; font-size: 12px; text-transform
   background: none; border: none; color: var(--accent); cursor: pointer; padding: 0; font-size: 13px;
 }
 .link-btn.danger { color: var(--danger); }
+
+/* Teacher Command Center: task rows, class cards, progress bars */
+.task-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface); flex-wrap: wrap;
+}
+.class-cards-grid { display: flex; gap: 14px; flex-wrap: wrap; }
+.class-command-card {
+  display: flex; flex-direction: column; gap: 6px;
+  width: 260px; padding: 16px; border-radius: 14px; border: 1px solid var(--border);
+  background: var(--surface);
+}
+.progress-bar { height: 6px; border-radius: 999px; background: var(--border); overflow: hidden; margin-top: 4px; }
+.progress-bar-fill { height: 100%; background: var(--accent); border-radius: 999px; }
+
+.score-cell-dirty { background: var(--warning-bg) !important; border-color: var(--warning) !important; }
 
 /* Quick Actions icon grid */
 .quick-actions-grid { display: flex; gap: 14px; flex-wrap: wrap; }

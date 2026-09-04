@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import ThemeToggle from '../common/ThemeToggle';
 import OfflineIndicator from '../common/OfflineIndicator';
 import AnnouncementBanner from '../common/AnnouncementBanner';
+import NotificationBell from '../common/NotificationBell';
 import AskJesManage from '../common/AskJesManage';
 import CommandPalette from '../common/CommandPalette';
 import ScrollToTopButton from '../common/ScrollToTopButton';
@@ -137,6 +138,7 @@ export default function AppShell() {
             </div>
           </div>
           <div className="topbar-actions">
+            <NotificationBell />
             {ASK_JESMANAGE_ROLES.includes(user?.role) && (
               <button type="button" className="btn-secondary" onClick={() => setAskOpen(true)}>🔎 Ask JesManage</button>
             )}
