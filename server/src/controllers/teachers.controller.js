@@ -110,4 +110,29 @@ const remove = asyncHandler(async (req, res, next) => {
   res.json({ success: true, data: null });
 });
 
-module.exports = { list, getById, create, update, remove };
+// POST /teachers/me/signature — a teacher uploading their own signature
+// image, embedded on terminal report cards when they're the class's
+// homeroom teacher (see reportCardTemplate.service.js). Self only: scoped
+// to req.user.id, never a :id param, so a teacher can't touch another
+// teacher's record.
+const uploadMySignature = asyncHandler(async (req, res, next) => {
+  if (!req.file) return next(new AppError('A signature image is required', 400));
+
+  const signatureUrl = `${req.protocol}://${req.get('host')}/uploads/signatures/${req.file.filename}`;
+  const teacher = await Teacher.findOneAndUpdate(
+    { userId: req.user.id },
+    { $set: { signatureUrl } },
+    { new: true },
+  );
+  if (!teacher) return next(new AppError('Teacher profile not found', 404));
+
+  await auditLog.record({
+    req, action: 'teacher.signatureUpload', entityType: 'Teacher', entityId: teacher.id, description: 'Uploaded their signature',
+  });
+
+  res.json({ success: true, data: { signatureUrl } });
+});
+
+module.exports = {
+  list, getById, create, update, remove, uploadMySignature,
+};

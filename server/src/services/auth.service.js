@@ -30,6 +30,7 @@ const toPublicUser = (user, school, teacher) => ({
     staffPhone: teacher.phone || null,
     qualification: teacher.qualification || null,
     gender: teacher.gender || null,
+    signatureUrl: teacher.signatureUrl || null,
   } : {}),
 });
 

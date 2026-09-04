@@ -1,4 +1,6 @@
-const { TerminalReport, Student, Class, AcademicTerm, Result, ClassSubject, ResultSheet, SchoolSettings, School, PersonalAttribute } = require('../models');
+const {
+  TerminalReport, Student, Class, AcademicTerm, Result, ClassSubject, ResultSheet, SchoolSettings, School, PersonalAttribute, Teacher,
+} = require('../models');
 const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/AppError');
 const { getTeacherClassIds, isHomeroomTeacher } = require('../services/teacherScope.service');
@@ -341,6 +343,16 @@ const publishAll = asyncHandler(async (req, res, next) => {
   res.json({ success: true, data: { published: result.modifiedCount } });
 });
 
+// The class's current homeroom teacher's signature image, for the report
+// card's Class Teacher signature block — there's no per-report link back to
+// who actually submitted teacherRemark (only the typed teacherSignatureName
+// is stored), so this resolves to whoever is homeroom teacher *now*.
+const resolveClassTeacherSignatureUrl = async (classRow) => {
+  if (!classRow.classTeacherId) return null;
+  const classTeacher = await Teacher.findById(classRow.classTeacherId, 'signatureUrl');
+  return classTeacher?.signatureUrl || null;
+};
+
 // Gathers everything buildReportCardsPdfHtml needs for a class/term, or a
 // subset of it if studentIds is given — shared by the whole-class PDF, the
 // print-selected-students PDF, and the ZIP-of-individual-PDFs download, so
@@ -382,9 +394,10 @@ const buildClassPdfContext = async (req, { classId, academicTermId, studentIds }
   }));
 
   const attributeNameById = new Map((await PersonalAttribute.find()).map((a) => [a.id, a.name]));
+  const classTeacherSignatureUrl = await resolveClassTeacherSignatureUrl(classRow);
 
   return {
-    school, classRow, term, nextTerm, reports, resultsByStudent, totalPossible, rollCount: reports.length, qrByReportId, scheme, attributeNameById,
+    school, classRow, term, nextTerm, reports, resultsByStudent, totalPossible, rollCount: reports.length, qrByReportId, scheme, attributeNameById, classTeacherSignatureUrl,
   };
 };
 
@@ -537,6 +550,7 @@ const downloadStudentPdf = asyncHandler(async (req, res, next) => {
   const schoolDoc = await School.findById(req.user.schoolId);
   const qrCodeDataUrl = await buildVerificationQrDataUrl('report', report.id, schoolDoc.slug);
   const attributeNameById = new Map((await PersonalAttribute.find()).map((a) => [a.id, a.name]));
+  const classTeacherSignatureUrl = await resolveClassTeacherSignatureUrl(classRow);
 
   const html = buildReportCardsPdfHtml({
     school: settings,
@@ -550,6 +564,7 @@ const downloadStudentPdf = asyncHandler(async (req, res, next) => {
     qrByReportId: new Map([[report.id, qrCodeDataUrl]]),
     scheme,
     attributeNameById,
+    classTeacherSignatureUrl,
   });
 
   const pdfBuffer = await renderHtmlToPdfBuffer(html, { format: 'A4' });

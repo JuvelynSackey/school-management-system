@@ -7,6 +7,7 @@ import {
   listPersonalAttributes, createPersonalAttribute, updatePersonalAttribute, deletePersonalAttribute,
 } from '../../api/personalAttributes.api';
 import { getGradingScheme, updateGradingScheme } from '../../api/gradingScheme.api';
+import ImageUploadField from '../../components/common/ImageUploadField';
 
 function SchoolEmblemIcon() {
   return (
@@ -23,53 +24,6 @@ function SignatureIcon() {
       <path d="M3 17.5c2-.5 3-2 4-3.5 1.5-2.3 2.7-6.5 4.3-6.5 1.3 0 1 3 2.2 3 1.5 0 2.7-2.5 4-2.5.9 0 1 1.3 2 1.3.7 0 1-.6 1.5-1.3" />
       <path d="M4 20.5h16" />
     </svg>
-  );
-}
-
-// Shared by the logo and headteacher-signature fields below — same
-// immediate-upload-on-select behavior (mirrors StudentPhoto's pattern in
-// StudentProfile.jsx), just a different upload function, alt text, and
-// fallback icon.
-function ImageUploadField({
-  imageUrl, alt, onUploaded, uploadFn, resultKey, label, fallbackIcon,
-}) {
-  const [isUploading, setIsUploading] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleFile = async (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = ''; // allow re-selecting the same file next time
-    if (!file) return;
-    setIsUploading(true);
-    setError('');
-    try {
-      const result = await uploadFn(file);
-      onUploaded(result[resultKey]);
-    } catch (err) {
-      setError(err.response?.data?.message || `Failed to upload ${label.toLowerCase()}.`);
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18 }}>
-      {imageUrl ? (
-        <img src={imageUrl} alt={alt} style={{ width: 64, height: 64, borderRadius: 12, objectFit: 'cover', border: '1px solid var(--border)' }} />
-      ) : (
-        <div className="profile-avatar" style={{ width: 64, height: 64, marginBottom: 0, borderRadius: 12 }}>
-          {fallbackIcon}
-        </div>
-      )}
-      <div>
-        <label className="btn-secondary" style={{ cursor: 'pointer', fontSize: 13, display: 'inline-block' }}>
-          {isUploading ? 'Uploading…' : imageUrl ? `Replace ${label}` : `Upload ${label}`}
-          <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFile} disabled={isUploading} style={{ display: 'none' }} />
-        </label>
-        <p className="muted" style={{ fontSize: 11.5, margin: '6px 0 0' }}>JPEG, PNG, or WebP — up to 2MB.</p>
-        {error && <p className="alert-error" style={{ padding: '4px 10px', margin: '6px 0 0', fontSize: 12 }}>{error}</p>}
-      </div>
-    </div>
   );
 }
 

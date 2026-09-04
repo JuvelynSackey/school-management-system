@@ -8,15 +8,15 @@ const MIME_BY_EXT = {
 // PDF templates are rendered via Puppeteer's page.setContent(), which has no
 // base URL to resolve a relative/absolute <img src> against — embedding as a
 // base64 data URI (same approach verification.service.js already uses for
-// QR codes) sidesteps that entirely. Returns null if there's no logo, or if
+// QR codes) sidesteps that entirely. Returns null if there's no image, or if
 // the file can't be read (e.g. it was uploaded then deleted) — templates
-// fall back to their existing text-only header in either case.
-const getLogoDataUrl = (logoUrl) => {
-  if (!logoUrl) return null;
+// fall back to their existing text-only rendering in either case.
+const getImageDataUrl = (fileUrl, uploadsSubdir) => {
+  if (!fileUrl) return null;
   try {
-    const filename = logoUrl.split('/uploads/logos/')[1];
+    const filename = fileUrl.split(`/uploads/${uploadsSubdir}/`)[1];
     if (!filename) return null;
-    const filePath = path.join(__dirname, '../../uploads/logos', filename);
+    const filePath = path.join(__dirname, `../../uploads/${uploadsSubdir}`, filename);
     const mimeType = MIME_BY_EXT[path.extname(filename).toLowerCase()];
     if (!mimeType) return null;
     const bytes = fs.readFileSync(filePath);
@@ -26,4 +26,7 @@ const getLogoDataUrl = (logoUrl) => {
   }
 };
 
-module.exports = { getLogoDataUrl };
+const getLogoDataUrl = (logoUrl) => getImageDataUrl(logoUrl, 'logos');
+const getSignatureDataUrl = (signatureUrl) => getImageDataUrl(signatureUrl, 'signatures');
+
+module.exports = { getLogoDataUrl, getSignatureDataUrl };

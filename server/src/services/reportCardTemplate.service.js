@@ -1,4 +1,4 @@
-const { getLogoDataUrl } = require('./branding.service');
+const { getLogoDataUrl, getSignatureDataUrl } = require('./branding.service');
 
 const ORDINALS = { 1: 'st', 2: 'nd', 3: 'rd' };
 const ordinal = (n) => {
@@ -32,7 +32,9 @@ const overallGrade = (averageScore, bands) => {
   return match ? match.grade : (sorted[sorted.length - 1]?.grade || 'F9');
 };
 
-const buildStudentPageHtml = ({ school, classRow, term, nextTerm, report, results, totalPossible, rollCount, qrCodeDataUrl, scheme, attributeNameById }) => {
+const buildStudentPageHtml = ({
+  school, classRow, term, nextTerm, report, results, totalPossible, rollCount, qrCodeDataUrl, scheme, attributeNameById, classTeacherSignatureUrl,
+}) => {
   const isLocked = report.status === 'Locked';
   const watermark = !isLocked ? '<div class="watermark">DRAFT — NOT YET APPROVED</div>' : '';
   // Lower Primary/KG/Nursery in Ghana typically use qualitative assessment
@@ -66,6 +68,8 @@ const buildStudentPageHtml = ({ school, classRow, term, nextTerm, report, result
     .filter(Boolean).join(' &nbsp;|&nbsp; ');
 
   const logoDataUrl = getLogoDataUrl(school.logoUrl);
+  const teacherSignatureDataUrl = getSignatureDataUrl(classTeacherSignatureUrl);
+  const headteacherSignatureDataUrl = getSignatureDataUrl(school.headteacherSignatureUrl);
 
   return `
     <section class="page">
@@ -166,13 +170,13 @@ const buildStudentPageHtml = ({ school, classRow, term, nextTerm, report, result
 
       <div class="signatures">
         <div class="sig-block">
-          <div class="sig-line"></div>
+          <div class="sig-line">${teacherSignatureDataUrl ? `<img class="sig-image" src="${teacherSignatureDataUrl}" alt="Class teacher signature" />` : ''}</div>
           <p class="sig-role">Class Teacher</p>
           <p class="sig-name">${report.teacherSignatureName || '—'}</p>
           <p class="sig-date">Date: ${report.teacherSignatureName ? generatedDate : '—'}</p>
         </div>
         <div class="sig-block">
-          <div class="sig-line"></div>
+          <div class="sig-line">${headteacherSignatureDataUrl ? `<img class="sig-image" src="${headteacherSignatureDataUrl}" alt="Headteacher signature" />` : ''}</div>
           <p class="sig-role">Headteacher</p>
           <p class="sig-name">${report.headteacherSignatureName || '—'}</p>
           <p class="sig-date">Date: ${signedDate}</p>
@@ -194,7 +198,9 @@ const buildStudentPageHtml = ({ school, classRow, term, nextTerm, report, result
   `;
 };
 
-const buildReportCardsPdfHtml = ({ school, classRow, term, nextTerm, reports, resultsByStudent, totalPossible, rollCount, qrByReportId, scheme }) => {
+const buildReportCardsPdfHtml = ({
+  school, classRow, term, nextTerm, reports, resultsByStudent, totalPossible, rollCount, qrByReportId, scheme, attributeNameById, classTeacherSignatureUrl,
+}) => {
   const pages = reports.map((report) => buildStudentPageHtml({
     school,
     classRow,
@@ -206,6 +212,8 @@ const buildReportCardsPdfHtml = ({ school, classRow, term, nextTerm, reports, re
     rollCount,
     qrCodeDataUrl: qrByReportId?.get(report.id),
     scheme,
+    attributeNameById,
+    classTeacherSignatureUrl,
   })).join('');
 
   return `
@@ -286,7 +294,8 @@ const buildReportCardsPdfHtml = ({ school, classRow, term, nextTerm, reports, re
 
   .signatures { display: flex; justify-content: space-between; gap: 60px; margin: 28px 0 20px; }
   .sig-block { flex: 1; text-align: center; }
-  .sig-line { border-bottom: 1px solid #333; height: 40px; }
+  .sig-line { border-bottom: 1px solid #333; height: 40px; display: flex; align-items: flex-end; justify-content: center; }
+  .sig-image { max-height: 36px; max-width: 160px; object-fit: contain; }
   .sig-role { margin: 6px 0 0; font-size: 12px; font-weight: bold; }
   .sig-name { margin: 2px 0; font-size: 12px; }
   .sig-date { margin: 2px 0; font-size: 11px; color: #666; }

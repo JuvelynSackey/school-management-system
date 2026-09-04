@@ -13,6 +13,10 @@ const teacherSchema = new mongoose.Schema({
   hireDate: { type: String, default: null },
   qualification: { type: String, default: null },
   status: { type: String, required: true, enum: ['active', 'inactive'], default: 'active' },
+  // Self-uploaded via POST /teachers/me/signature — embedded on terminal
+  // report cards next to the class-teacher remark when this teacher is the
+  // class's homeroom teacher (see reportCardTemplate.service.js).
+  signatureUrl: { type: String, default: null },
 }, { timestamps: true });
 
 teacherSchema.index({ schoolId: 1, userId: 1 }, { unique: true });

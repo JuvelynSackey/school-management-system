@@ -2,10 +2,22 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { updateMe, changePassword } from '../../api/auth.api';
 import { getDashboard } from '../../api/dashboard.api';
+import { uploadMySignature } from '../../api/teachers.api';
+import ImageUploadField from '../../components/common/ImageUploadField';
+
+function SignatureIcon() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 17.5c2-.5 3-2 4-3.5 1.5-2.3 2.7-6.5 4.3-6.5 1.3 0 1 3 2.2 3 1.5 0 2.7-2.5 4-2.5.9 0 1 1.3 2 1.3.7 0 1-.6 1.5-1.3" />
+      <path d="M4 20.5h16" />
+    </svg>
+  );
+}
 
 export default function MyAccount() {
   const { user, setUser } = useAuth();
   const [teachingResponsibilities, setTeachingResponsibilities] = useState(null);
+  const [signatureUrl, setSignatureUrl] = useState(user?.signatureUrl || null);
 
   useEffect(() => {
     if (user?.role !== 'teacher') return;
@@ -109,6 +121,24 @@ export default function MyAccount() {
             <div><strong>Qualification:</strong> {user.qualification || '—'}</div>
             <div><strong>Gender:</strong> {user.gender || '—'}</div>
           </div>
+        </div>
+      )}
+
+      {user?.role === 'teacher' && (
+        <div className="panel" style={{ maxWidth: 480, marginBottom: 20 }}>
+          <h3 style={{ fontSize: 14, margin: '0 0 12px' }}>My Signature</h3>
+          <p className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>
+            Shown on terminal report cards for classes where you are the class teacher.
+          </p>
+          <ImageUploadField
+            imageUrl={signatureUrl}
+            alt="My signature"
+            onUploaded={(url) => { setSignatureUrl(url); setUser((u) => ({ ...u, signatureUrl: url })); }}
+            uploadFn={uploadMySignature}
+            resultKey="signatureUrl"
+            label="Signature"
+            fallbackIcon={<SignatureIcon />}
+          />
         </div>
       )}
 

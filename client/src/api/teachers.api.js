@@ -5,3 +5,9 @@ export const getTeacher = (id) => apiClient.get(`/teachers/${id}`).then((res) =>
 export const createTeacher = (payload) => apiClient.post('/teachers', payload).then((res) => res.data.data);
 export const updateTeacher = (id, payload) => apiClient.put(`/teachers/${id}`, payload).then((res) => res.data.data);
 export const deleteTeacher = (id) => apiClient.delete(`/teachers/${id}`).then((res) => res.data.data);
+
+export const uploadMySignature = (file) => {
+  const formData = new FormData();
+  formData.append('signature', file);
+  return apiClient.post('/teachers/me/signature', formData).then((res) => res.data.data);
+};
