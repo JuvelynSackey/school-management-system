@@ -156,8 +156,9 @@ export default function TerminalReports() {
     ? `${selectedClass.classTeacher.firstName} ${selectedClass.classTeacher.lastName}`
     : '';
 
-  // "Submit & Next" (ManageReportModal) advances straight to the next row in
-  // the table instead of closing back to the list -- lets a homeroom teacher
+  // Submitting a teacher remark or locking a headteacher remark
+  // (ManageReportModal) advances straight to the next row in the table
+  // instead of closing back to the list -- lets a teacher or headteacher
   // work through a whole class's remarks without reopening Manage each time.
   const handleAdvance = () => {
     const currentIndex = reports.findIndex((r) => r.id === managing.id);
@@ -590,12 +591,12 @@ function ManageReportModal({
     .filter((a) => ratings[a.id])
     .map((a) => ({ attributeId: a.id, rating: ratings[a.id] }));
 
-  const handleSubmit = async (advance = false) => {
+  const handleSubmit = async () => {
     setIsSaving(true);
     setError('');
     try {
       await submitTerminalReport(report.id, { teacherRemark, teacherSignatureName, personalAttributeRatings: ratingsPayload() });
-      if (advance && onAdvance) onAdvance();
+      if (onAdvance) onAdvance();
       else onChanged();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to submit report.');
@@ -609,7 +610,8 @@ function ManageReportModal({
     setError('');
     try {
       await lockTerminalReport(report.id, { headteacherRemark, headteacherSignatureName, personalAttributeRatings: ratingsPayload() });
-      onChanged();
+      if (onAdvance) onAdvance();
+      else onChanged();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to lock report.');
     } finally {
@@ -751,16 +753,16 @@ function ManageReportModal({
       )}
 
       {!remarksLocked && (
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <button type="button" className="btn-secondary" onClick={() => handleSubmit(false)} disabled={isSaving}>
-            {isSaving ? 'Saving...' : 'Submit'}
-          </button>
-          {onAdvance && (
-            <button type="button" className="btn-primary" onClick={() => handleSubmit(true)} disabled={isSaving} title="Submit this report and open the next student in the list">
-              {isSaving ? 'Saving...' : 'Submit & Next'}
-            </button>
-          )}
-        </div>
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={handleSubmit}
+          disabled={isSaving}
+          style={{ marginBottom: 16 }}
+          title={onAdvance ? 'Submits this report and opens the next student in the list' : undefined}
+        >
+          {isSaving ? 'Saving...' : 'Submit'}
+        </button>
       )}
 
       {isAdmin && (
@@ -825,7 +827,13 @@ function ManageReportModal({
             {report.status === 'Submitted' && !showReject && (
               <>
                 <button type="button" className="btn-secondary" onClick={() => setShowReject(true)} disabled={isSaving}>Reject</button>
-                <button type="button" className="btn-primary" onClick={handleLock} disabled={isSaving}>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={handleLock}
+                  disabled={isSaving}
+                  title={onAdvance ? 'Locks this report and opens the next student in the list' : undefined}
+                >
                   {isSaving ? 'Locking...' : 'Lock (Approve)'}
                 </button>
               </>
