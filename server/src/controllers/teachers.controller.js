@@ -8,8 +8,11 @@ const { deleteWithCascade } = require('../services/cascadeDelete.service');
 const { createTeacherAccount } = require('../services/teacherEnrollment.service');
 const auditLog = require('../services/auditLog.service');
 
+// signatureUrl is excluded here — it's a base64 data URL now (see
+// uploadMySignature below), and this list can return every teacher in the
+// school at once, unlike getById's single record.
 const list = asyncHandler(async (req, res) => {
-  const teachers = await Teacher.find().populate('user', 'email status').sort({ firstName: 1 });
+  const teachers = await Teacher.find({}, '-signatureUrl').populate('user', 'email status').sort({ firstName: 1 });
   res.json({ success: true, data: teachers });
 });
 
@@ -115,12 +118,15 @@ const remove = asyncHandler(async (req, res, next) => {
 // homeroom teacher (see reportCardTemplate.service.js). Self only: scoped
 // to req.user.id, never a :id param, so a teacher can't touch another
 // teacher's record.
+// Stored as a data URL directly on the document (see upload.js's
+// createInMemoryImageUploader) rather than a file path, so it survives a
+// Render redeploy — Render's free/starter disk is ephemeral.
 const uploadMySignature = asyncHandler(async (req, res, next) => {
   if (!req.file) return next(new AppError('A signature image is required', 400));
 
-  const signatureUrl = `${req.protocol}://${req.get('host')}/uploads/signatures/${req.file.filename}`;
+  const signatureUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
   const teacher = await Teacher.findOneAndUpdate(
-    { userId: req.user.id },
+    { userId: req.user.id, schoolId: req.user.schoolId },
     { $set: { signatureUrl } },
     { new: true },
   );

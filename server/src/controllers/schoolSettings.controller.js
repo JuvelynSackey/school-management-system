@@ -40,14 +40,13 @@ const update = asyncHandler(async (req, res) => {
 });
 
 // POST /school-settings/logo — multipart, req.file populated by the
-// uploadLogo multer middleware before this handler runs.
+// uploadLogo multer middleware before this handler runs. Stored as a data
+// URL directly on the document (see upload.js's createInMemoryImageUploader)
+// rather than a file path, so it survives a Render redeploy.
 const uploadLogo = asyncHandler(async (req, res, next) => {
   if (!req.file) return next(new AppError('A logo file is required', 400));
 
-  // Absolute URL so the client never has to guess the API host, and so it
-  // can be re-fetched and base64-embedded into report-card PDFs later
-  // regardless of which origin generated the URL.
-  const logoUrl = `${req.protocol}://${req.get('host')}/uploads/logos/${req.file.filename}`;
+  const logoUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
 
   const settings = await SchoolSettings.findOneAndUpdate(
     { schoolId: req.user.schoolId },
@@ -63,13 +62,15 @@ const uploadLogo = asyncHandler(async (req, res, next) => {
 });
 
 // POST /school-settings/signature — multipart, req.file populated by the
-// uploadSignature multer middleware before this handler runs. Stored for
-// display/reference only — the report-card PDF still uses a typed name on
-// a signature line, it does not embed this image.
+// uploadSignature multer middleware before this handler runs. Embedded on
+// terminal report cards (see reportCardTemplate.service.js) next to the
+// typed headteacher name. Stored as a data URL directly on the document
+// (see upload.js's createInMemoryImageUploader) rather than a file path, so
+// it survives a Render redeploy.
 const uploadSignature = asyncHandler(async (req, res, next) => {
   if (!req.file) return next(new AppError('A signature image is required', 400));
 
-  const headteacherSignatureUrl = `${req.protocol}://${req.get('host')}/uploads/signatures/${req.file.filename}`;
+  const headteacherSignatureUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
 
   const settings = await SchoolSettings.findOneAndUpdate(
     { schoolId: req.user.schoolId },

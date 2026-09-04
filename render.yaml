@@ -11,12 +11,15 @@
 # deployment-specific values that don't belong committed to the repo.
 #
 # KNOWN LIMITATION — read before relying on file uploads in production:
-# server/uploads/ (school logos, student photos) is a local, EPHEMERAL disk
-# on Render's free/starter plans. A redeploy or restart wipes it. The `disk`
-# block below (commented out) is the fix, but it requires a paid instance
-# type — Render doesn't support persistent disks on the free tier. Until
-# either that's added or uploads move to something like S3/Cloudinary,
-# treat uploaded logos/photos as not-guaranteed-to-survive-a-redeploy.
+# server/uploads/ is a local, EPHEMERAL disk on Render's free/starter plans.
+# A redeploy or restart wipes it. School logos and signatures (school and
+# teacher) no longer live here — they're stored as base64 data URLs directly
+# in MongoDB (see upload.js's createInMemoryImageUploader), so they survive
+# every redeploy at no extra cost. Student photos are still disk-based (there
+# can be hundreds per school, so embedding them in Student documents would
+# bloat every roster query) — the `disk` block below (commented out) is the
+# fix for those, but it requires a paid instance type; until then, treat
+# uploaded student photos as not-guaranteed-to-survive-a-redeploy.
 services:
   - type: web
     name: jesmanage-api

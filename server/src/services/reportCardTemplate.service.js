@@ -103,6 +103,7 @@ const buildStudentPageHtml = ({
     </tr>
   `).join('');
 
+  const vacationDate = term.endDate || 'To be announced';
   const nextTermBegins = nextTerm?.startDate || 'To be announced';
   const totalAttendance = report.totalAttendance ?? 0;
   const outOfAttendance = report.outOfAttendance ?? 0;
@@ -147,7 +148,11 @@ const buildStudentPageHtml = ({
           </tr>
           <tr>
             ${showPositions ? `<td><strong>Roll Count:</strong> ${rollCount} Pupils</td>` : '<td></td>'}
-            <td><strong>Next Term Begins:</strong> ${nextTermBegins}</td>
+            <td><strong>Vacation Date:</strong> ${vacationDate}</td>
+          </tr>
+          <tr>
+            <td></td>
+            <td><strong>Reopening Date:</strong> ${nextTermBegins}</td>
           </tr>
           ${(report.student.category || report.student.programme) ? `
           <tr>

@@ -11,8 +11,15 @@ const MIME_BY_EXT = {
 // QR codes) sidesteps that entirely. Returns null if there's no image, or if
 // the file can't be read (e.g. it was uploaded then deleted) — templates
 // fall back to their existing text-only rendering in either case.
+//
+// Logo/signature uploads (upload.js's createInMemoryImageUploader) now store
+// a data URL directly rather than a /uploads/... path — nothing to read from
+// disk, so it's returned as-is. The disk-path branch below only still
+// matters for a value uploaded before that change, which stopped resolving
+// to a real file the moment Render's ephemeral disk was next wiped anyway.
 const getImageDataUrl = (fileUrl, uploadsSubdir) => {
   if (!fileUrl) return null;
+  if (fileUrl.startsWith('data:')) return fileUrl;
   try {
     const filename = fileUrl.split(`/uploads/${uploadsSubdir}/`)[1];
     if (!filename) return null;
