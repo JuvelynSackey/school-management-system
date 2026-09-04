@@ -32,6 +32,57 @@ const overallGrade = (averageScore, bands) => {
   return match ? match.grade : (sorted[sorted.length - 1]?.grade || 'F9');
 };
 
+// How many of this student's subjects fall into each grade band this term —
+// same best-to-worst label grouping gradingKeyLine uses, just counted
+// instead of just named. A fixed-size pie (unlike a bar chart with one row
+// per subject) keeps the report to one page regardless of how many subjects
+// a class carries.
+const gradeDistribution = (results, bands) => {
+  const labelByGrade = new Map(bands.map((b) => [b.grade, b.label]));
+  const orderedLabels = [];
+  const seen = new Set();
+  [...bands].sort((a, b) => b.min - a.min).forEach((b) => {
+    if (!seen.has(b.label)) { seen.add(b.label); orderedLabels.push(b.label); }
+  });
+  const counts = new Map(orderedLabels.map((label) => [label, 0]));
+  results.forEach((r) => {
+    const label = labelByGrade.get(r.grade);
+    if (label && counts.has(label)) counts.set(label, counts.get(label) + 1);
+  });
+  return orderedLabels.map((label) => ({ label, count: counts.get(label) })).filter((d) => d.count > 0);
+};
+
+const PIE_COLORS = ['#2f7d4f', '#5aa06d', '#f5c344', '#e0973c', '#d9534f', '#8b2f2f'];
+
+const buildPerformancePieChart = (results, bands) => {
+  const distribution = gradeDistribution(results, bands);
+  const total = distribution.reduce((sum, d) => sum + d.count, 0);
+  if (total === 0) return '';
+
+  let cursor = 0;
+  const stops = distribution.map((d, i) => {
+    const start = (cursor / total) * 100;
+    cursor += d.count;
+    const end = (cursor / total) * 100;
+    return `${PIE_COLORS[i % PIE_COLORS.length]} ${start.toFixed(2)}% ${end.toFixed(2)}%`;
+  }).join(', ');
+
+  const legend = distribution.map((d, i) => `
+    <div class="pie-legend-item">
+      <span class="pie-swatch" style="background:${PIE_COLORS[i % PIE_COLORS.length]}"></span>
+      <span>${d.label} (${d.count})</span>
+    </div>`).join('');
+
+  return `
+  <div class="chart-section">
+    <p class="chart-title">PERFORMANCE OVERVIEW</p>
+    <div class="pie-wrap">
+      <div class="pie-chart" style="background: conic-gradient(${stops});"></div>
+      <div class="pie-legend">${legend}</div>
+    </div>
+  </div>`;
+};
+
 const buildStudentPageHtml = ({
   school, classRow, term, nextTerm, report, results, totalPossible, rollCount, qrCodeDataUrl, scheme, attributeNameById, classTeacherSignatureUrl,
 }) => {
@@ -132,20 +183,7 @@ const buildStudentPageHtml = ({
         <div class="perf-item"><span>Subjects Passed</span><strong>${subjectsPassed} / ${results.length}</strong></div>
       </div>
 
-      ${school.performanceChartEnabled ? `
-      <div class="chart-section">
-        <p class="chart-title">PERFORMANCE OVERVIEW</p>
-        ${results.map((r) => {
-          const subjectMax = scheme.classScoreMax + scheme.examScoreMax;
-          const pct = subjectMax > 0 ? Math.min(100, (Number(r.totalScore) / subjectMax) * 100) : 0;
-          return `
-          <div class="chart-row">
-            <span class="chart-label">${(r.subject?.name || '').toUpperCase()}</span>
-            <div class="chart-track"><div class="chart-fill" style="width:${pct.toFixed(1)}%"></div></div>
-            <span class="chart-value">${Number(r.totalScore).toFixed(0)}</span>
-          </div>`;
-        }).join('')}
-      </div>` : ''}
+      ${school.performanceChartEnabled ? buildPerformancePieChart(results, scheme.bands) : ''}
 
       ${report.personalAttributeRatings?.length ? `
       <table class="attributes">
@@ -225,7 +263,7 @@ const buildReportCardsPdfHtml = ({
   * { box-sizing: border-box; }
   body { font-family: Arial, Helvetica, sans-serif; color: #1a1a1a; margin: 0; }
   .page {
-    position: relative; padding: 30px 36px; page-break-after: always;
+    position: relative; padding: 18px 34px; page-break-after: always;
     display: flex; flex-direction: column; min-height: 1060px;
   }
   .page:last-child { page-break-after: auto; }
@@ -238,71 +276,71 @@ const buildReportCardsPdfHtml = ({
     white-space: nowrap; pointer-events: none;
   }
 
-  .header { text-align: center; border-bottom: 4px solid #322c7c; padding-bottom: 14px; margin-bottom: 20px; }
-  .header .school-logo { width: 56px; height: 56px; object-fit: contain; margin-bottom: 6px; }
-  .header h1 { margin: 0; font-size: 28px; color: #322c7c; letter-spacing: 0.5px; }
-  .header .motto { margin: 4px 0; font-size: 13px; font-style: italic; color: #7c4a24; }
-  .header .contact { margin: 4px 0; font-size: 12px; color: #555; }
-  .header .title { font-weight: bold; font-size: 18px; letter-spacing: 2px; margin: 14px 0 4px; }
-  .header .subtitle { font-size: 13px; letter-spacing: 1px; color: #444; margin: 0; }
+  .header { text-align: center; border-bottom: 3px solid #322c7c; padding-bottom: 7px; margin-bottom: 10px; }
+  .header .school-logo { width: 44px; height: 44px; object-fit: contain; margin-bottom: 3px; }
+  .header h1 { margin: 0; font-size: 22px; color: #322c7c; letter-spacing: 0.5px; }
+  .header .motto { margin: 2px 0; font-size: 11.5px; font-style: italic; color: #7c4a24; }
+  .header .contact { margin: 2px 0; font-size: 10.5px; color: #555; }
+  .header .title { font-weight: bold; font-size: 15px; letter-spacing: 2px; margin: 6px 0 2px; }
+  .header .subtitle { font-size: 11.5px; letter-spacing: 1px; color: #444; margin: 0; }
 
-  .student-block { display: flex; align-items: center; gap: 20px; margin-bottom: 18px; }
+  .student-block { display: flex; align-items: center; gap: 16px; margin-bottom: 10px; }
   .avatar {
-    flex-shrink: 0; width: 64px; height: 64px; border-radius: 50%;
+    flex-shrink: 0; width: 50px; height: 50px; border-radius: 50%;
     background: rgba(50,44,124,0.1); color: #322c7c;
     display: flex; align-items: center; justify-content: center;
-    font-weight: 700; font-size: 20px;
+    font-weight: 700; font-size: 16px;
   }
-  table.info { width: 100%; border-collapse: collapse; font-size: 13px; }
-  table.info td { padding: 7px 10px; border: 1px solid #ddd; width: 50%; }
+  table.info { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.info td { padding: 5px 10px; border: 1px solid #ddd; width: 50%; }
 
-  table.attendance-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 18px; }
-  table.attendance-table th, table.attendance-table td { border: 1px solid #ccc; padding: 8px 8px; }
+  table.attendance-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 10px; }
+  table.attendance-table th, table.attendance-table td { border: 1px solid #ccc; padding: 5px 8px; }
   table.attendance-table th { background: #f4f3f8; }
   table.attendance-table td.center, table.attendance-table th { text-align: center; }
 
-  table.subjects { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 8px; }
-  table.subjects th, table.subjects td { border: 1px solid #ccc; padding: 9px 10px; }
+  table.subjects { width: 100%; border-collapse: collapse; font-size: 11.5px; margin-bottom: 5px; }
+  table.subjects th, table.subjects td { border: 1px solid #ccc; padding: 3px 8px; }
   table.subjects th { background: #322c7c; color: #fff; text-align: left; }
   table.subjects td.num { text-align: right; }
   table.subjects td.center { text-align: center; }
-  .grading-key { font-size: 11px; color: #555; margin: 0 0 20px; }
+  .grading-key { font-size: 10px; color: #555; margin: 0 0 10px; }
 
-  table.attributes { width: 60%; border-collapse: collapse; font-size: 12.5px; margin-bottom: 20px; }
-  table.attributes th, table.attributes td { border: 1px solid #ccc; padding: 7px 10px; text-align: left; }
+  table.attributes { width: 60%; border-collapse: collapse; font-size: 11.5px; margin-bottom: 10px; }
+  table.attributes th, table.attributes td { border: 1px solid #ccc; padding: 4px 9px; text-align: left; }
   table.attributes th { background: #f4f3f8; }
 
-  .performance-summary { display: flex; gap: 14px; margin-bottom: 20px; }
+  .performance-summary { display: flex; gap: 10px; margin-bottom: 10px; }
   .perf-item {
-    flex: 1; text-align: center; background: #f4f3f8; border-radius: 8px; padding: 16px 8px;
+    flex: 1; text-align: center; background: #f4f3f8; border-radius: 8px; padding: 8px 8px;
     border-top: 4px solid #f5c344;
   }
-  .perf-item span { display: block; font-size: 11px; color: #666; margin-bottom: 6px; }
-  .perf-item strong { font-size: 20px; color: #322c7c; }
+  .perf-item span { display: block; font-size: 10px; color: #666; margin-bottom: 3px; }
+  .perf-item strong { font-size: 16px; color: #322c7c; }
 
-  .chart-section { margin-bottom: 20px; }
-  .chart-title { font-size: 11.5px; font-weight: bold; color: #322c7c; letter-spacing: 0.5px; margin: 0 0 10px; }
-  .chart-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
-  .chart-label { width: 110px; flex-shrink: 0; font-size: 10.5px; color: #444; text-align: right; }
-  .chart-track { flex: 1; height: 14px; background: #eee; border-radius: 3px; overflow: hidden; }
-  .chart-fill { height: 100%; background: linear-gradient(90deg, #322c7c, #f5c344); border-radius: 3px; }
-  .chart-value { width: 28px; flex-shrink: 0; font-size: 10.5px; color: #322c7c; font-weight: bold; }
+  .chart-section { margin-bottom: 10px; }
+  .chart-title { font-size: 11px; font-weight: bold; color: #322c7c; letter-spacing: 0.5px; margin: 0 0 6px; }
+  .pie-wrap { display: flex; align-items: center; gap: 18px; }
+  .pie-chart { width: 68px; height: 68px; border-radius: 50%; flex-shrink: 0; }
+  .pie-legend { display: flex; flex-direction: column; gap: 3px; }
+  .pie-legend-item { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: #444; }
+  .pie-swatch { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
 
-  .remarks-box { border: 1px solid #ccc; border-radius: 6px; padding: 12px 14px; margin-bottom: 16px; min-height: 60px; }
-  .remarks-label { margin: 0 0 6px; font-size: 11.5px; font-weight: bold; color: #322c7c; letter-spacing: 0.5px; }
-  .remarks-text { margin: 0; font-size: 13px; font-style: italic; }
+  .remarks-box { border: 1px solid #ccc; border-radius: 6px; padding: 8px 14px; margin-bottom: 8px; min-height: 40px; }
+  .remarks-label { margin: 0 0 4px; font-size: 10.5px; font-weight: bold; color: #322c7c; letter-spacing: 0.5px; }
+  .remarks-text { margin: 0; font-size: 12px; font-style: italic; }
 
-  .signatures { display: flex; justify-content: space-between; gap: 60px; margin: 28px 0 20px; }
+  .signatures { display: flex; justify-content: space-between; gap: 60px; margin: 10px 0 6px; }
   .sig-block { flex: 1; text-align: center; }
-  .sig-line { border-bottom: 1px solid #333; height: 40px; display: flex; align-items: flex-end; justify-content: center; }
-  .sig-image { max-height: 36px; max-width: 160px; object-fit: contain; }
-  .sig-role { margin: 6px 0 0; font-size: 12px; font-weight: bold; }
-  .sig-name { margin: 2px 0; font-size: 12px; }
-  .sig-date { margin: 2px 0; font-size: 11px; color: #666; }
+  .sig-line { border-bottom: 1px solid #333; height: 28px; display: flex; align-items: flex-end; justify-content: center; }
+  .sig-image { max-height: 24px; max-width: 160px; object-fit: contain; }
+  .sig-role { margin: 3px 0 0; font-size: 11px; font-weight: bold; }
+  .sig-name { margin: 1px 0; font-size: 11px; }
+  .sig-date { margin: 1px 0; font-size: 10px; color: #666; }
 
   .footer {
-    display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #ddd; padding-top: 10px;
-    margin-top: auto; font-size: 10.5px; color: #777;
+    display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #ddd; padding-top: 6px;
+    margin-top: auto; font-size: 10px; color: #777;
   }
   .footer-verify { display: flex; align-items: center; gap: 6px; }
   .footer-verify .qr { width: 36px; height: 36px; }
