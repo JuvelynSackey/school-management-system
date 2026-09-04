@@ -822,7 +822,14 @@ function TodaysSchedule({ todaysExamSchedule }) {
 
 function TeacherDashboard({ data, user }) {
   const {
-    counts, overallAttendancePercent, pendingResultsCount, classCards, taskCenter, todaysExamSchedule, teachingResponsibilities, insights,
+    counts,
+    overallAttendancePercent = null,
+    pendingResultsCount = 0,
+    classCards = [],
+    taskCenter = { pendingMarksheets: [], overdueAttendanceClasses: [] },
+    todaysExamSchedule = [],
+    teachingResponsibilities,
+    insights,
   } = data;
   const navigate = useNavigate();
   const [unreadNoticeCount, setUnreadNoticeCount] = useState(0);
