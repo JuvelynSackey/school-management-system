@@ -3,7 +3,9 @@ import useApiResource from '../../hooks/useApiResource';
 import { listTerms, createTerm, updateTerm, deleteTerm } from '../../api/terms.api';
 import Modal from '../../components/common/Modal';
 
-const emptyForm = { name: '', academicYear: '', termNumber: 1, startDate: '', endDate: '', isCurrent: false };
+const emptyForm = {
+  name: '', academicYear: '', termNumber: 1, startDate: '', endDate: '', nextTermBegins: '', isCurrent: false,
+};
 
 export default function TermList() {
   const { data: terms, isLoading, error, reload } = useApiResource(listTerms);
@@ -20,6 +22,7 @@ export default function TermList() {
       termNumber: term.termNumber,
       startDate: term.startDate || '',
       endDate: term.endDate || '',
+      nextTermBegins: term.nextTermBegins || '',
       isCurrent: term.isCurrent,
     });
     setFormError('');
@@ -67,7 +70,7 @@ export default function TermList() {
           <table>
             <thead>
               <tr>
-                <th>Name</th><th>Academic Year</th><th>Term</th><th>Start</th><th>End</th><th>Status</th><th />
+                <th>Name</th><th>Academic Year</th><th>Term</th><th>Start</th><th>End (Vacation)</th><th>Next Term Begins (Reopening)</th><th>Status</th><th />
               </tr>
             </thead>
             <tbody>
@@ -78,6 +81,7 @@ export default function TermList() {
                   <td>{term.termNumber}</td>
                   <td>{term.startDate || '—'}</td>
                   <td>{term.endDate || '—'}</td>
+                  <td>{term.nextTermBegins || '—'}</td>
                   <td>{term.isCurrent ? <span className="badge badge-success">Current</span> : <span className="badge badge-neutral">Past/Future</span>}</td>
                   <td>
                     <div className="row-actions">
@@ -88,7 +92,7 @@ export default function TermList() {
                 </tr>
               ))}
               {terms.length === 0 && (
-                <tr><td colSpan={7} className="muted">No academic terms yet.</td></tr>
+                <tr><td colSpan={8} className="muted">No academic terms yet.</td></tr>
               )}
             </tbody>
           </table>
@@ -122,6 +126,13 @@ export default function TermList() {
             <label className="field">
               <span>End Date</span>
               <input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} />
+            </label>
+            <label className="field">
+              <span>Next Term Begins (Reopening Date)</span>
+              <input type="date" value={form.nextTermBegins} onChange={(e) => setForm({ ...form, nextTermBegins: e.target.value })} />
+              <p className="muted" style={{ fontSize: 11.5, marginTop: 4 }}>
+                Shown as the Reopening Date on this term&apos;s report cards — set it here as soon as it&apos;s known, even before the next term itself is created.
+              </p>
             </label>
             <label className="field" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <input type="checkbox" checked={form.isCurrent} onChange={(e) => setForm({ ...form, isCurrent: e.target.checked })} />

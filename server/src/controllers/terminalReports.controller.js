@@ -362,9 +362,13 @@ const buildClassPdfContext = async (req, { classId, academicTermId, studentIds }
   const term = await AcademicTerm.findById(academicTermId);
   if (!classRow || !term) throw new AppError('Class or term not found', 404);
 
-  const nextTerm = await AcademicTerm.findOne({
-    academicYear: term.academicYear, termNumber: term.termNumber + 1,
-  });
+  // An admin closing out this term usually already knows the reopening date
+  // well before the next AcademicTerm record itself gets created — prefer
+  // that explicit value over deriving one from a next-term record that may
+  // not exist yet.
+  const nextTerm = term.nextTermBegins
+    ? { startDate: term.nextTermBegins }
+    : await AcademicTerm.findOne({ academicYear: term.academicYear, termNumber: term.termNumber + 1 });
 
   const reportQuery = { classId, academicTermId };
   if (studentIds) reportQuery.studentId = { $in: studentIds };
@@ -537,7 +541,9 @@ const downloadStudentPdf = asyncHandler(async (req, res, next) => {
 
   const classRow = await Class.findById(report.classId);
   const term = await AcademicTerm.findById(report.academicTermId);
-  const nextTerm = await AcademicTerm.findOne({ academicYear: term.academicYear, termNumber: term.termNumber + 1 });
+  const nextTerm = term.nextTermBegins
+    ? { startDate: term.nextTermBegins }
+    : await AcademicTerm.findOne({ academicYear: term.academicYear, termNumber: term.termNumber + 1 });
 
   const results = await Result.find({
     studentId: report.studentId, classId: report.classId, academicTermId: report.academicTermId,

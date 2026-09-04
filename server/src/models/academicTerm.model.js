@@ -9,6 +9,13 @@ const academicTermSchema = new mongoose.Schema({
   termNumber: { type: Number, required: true },
   startDate: { type: String, default: null },
   endDate: { type: String, default: null },
+  // The reopening date for the NEXT term, set here rather than requiring
+  // that term to already exist — a school closing out this term usually
+  // already knows when it reopens, well before the next AcademicTerm record
+  // itself gets created. Report cards (reportCardTemplate.service.js) use
+  // this as the Reopening Date when set, falling back to the next term's own
+  // startDate (if that term already exists) otherwise.
+  nextTermBegins: { type: String, default: null },
   isCurrent: { type: Boolean, required: true, default: false },
 }, { timestamps: { createdAt: true, updatedAt: false } });
 
