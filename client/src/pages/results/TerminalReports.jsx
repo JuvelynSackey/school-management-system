@@ -152,6 +152,23 @@ export default function TerminalReports() {
   // rather than competitive class ranking -- see Class.showPositions.
   const selectedClass = classes.find((c) => String(c.id) === classId);
   const showPositions = selectedClass?.showPositions !== false;
+  const classTeacherName = selectedClass?.classTeacher
+    ? `${selectedClass.classTeacher.firstName} ${selectedClass.classTeacher.lastName}`
+    : '';
+
+  // "Submit & Next" (ManageReportModal) advances straight to the next row in
+  // the table instead of closing back to the list -- lets a homeroom teacher
+  // work through a whole class's remarks without reopening Manage each time.
+  const handleAdvance = () => {
+    const currentIndex = reports.findIndex((r) => r.id === managing.id);
+    if (currentIndex !== -1 && currentIndex < reports.length - 1) {
+      setManaging(reports[currentIndex + 1]);
+    } else {
+      setManaging(null);
+      setMessage('Saved. Reached the end of the list.');
+    }
+    load(); // refreshes table status badges in the background; doesn't affect which report is now open
+  };
 
   return (
     <div>
@@ -221,13 +238,16 @@ export default function TerminalReports() {
 
       {managing && (
         <ManageReportModal
+          key={managing.id}
           report={managing}
           isAdmin={isAdmin}
           isHomeroom={Boolean(access?.isHomeroom)}
           userFullName={user?.fullName}
+          classTeacherName={classTeacherName}
           headteacherDefaultName={headteacherDefaultName}
           onClose={() => setManaging(null)}
           onChanged={() => { setManaging(null); load(); }}
+          onAdvance={handleAdvance}
         />
       )}
 
@@ -490,11 +510,16 @@ function ReviewSheetModal({ sheet, onClose, onChanged }) {
 }
 
 function ManageReportModal({
-  report, isAdmin, isHomeroom, userFullName, headteacherDefaultName, onClose, onChanged,
+  report, isAdmin, isHomeroom, userFullName, classTeacherName, headteacherDefaultName, onClose, onChanged, onAdvance,
 }) {
   const canManageRemarks = isAdmin || isHomeroom;
   const [teacherRemark, setTeacherRemark] = useState(report.teacherRemark || '');
-  const [teacherSignatureName, setTeacherSignatureName] = useState(report.teacherSignatureName || userFullName || '');
+  // The class's actual assigned homeroom teacher outranks whoever is logged
+  // in as the default signature name — an admin submitting on a teacher's
+  // behalf shouldn't have their own name pre-filled in the teacher's slot.
+  const [teacherSignatureName, setTeacherSignatureName] = useState(
+    report.teacherSignatureName || classTeacherName || userFullName || '',
+  );
   const [headteacherRemark, setHeadteacherRemark] = useState(report.headteacherRemark || '');
   const [headteacherSignatureName, setHeadteacherSignatureName] = useState(
     report.headteacherSignatureName || headteacherDefaultName || userFullName || '',
@@ -565,12 +590,13 @@ function ManageReportModal({
     .filter((a) => ratings[a.id])
     .map((a) => ({ attributeId: a.id, rating: ratings[a.id] }));
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (advance = false) => {
     setIsSaving(true);
     setError('');
     try {
       await submitTerminalReport(report.id, { teacherRemark, teacherSignatureName, personalAttributeRatings: ratingsPayload() });
-      onChanged();
+      if (advance && onAdvance) onAdvance();
+      else onChanged();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to submit report.');
     } finally {
@@ -725,9 +751,16 @@ function ManageReportModal({
       )}
 
       {!remarksLocked && (
-        <button type="button" className="btn-secondary" onClick={handleSubmit} disabled={isSaving} style={{ marginBottom: 16 }}>
-          {isSaving ? 'Saving...' : 'Submit'}
-        </button>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          <button type="button" className="btn-secondary" onClick={() => handleSubmit(false)} disabled={isSaving}>
+            {isSaving ? 'Saving...' : 'Submit'}
+          </button>
+          {onAdvance && (
+            <button type="button" className="btn-primary" onClick={() => handleSubmit(true)} disabled={isSaving} title="Submit this report and open the next student in the list">
+              {isSaving ? 'Saving...' : 'Submit & Next'}
+            </button>
+          )}
+        </div>
       )}
 
       {isAdmin && (
