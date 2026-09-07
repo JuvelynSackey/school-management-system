@@ -163,10 +163,12 @@ export default function TerminalReports() {
   const handleAdvance = () => {
     const currentIndex = reports.findIndex((r) => r.id === managing.id);
     if (currentIndex !== -1 && currentIndex < reports.length - 1) {
-      setManaging(reports[currentIndex + 1]);
+      const next = reports[currentIndex + 1];
+      setManaging(next);
+      setMessage(`Saved. Moved to ${next.student?.firstName} ${next.student?.lastName}.`);
     } else {
       setManaging(null);
-      setMessage('Saved. Reached the end of the list.');
+      setMessage('Saved. End of class roster.');
     }
     load(); // refreshes table status badges in the background; doesn't affect which report is now open
   };

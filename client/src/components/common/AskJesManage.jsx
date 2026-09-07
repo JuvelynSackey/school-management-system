@@ -256,7 +256,10 @@ export default function AskJesManage({ onClose, initialQuestion }) {
   const showInspector = isAdmin && result?.inspector;
 
   return (
-    <Modal title="Ask JesManage" onClose={onClose} wide={isAdmin && inspectorMode}>
+    <Modal title="💬 Chatbot" subtitle="JesManage Intelligence" onClose={onClose} wide={isAdmin && inspectorMode}>
+      {!result && !error && (
+        <p style={{ fontSize: 14, marginBottom: 14 }}>👋 How can I help you?</p>
+      )}
       <form onSubmit={handleAsk}>
         <label className="field">
           <span>Ask a question about fees, results, or attendance</span>

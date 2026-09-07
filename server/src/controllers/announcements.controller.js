@@ -184,6 +184,22 @@ const markRead = asyncHandler(async (req, res, next) => {
   res.json({ success: true, data: { isRead: true } });
 });
 
+// POST /announcements/mark-all-read — same recipient-matching as
+// getMyNoticeBoard/unreadCount, applied to every not-yet-read notice at
+// once instead of one id at a time.
+const markAllRead = asyncHandler(async (req, res, next) => {
+  const match = await resolveNoticeBoardMatchForRole(req.user);
+  if (match === undefined) return next(new AppError('Admins should use the full announcement history instead', 400));
+  if (match === null) return res.json({ success: true, data: { marked: 0 } });
+
+  const result = await Announcement.updateMany(
+    { ...match, sentAt: { $ne: null }, 'readBy.userId': { $ne: req.user.id } },
+    { $push: { readBy: { userId: req.user.id, readAt: new Date() } } },
+  );
+
+  res.json({ success: true, data: { marked: result.modifiedCount } });
+});
+
 module.exports = {
-  create, list, remove, getMyNoticeBoard, getBanner, unreadCount, markRead, dispatchAnnouncement,
+  create, list, remove, getMyNoticeBoard, getBanner, unreadCount, markRead, markAllRead, dispatchAnnouncement,
 };

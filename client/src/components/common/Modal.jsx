@@ -6,7 +6,7 @@ import { useEffect } from 'react';
 // lifecycle, restoring the previous overflow value (not a hardcoded
 // 'unset') in case something else on the page already set one.
 export default function Modal({
-  title, onClose, children, wide = false,
+  title, subtitle, onClose, children, wide = false,
 }) {
   useEffect(() => {
     // <html>, not <body>, is this app's actual scrolling element -- body
@@ -28,7 +28,10 @@ export default function Modal({
     <div className="modal-overlay" onClick={onClose}>
       <div className={`modal-card${wide ? ' modal-card--wide' : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>{title}</h2>
+          <div>
+            <h2>{title}</h2>
+            {subtitle && <p className="modal-subtitle">{subtitle}</p>}
+          </div>
           <button type="button" className="modal-close" onClick={onClose} aria-label="Close">×</button>
         </div>
         <div className="modal-body">{children}</div>

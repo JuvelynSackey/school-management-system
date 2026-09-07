@@ -5,5 +5,6 @@ export const getMyNoticeBoard = () => apiClient.get('/announcements/me').then((r
 export const getAnnouncementBanner = () => apiClient.get('/announcements/banner').then((res) => res.data.data);
 export const getUnreadAnnouncementCount = () => apiClient.get('/announcements/unread-count').then((res) => res.data.data.count);
 export const markAnnouncementRead = (id) => apiClient.post(`/announcements/${id}/read`).then((res) => res.data.data);
+export const markAllAnnouncementsRead = () => apiClient.post('/announcements/mark-all-read').then((res) => res.data.data);
 export const createAnnouncement = (payload) => apiClient.post('/announcements', payload).then((res) => res.data.data);
 export const deleteAnnouncement = (id) => apiClient.delete(`/announcements/${id}`).then((res) => res.data.data);

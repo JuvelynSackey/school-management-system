@@ -12,6 +12,7 @@ router.use(authenticate);
 router.get('/me', authorize('teacher', 'student', 'parent'), controller.getMyNoticeBoard);
 router.get('/banner', authorize('teacher', 'student', 'parent'), controller.getBanner);
 router.get('/unread-count', authorize('teacher', 'student', 'parent'), controller.unreadCount);
+router.post('/mark-all-read', authorize('teacher', 'student', 'parent'), controller.markAllRead);
 router.post('/:id/read', authorize('teacher', 'student', 'parent'), controller.markRead);
 router.get('/', authorize('admin'), listValidator, validate, controller.list);
 router.post('/', authorize('admin'), createValidator, validate, controller.create);

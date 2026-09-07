@@ -2,11 +2,42 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
-  getMyNoticeBoard, getUnreadAnnouncementCount, markAnnouncementRead, listAnnouncements,
+  getMyNoticeBoard, getUnreadAnnouncementCount, markAnnouncementRead, markAllAnnouncementsRead, listAnnouncements,
 } from '../../api/announcements.api';
 
 const RECIPIENT_ROLES = ['teacher', 'student', 'parent'];
 const MAX_ITEMS = 8;
+
+const isToday = (dateStr) => {
+  if (!dateStr) return false;
+  return new Date(dateStr).toDateString() === new Date().toDateString();
+};
+
+// Splits the already-fetched, already-newest-first items into three
+// non-overlapping buckets. There's no dedicated "system" category in the
+// Announcement model (general/fee_reminder/academic) -- System here is just
+// "the rest": general, fee_reminder, and any non-today academic notice.
+// Today takes priority over category since recency is the more useful
+// signal for something that just happened.
+const categorize = (items) => {
+  const today = [];
+  const academic = [];
+  const system = [];
+  items.forEach((a) => {
+    if (isToday(a.createdAt)) today.push(a);
+    else if (a.category === 'academic') academic.push(a);
+    else system.push(a);
+  });
+  return [
+    { key: 'today', label: 'Today', items: today },
+    { key: 'academic', label: 'Academic', items: academic },
+    { key: 'system', label: 'System', items: system },
+  ].filter((section) => section.items.length > 0);
+};
+
+const actionForItem = (a) => (a.category === 'fee_reminder'
+  ? { label: 'View Fees', to: '/fees' }
+  : { label: 'View Notice', to: '/announcements' });
 
 // Built on the existing per-user Announcement endpoints — this app has no
 // separate Notification model, so "notifications" here means the same data
@@ -74,7 +105,19 @@ export default function NotificationBell() {
     }
   };
 
+  const handleMarkAllRead = async () => {
+    setItems((prev) => prev.map((a) => ({ ...a, isRead: true })));
+    setUnreadCount(0);
+    try {
+      await markAllAnnouncementsRead();
+    } catch {
+      load();
+    }
+  };
+
   if (!isAdmin && !isRecipient) return null;
+
+  const sections = categorize(items);
 
   return (
     <div className="notification-bell" ref={wrapRef}>
@@ -89,19 +132,36 @@ export default function NotificationBell() {
         <div className="notification-dropdown">
           <div className="notification-dropdown-header">
             <span>{isAdmin ? 'Recent Announcements' : 'Notifications'}</span>
-            <Link to="/announcements" className="link-btn" onClick={() => setOpen(false)}>View All</Link>
+            <div style={{ display: 'flex', gap: 10 }}>
+              {!isAdmin && unreadCount > 0 && (
+                <button type="button" className="link-btn" onClick={handleMarkAllRead}>Mark all as read</button>
+              )}
+              <Link to="/announcements" className="link-btn" onClick={() => setOpen(false)}>View All</Link>
+            </div>
           </div>
           {isLoading && <p className="muted" style={{ padding: 12 }}>Loading...</p>}
           {!isLoading && items.length === 0 && <p className="muted" style={{ padding: 12 }}>Nothing here yet.</p>}
-          {!isLoading && items.map((a) => (
-            <div key={a.id} className={`notification-dropdown-item${a.isRead === false ? ' is-unread' : ''}`}>
-              <p className="notification-dropdown-message">{a.message}</p>
-              <div className="notification-dropdown-meta">
-                <span className="muted">{a.createdAt ? new Date(a.createdAt).toLocaleDateString() : ''}</span>
-                {!isAdmin && a.isRead === false && (
-                  <button type="button" className="link-btn" onClick={() => handleMarkRead(a.id)}>Mark as read</button>
-                )}
-              </div>
+          {!isLoading && sections.map((section) => (
+            <div key={section.key}>
+              <p className="notification-section-header">{section.label}</p>
+              {section.items.map((a) => {
+                const action = actionForItem(a);
+                return (
+                  <div key={a.id} className={`notification-dropdown-item${a.isRead === false ? ' is-unread' : ''}`}>
+                    {a.priority === 'urgent' && <span className="badge badge-danger" style={{ marginBottom: 6 }}>Urgent</span>}
+                    <p className="notification-dropdown-message">{a.message}</p>
+                    <div className="notification-dropdown-meta">
+                      <span className="muted">{a.createdAt ? new Date(a.createdAt).toLocaleDateString() : ''}</span>
+                      <div style={{ display: 'flex', gap: 10 }}>
+                        <Link to={action.to} className="link-btn" onClick={() => setOpen(false)}>{action.label}</Link>
+                        {!isAdmin && a.isRead === false && (
+                          <button type="button" className="link-btn" onClick={() => handleMarkRead(a.id)}>Mark as read</button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ))}
         </div>

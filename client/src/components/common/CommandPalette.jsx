@@ -47,7 +47,7 @@ export default function CommandPalette({ navItems, enableAI, onAskJesManage }) {
     : navItems;
   const results = [
     ...navMatches.map((item) => ({ type: 'nav', key: item.to, label: item.label, to: item.to })),
-    ...(enableAI && trimmed ? [{ type: 'ask', key: 'ask', label: `Ask JesManage: "${trimmed}"` }] : []),
+    ...(enableAI && trimmed ? [{ type: 'ask', key: 'ask', label: `Ask Chatbot: "${trimmed}"` }] : []),
   ];
 
   const close = () => setIsOpen(false);
