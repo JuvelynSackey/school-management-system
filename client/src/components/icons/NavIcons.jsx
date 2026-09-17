@@ -100,6 +100,13 @@ export const NAV_ICONS = {
       <path d="M8 11h8M8 15h8M8 7h4" />
     </svg>
   ),
+  questionBank: (
+    <svg {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2 1.75-2 3.25" />
+      <path d="M12 16.5h.01" />
+    </svg>
+  ),
   fees: (
     <svg {...props}>
       <rect x="2.5" y="6" width="19" height="13" rx="2.5" />
