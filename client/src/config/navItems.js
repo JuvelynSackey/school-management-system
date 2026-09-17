@@ -23,6 +23,7 @@ export const NAV_ITEMS = [
   { to: '/exam-timetable', label: 'Exam Timetable', roles: ['admin', 'teacher', 'student', 'parent'], group: 'ACADEMICS', icon: 'timetable' },
   { to: '/results', label: 'Results', roles: ['admin', 'teacher', 'student'], group: 'ACADEMICS', icon: 'results' },
   { to: '/question-bank', label: 'Question Bank', roles: ['admin', 'teacher'], group: 'ACADEMICS', icon: 'questionBank' },
+  { to: '/assessments', label: 'Assessments', roles: ['admin', 'teacher'], group: 'ACADEMICS', icon: 'assessment' },
   { to: '/assessment-sheets', label: 'Assessment Sheets', roles: ['admin'], group: 'ACADEMICS', icon: 'assessment' },
   { to: '/fees', label: 'Fees', roles: ['admin', 'student'], group: 'FINANCE', icon: 'fees' },
   { to: '/fee-structures', label: 'Fee Structures', roles: ['admin'], group: 'FINANCE', icon: 'feeStructures' },

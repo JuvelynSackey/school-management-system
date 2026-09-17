@@ -39,6 +39,7 @@ import ExamTimetable from '../pages/examSchedule/ExamTimetable';
 import Intelligence from '../pages/intelligence/Intelligence';
 import Parents from '../pages/parents/Parents';
 import QuestionBank from '../pages/questionBank/QuestionBank';
+import Assessments from '../pages/assessments/Assessments';
 import IDCards from '../pages/idCards/IDCards';
 import Unauthorized from '../pages/errors/Unauthorized';
 import NotFound from '../pages/errors/NotFound';
@@ -102,6 +103,7 @@ export default function AppRoutes() {
             <Route path="/parents" element={<Parents />} />
             <Route path="/terminal-reports" element={<TerminalReports />} />
             <Route path="/question-bank" element={<QuestionBank />} />
+            <Route path="/assessments" element={<Assessments />} />
           </Route>
 
           <Route element={<RoleRoute roles={['admin', 'teacher', 'parent']} />}>
