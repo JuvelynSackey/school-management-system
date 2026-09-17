@@ -1,5 +1,5 @@
 const {
-  Assessment, Teacher, Subject, Class, AcademicTerm, Question,
+  Assessment, Teacher, Subject, Class, AcademicTerm, Question, Student,
 } = require('../models');
 const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/AppError');
@@ -30,6 +30,18 @@ const assertQuestionsExist = async (questionIds) => {
   const count = await Question.countDocuments({ _id: { $in: questionIds } });
   if (count !== questionIds.length) throw new AppError('One or more selected questions could not be found', 400);
 };
+
+// GET /assessments/published-for-me (student) -- there's no student-facing
+// equivalent of the admin/teacher list() below (that route is authorize
+// admin/teacher only), so a student needs their own way to see what's
+// actually available to them: Published, and for their own class.
+const listPublishedForMe = asyncHandler(async (req, res, next) => {
+  const student = await Student.findOne({ userId: req.user.id });
+  if (!student) return next(new AppError('Student profile not found', 404));
+
+  const assessments = await populateForDisplay(Assessment.find({ classId: student.classId, status: 'Published' })).sort({ createdAt: -1 });
+  res.json({ success: true, data: assessments });
+});
 
 // GET /assessments?classId=&subjectId=&academicTermId=&status=
 const list = asyncHandler(async (req, res) => {
@@ -143,5 +155,5 @@ const remove = asyncHandler(async (req, res, next) => {
 });
 
 module.exports = {
-  list, getById, create, update, remove,
+  list, listPublishedForMe, getById, create, update, remove,
 };

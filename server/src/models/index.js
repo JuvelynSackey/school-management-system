@@ -30,6 +30,7 @@ const PersonalAttribute = require('./personalAttribute.model');
 const ExamSchedule = require('./examSchedule.model');
 const Question = require('./question.model');
 const Assessment = require('./assessment.model');
+const AssessmentAttempt = require('./assessmentAttempt.model');
 
 // Relationships now live in-schema as `ref` fields (see each *.model.js);
 // there's no separate association-wiring step the way Sequelize needed.
@@ -65,4 +66,5 @@ module.exports = {
   ExamSchedule,
   Question,
   Assessment,
+  AssessmentAttempt,
 };
