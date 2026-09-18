@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import useApiResource from '../../hooks/useApiResource';
 import {
   listAssessments, createAssessment, updateAssessment, deleteAssessment,
@@ -86,6 +87,7 @@ const buildPayload = (form, status) => ({
 });
 
 export default function AssessmentBuilder() {
+  const navigate = useNavigate();
   const [subjects, setSubjects] = useState([]);
   const [classes, setClasses] = useState([]);
   const [terms, setTerms] = useState([]);
@@ -232,6 +234,9 @@ export default function AssessmentBuilder() {
                   <td>
                     <div className="row-actions">
                       <button type="button" className="link-btn" onClick={() => openEdit(a)}>Edit</button>
+                      {a.status !== 'Draft' && (
+                        <button type="button" className="link-btn" onClick={() => navigate(`/assessments/${a.id}/grade`)}>Review Submissions</button>
+                      )}
                       <button type="button" className="link-btn danger" onClick={() => handleDelete(a)}>Delete</button>
                     </div>
                   </td>

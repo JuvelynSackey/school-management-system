@@ -6,5 +6,6 @@ export const saveAnswer = (attemptId, questionId, response) => apiClient
   .put(`/attempts/${attemptId}/answer`, { questionId, response })
   .then((res) => res.data.data);
 export const submitAttempt = (attemptId) => apiClient.post(`/attempts/${attemptId}/submit`).then((res) => res.data.data);
+export const gradeAttempt = (attemptId, grades) => apiClient.post(`/attempts/${attemptId}/grade`, { grades }).then((res) => res.data.data);
 export const releaseAttempt = (attemptId) => apiClient.post(`/attempts/${attemptId}/release`).then((res) => res.data.data);
 export const listAttemptsForAssessment = (assessmentId) => apiClient.get(`/assessments/${assessmentId}/attempts`).then((res) => res.data.data);

@@ -95,7 +95,7 @@ const finalizeSubmission = async (attempt, assessment) => {
 
   attempt.answers = gradedAnswers;
   attempt.autoScore = autoScore;
-  attempt.totalScore = autoScore; // no manual-grading contribution exists yet (later phase)
+  attempt.totalScore = autoScore; // no manual-grading marks exist yet at this point -- gradeManualAnswers() adds them later
   attempt.totalPossibleMarks = totalPossibleMarks;
   attempt.submittedAt = new Date();
   attempt.status = needsManualGrading ? 'AwaitingReview' : 'Graded';
@@ -208,6 +208,58 @@ const submit = asyncHandler(async (req, res, next) => {
   res.json({ success: true, data: await buildStudentAttemptResponse(attempt, assessment) });
 });
 
+// POST /attempts/:id/grade { grades: [{ questionId, marksAwarded }] } (teacher/admin)
+// Bulk -- one save covers every manually-gradable answer on this attempt a
+// teacher is reviewing right now, rather than one request per question.
+const gradeManualAnswers = asyncHandler(async (req, res, next) => {
+  const attempt = await AssessmentAttempt.findById(req.params.id);
+  if (!attempt) return next(new AppError('Attempt not found', 404));
+  const assessment = await Assessment.findById(attempt.assessmentId);
+  if (!assessment) return next(new AppError('Assessment not found', 404));
+  if (!(await assertCanManageAssessment(req, assessment, next))) return;
+  if (attempt.status !== 'AwaitingReview' && attempt.status !== 'Graded') {
+    return next(new AppError('This attempt has not been submitted yet', 400));
+  }
+
+  const questions = await Question.find({ _id: { $in: attempt.questionOrder } });
+  const questionsById = new Map(questions.map((q) => [q.id, q]));
+
+  const { grades } = req.body;
+  for (const grade of grades) {
+    const answer = attempt.answers.find((a) => a.questionId.toString() === grade.questionId);
+    // Silently skips anything that isn't actually a manually-gradable answer
+    // on THIS attempt -- an auto-graded answer's marksAwarded is never
+    // touched by this endpoint, even if the client mistakenly includes one.
+    if (!answer || !answer.needsManualGrading) continue;
+    const question = questionsById.get(grade.questionId);
+    if (!question) continue;
+    if (Number(grade.marksAwarded) > question.marks) {
+      return next(new AppError(`Marks awarded for "${question.topic}" cannot exceed ${question.marks}`, 400));
+    }
+    answer.marksAwarded = Number(grade.marksAwarded);
+  }
+
+  const manualAnswers = attempt.answers.filter((a) => a.needsManualGrading);
+  const allManualGraded = manualAnswers.every((a) => a.marksAwarded !== null);
+  const manualTotal = manualAnswers.reduce((sum, a) => sum + (a.marksAwarded || 0), 0);
+  attempt.totalScore = (attempt.autoScore || 0) + manualTotal;
+
+  if (allManualGraded) {
+    attempt.status = 'Graded';
+    if (assessment.resultRelease === 'immediately' && !attempt.resultReleasedAt) {
+      attempt.resultReleasedAt = new Date();
+    }
+  }
+
+  await attempt.save();
+  res.json({
+    success: true,
+    data: {
+      status: attempt.status, totalScore: attempt.totalScore, totalPossibleMarks: attempt.totalPossibleMarks, released: Boolean(attempt.resultReleasedAt),
+    },
+  });
+});
+
 // POST /attempts/:id/release (teacher/admin)
 const release = asyncHandler(async (req, res, next) => {
   const attempt = await AssessmentAttempt.findById(req.params.id);
@@ -235,5 +287,5 @@ const listForAssessment = asyncHandler(async (req, res, next) => {
 });
 
 module.exports = {
-  startAttempt, getMyAttempt, saveAnswer, submit, release, listForAssessment,
+  startAttempt, getMyAttempt, saveAnswer, submit, gradeManualAnswers, release, listForAssessment,
 };

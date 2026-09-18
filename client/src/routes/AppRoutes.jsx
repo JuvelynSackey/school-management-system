@@ -41,6 +41,7 @@ import Parents from '../pages/parents/Parents';
 import QuestionBank from '../pages/questionBank/QuestionBank';
 import Assessments from '../pages/assessments/Assessments';
 import TakeAssessment from '../pages/assessments/TakeAssessment';
+import GradeSubmissions from '../pages/assessments/GradeSubmissions';
 import IDCards from '../pages/idCards/IDCards';
 import Unauthorized from '../pages/errors/Unauthorized';
 import NotFound from '../pages/errors/NotFound';
@@ -104,6 +105,7 @@ export default function AppRoutes() {
             <Route path="/parents" element={<Parents />} />
             <Route path="/terminal-reports" element={<TerminalReports />} />
             <Route path="/question-bank" element={<QuestionBank />} />
+            <Route path="/assessments/:id/grade" element={<GradeSubmissions />} />
           </Route>
 
           <Route element={<RoleRoute roles={['admin', 'teacher', 'student']} />}>
